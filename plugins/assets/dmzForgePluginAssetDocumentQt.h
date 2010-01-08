@@ -41,6 +41,8 @@ namespace dmz {
             const Data *InData,
             Data *outData);
 
+         void closeEvent (QCloseEvent *);
+
       protected slots:
          void on_buttonBox_accepted ();
          void on_buttonBox_rejected ();
@@ -61,6 +63,8 @@ namespace dmz {
          Message _processMsg;
          Message _finishedMsg;
          DataConverterString _converter;
+
+         Boolean _saveInfo;
 
       private:
          ForgePluginAssetDocumentQt ();

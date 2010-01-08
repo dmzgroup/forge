@@ -1,5 +1,6 @@
 {
 "name":"Foo Model",
 "brief":"This a model of a foo",
-"details":"This is a multi-line details.\nIsn't that cool?"
+"details":"This is a multi-line details.\nIsn't that cool?",
+"keywords":["red", "fast", "fourwheel"]
 }

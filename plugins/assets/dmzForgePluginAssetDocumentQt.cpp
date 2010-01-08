@@ -1,11 +1,25 @@
 #include "dmzForgePluginAssetDocumentQt.h"
 #include <dmzFoundationConfigFileIO.h>
+#include <dmzFoundationJSONUtil.h>
 #include <dmzQtUtil.h>
 #include <dmzSystemFile.h>
+#include <dmzSystemStreamString.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzRuntimeSession.h>
+#include <dmzTypesStringTokenizer.h>
+#include <dmzTypesStringUtil.h>
+
+namespace {
+
+static const dmz::String LocalName ("name");
+static const dmz::String LocalBrief ("brief");
+static const dmz::String LocalDetails ("details");
+static const dmz::String LocalKeywords ("keywords");
+static const dmz::String LocalValue ("value");
+
+};
 
 dmz::ForgePluginAssetDocumentQt::ForgePluginAssetDocumentQt (
       const PluginInfo &Info,
@@ -13,7 +27,8 @@ dmz::ForgePluginAssetDocumentQt::ForgePluginAssetDocumentQt (
       Plugin (Info),
       MessageObserver (Info),
       _log (Info),
-      _converter (Info) {
+      _converter (Info),
+      _saveInfo (False) {
 
    _ui.setupUi (this);
 
@@ -45,6 +60,11 @@ dmz::ForgePluginAssetDocumentQt::update_plugin_state (
    }
    else if (State == PluginStateShutdown) {
 
+      Config session (get_plugin_name ());
+
+      session.add_config (qbytearray_to_config ("geometry", saveGeometry ()));
+
+      set_session_config (get_plugin_runtime_context (), session);
    }
 }
 
@@ -91,15 +111,56 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
 void
 dmz::ForgePluginAssetDocumentQt::on_buttonBox_accepted () {
 
-   hide ();
-   _finishedMsg.send ();
+   _saveInfo = True;
+   close ();
 }
 
 
 void
 dmz::ForgePluginAssetDocumentQt::on_buttonBox_rejected () {
 
-   hide ();
+   _saveInfo = False;
+   close ();
+}
+
+
+void
+dmz::ForgePluginAssetDocumentQt::closeEvent (QCloseEvent *) {
+
+   if (_saveInfo) {
+
+      _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
+      _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
+
+      _currentConfig.store_attribute (
+         LocalDetails,
+         qPrintable (_ui.detailsEdit->toPlainText ()));
+
+      const String Keywords = qPrintable (_ui.keywordEdit->text ());
+
+      StringTokenizer stz (Keywords, ',');
+      Boolean first = True;
+      String value;
+
+      while (stz.get_next (value)) {
+
+         trim_ascii_white_space (value);
+
+         Config data (LocalKeywords);
+         data.store_attribute (LocalValue, value);
+
+         if (first) { _currentConfig.overwrite_config (data); first = False; }
+         else { _currentConfig.add_config (data); }
+      }
+
+      String outStr;
+      StreamString out (outStr);
+      format_config_to_json (_currentConfig, out, ConfigStripGlobal | ConfigPrettyPrint, &_log);
+
+_log.error << outStr << endl;
+   }
+
+   _saveInfo = False;
    _finishedMsg.send ();
 }
 
@@ -118,12 +179,33 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
 _log.warn << _currentConfig << endl;
 
-   const String Name = config_to_string ("name", _currentConfig, "");
+   const String Name = config_to_string (LocalName, _currentConfig, "");
    _ui.nameEdit->setText (Name.get_buffer ());
-   const String Brief = config_to_string ("brief", _currentConfig, "");
+   const String Brief = config_to_string (LocalBrief, _currentConfig, "");
    _ui.briefEdit->setText (Brief.get_buffer ());
-   const String Details = config_to_string ("details", _currentConfig, "");
+   const String Details = config_to_string (LocalDetails, _currentConfig, "");
    _ui.detailsEdit->setPlainText (Details.get_buffer ());
+   Config keywordList;
+   String keywords;
+
+   if (_currentConfig.lookup_all_config (LocalKeywords, keywordList)) {
+
+      ConfigIterator it;
+      Config word;
+
+      while (keywordList.get_next_config (it, word)) {
+
+         const String Value = config_to_string (LocalValue, word);
+
+         if (Value) {
+
+            if (keywords) { keywords << ", ";}
+            keywords << Value;
+         }
+      }
+
+      _ui.keywordEdit->setText (keywords.get_buffer ());
+   }
 }
 
 
@@ -140,7 +222,7 @@ dmz::ForgePluginAssetDocumentQt::_init (Config &local) {
    _processMsg = config_create_message (
       "process-file-message.name",
       local,
-      "ProcessFileMessage",
+      "Process_File_Message",
       get_plugin_runtime_context ());
 
    subscribe_to_message (_processMsg);
@@ -148,7 +230,7 @@ dmz::ForgePluginAssetDocumentQt::_init (Config &local) {
    _finishedMsg = config_create_message (
       "finished-processing-file-message.name",
       local,
-      "FinishedProcessingFileMessage",
+      "Finished_Processing_File_Message",
       get_plugin_runtime_context ());
 }
 
