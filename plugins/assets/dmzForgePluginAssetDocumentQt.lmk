@@ -1,0 +1,12 @@
+require "lmkQt"
+lmkQt.set_name "dmzForgePluginAssetDocumentQt"
+lmk.set_type "plugin"
+lmk.add_files {"AssetDocument.ui",}
+lmk.add_files ({"dmzForgePluginAssetDocumentQt.h",}, {src="moc",})
+lmk.add_files {"dmzForgePluginAssetDocumentQt.cpp",}
+lmk.add_libs {
+   "dmzQtUtil",
+   "dmzFoundation",
+   "dmzKernel",
+}
+lmkQt.add_libs {"QtCore", "QtGui",}
