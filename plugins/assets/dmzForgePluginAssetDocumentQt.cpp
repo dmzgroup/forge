@@ -118,11 +118,11 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
 _log.warn << _currentConfig << endl;
 
-   const String Name = config_to_string ("dmz.name", _currentConfig, "");
+   const String Name = config_to_string ("name", _currentConfig, "");
    _ui.nameEdit->setText (Name.get_buffer ());
-   const String Brief = config_to_string ("dmz.brief", _currentConfig, "");
+   const String Brief = config_to_string ("brief", _currentConfig, "");
    _ui.briefEdit->setText (Brief.get_buffer ());
-   const String Details = config_to_string ("dmz.details", _currentConfig, "");
+   const String Details = config_to_string ("details", _currentConfig, "");
    _ui.detailsEdit->setPlainText (Details.get_buffer ());
 }
 
