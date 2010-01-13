@@ -6,6 +6,7 @@
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzRuntimeTimeSlice.h>
 
 #include <QtGui/QWidget>
 
@@ -16,6 +17,7 @@ namespace dmz {
    class ForgePluginAssetDocumentQt :
          public QWidget,
          public Plugin,
+         public TimeSlice,
          public MessageObserver {
 
       Q_OBJECT
@@ -33,6 +35,9 @@ namespace dmz {
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
 
+         // Time Slice Interface
+         virtual void update_time_slice (const Float64 TimeDelta);
+
          // Message Observer Interface
          virtual void receive_message (
             const Message &Type,
@@ -48,12 +53,15 @@ namespace dmz {
          void on_buttonBox_rejected ();
 
       protected:
+         void _save_info ();
          void _init_ui (const String &FileName);
          void _init (Config &local);
 
          Log _log;
 
          Ui::AssetForm _ui;
+
+         Boolean _finished;
 
          String _currentConfigFile;
          Config _currentConfig;
@@ -63,8 +71,6 @@ namespace dmz {
          Message _processMsg;
          Message _finishedMsg;
          DataConverterString _converter;
-
-         Boolean _saveInfo;
 
       private:
          ForgePluginAssetDocumentQt ();

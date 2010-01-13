@@ -25,10 +25,11 @@ dmz::ForgePluginAssetDocumentQt::ForgePluginAssetDocumentQt (
       const PluginInfo &Info,
       Config &local) :
       Plugin (Info),
+      TimeSlice (Info),
       MessageObserver (Info),
       _log (Info),
       _converter (Info),
-      _saveInfo (False) {
+      _finished (False) {
 
    _ui.setupUi (this);
 
@@ -83,6 +84,17 @@ dmz::ForgePluginAssetDocumentQt::discover_plugin (
 }
 
 
+void
+dmz::ForgePluginAssetDocumentQt::update_time_slice (const Float64 TimeDelta) {
+
+   if (_finished) {
+
+      _finished = False;
+      _finishedMsg.send ();
+   }
+}
+
+
 // Message Observer Interface
 void
 dmz::ForgePluginAssetDocumentQt::receive_message (
@@ -98,11 +110,17 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
 
       if (FileName) {
 
-         _init_ui (FileName);
+         Int32 index (0);
 
-         _ui.fileLabel->setText (FileName.get_buffer ());
-         show ();
-         activateWindow ();
+         if (!FileName.find_sub ("_ir_", index) && !FileName.find_sub ("_ir.", index)) {
+
+            _init_ui (FileName);
+
+            _ui.fileLabel->setText (FileName.get_buffer ());
+            show ();
+            activateWindow ();
+         }
+         else { _finished = True; }
       }
    }
 }
@@ -111,57 +129,61 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
 void
 dmz::ForgePluginAssetDocumentQt::on_buttonBox_accepted () {
 
-   _saveInfo = True;
-   close ();
+   _save_info ();
+   //_init_ui ("");
 }
 
 
 void
 dmz::ForgePluginAssetDocumentQt::on_buttonBox_rejected () {
 
-   _saveInfo = False;
-   close ();
+   //_init_ui ("");
+   _finished = True;
 }
 
 
 void
-dmz::ForgePluginAssetDocumentQt::closeEvent (QCloseEvent *) {
+dmz::ForgePluginAssetDocumentQt::closeEvent (QCloseEvent *) { _finished = True; }
 
-   if (_saveInfo) {
 
-      _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
-      _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
+void
+dmz::ForgePluginAssetDocumentQt::_save_info () {
 
-      _currentConfig.store_attribute (
-         LocalDetails,
-         qPrintable (_ui.detailsEdit->toPlainText ()));
+   if (!_currentConfig) { _currentConfig = Config ("global"); }
 
-      const String Keywords = qPrintable (_ui.keywordEdit->text ());
+   _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
+   _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
 
-      StringTokenizer stz (Keywords, ',');
-      Boolean first = True;
-      String value;
+   _currentConfig.store_attribute (
+      LocalDetails,
+      qPrintable (_ui.detailsEdit->toPlainText ()));
 
-      while (stz.get_next (value)) {
+   const String Keywords = qPrintable (_ui.keywordEdit->text ());
 
-         trim_ascii_white_space (value);
+   StringTokenizer stz (Keywords, ',');
+   Boolean first = True;
+   String value;
 
-         Config data (LocalKeywords);
-         data.store_attribute (LocalValue, value);
+   while (stz.get_next (value)) {
 
-         if (first) { _currentConfig.overwrite_config (data); first = False; }
-         else { _currentConfig.add_config (data); }
-      }
+      trim_ascii_white_space (value);
 
-      String outStr;
-      StreamString out (outStr);
-      format_config_to_json (_currentConfig, out, ConfigStripGlobal | ConfigPrettyPrint, &_log);
+      Config data (LocalKeywords);
+      data.store_attribute (LocalValue, value);
 
-_log.error << outStr << endl;
+      if (first) { _currentConfig.overwrite_config (data); first = False; }
+      else { _currentConfig.add_config (data); }
    }
 
-   _saveInfo = False;
-   _finishedMsg.send ();
+   String outStr;
+   StreamString out (outStr);
+   format_config_to_json (_currentConfig, out, ConfigStripGlobal | ConfigPrettyPrint, &_log);
+
+_log.error << outStr << endl;
+_log.error << _currentConfigFile << endl;
+   write_config_file ("", _currentConfigFile, _currentConfig, ConfigStripGlobal | ConfigPrettyPrint, FileTypeJSON, &_log);
+
+   _finished = True;
 }
 
 
@@ -170,42 +192,45 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
    _currentConfig.set_config_context (0);
 
-   _currentConfigFile = FileName + ".json";
+   if (FileName) {
 
-   if (is_valid_path (_currentConfigFile)) {
+      _currentConfigFile = FileName + ".json";
 
-      read_config_file (_currentConfigFile, _currentConfig, FileTypeAutoDetect, &_log);
-   }
+      if (is_valid_path (_currentConfigFile)) {
 
-_log.warn << _currentConfig << endl;
+         read_config_file (_currentConfigFile, _currentConfig, FileTypeAutoDetect, &_log);
 
-   const String Name = config_to_string (LocalName, _currentConfig, "");
-   _ui.nameEdit->setText (Name.get_buffer ());
-   const String Brief = config_to_string (LocalBrief, _currentConfig, "");
-   _ui.briefEdit->setText (Brief.get_buffer ());
-   const String Details = config_to_string (LocalDetails, _currentConfig, "");
-   _ui.detailsEdit->setPlainText (Details.get_buffer ());
-   Config keywordList;
-   String keywords;
+         const String Name = config_to_string (LocalName, _currentConfig);
+         _ui.nameEdit->setText (Name.get_buffer ());
+         const String Brief = config_to_string (LocalBrief, _currentConfig);
+         _ui.briefEdit->setText (Brief.get_buffer ());
+         const String Details = config_to_string (LocalDetails, _currentConfig);
+         _ui.detailsEdit->setPlainText (Details.get_buffer ());
+         Config keywordList;
+         String keywords;
 
-   if (_currentConfig.lookup_all_config (LocalKeywords, keywordList)) {
+         if (_currentConfig.lookup_all_config (LocalKeywords, keywordList)) {
 
-      ConfigIterator it;
-      Config word;
+            ConfigIterator it;
+            Config word;
 
-      while (keywordList.get_next_config (it, word)) {
+            while (keywordList.get_next_config (it, word)) {
 
-         const String Value = config_to_string (LocalValue, word);
+               const String Value = config_to_string (LocalValue, word);
 
-         if (Value) {
+               if (Value) {
 
-            if (keywords) { keywords << ", ";}
-            keywords << Value;
+                  if (keywords) { keywords << ", ";}
+                  keywords << Value;
+               }
+            }
+
+            _ui.keywordEdit->setText (keywords.get_buffer ());
          }
+         else { _ui.keywordEdit->setText (""); }
       }
-
-      _ui.keywordEdit->setText (keywords.get_buffer ());
    }
+   else { _currentConfigFile.flush (); }
 }
 
 
@@ -223,7 +248,7 @@ dmz::ForgePluginAssetDocumentQt::_init (Config &local) {
       "process-file-message.name",
       local,
       "Process_File_Message",
-      get_plugin_runtime_context ());
+      context);
 
    subscribe_to_message (_processMsg);
 
@@ -231,7 +256,7 @@ dmz::ForgePluginAssetDocumentQt::_init (Config &local) {
       "finished-processing-file-message.name",
       local,
       "Finished_Processing_File_Message",
-      get_plugin_runtime_context ());
+      context);
 }
 
 

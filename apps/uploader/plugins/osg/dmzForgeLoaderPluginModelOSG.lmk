@@ -1,0 +1,11 @@
+require "lmkOSG"
+lmkOSG.set_name "dmzForgeLoaderPluginModelOSG"
+lmk.set_type "plugin"
+lmk.add_files {"dmzForgeLoaderPluginModelOSG.cpp",}
+lmk.add_libs {
+   "dmzInputEvents",
+   "dmzInputUtil",
+   "dmzKernel",
+}
+lmk.add_preqs {"dmzInputFramework", "dmzRenderFramework", "dmzRenderModuleCoreOSG",}
+lmkOSG.add_libs {"osgDB", "osgUtil", "osg", "OpenThreads",}
