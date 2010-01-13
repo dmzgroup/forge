@@ -7,6 +7,7 @@
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzSystemFile.h>
+#include <dmzTypesVector.h>
 
 #include <osg/Node>
 
@@ -48,6 +49,7 @@ namespace dmz {
 
       protected:
          void _send_next_file ();
+         void _reset_portal ();
          void _set_portal ();
          void _init (Config &local);
 
@@ -64,6 +66,11 @@ namespace dmz {
          osg::ref_ptr<osg::Node> _current;
          String _path;
          PathContainer _fileList;
+
+         Vector _center;
+         Float64 _radius;
+         Float64 _heading;
+         Float64 _pitch;
 
       private:
          ForgeLoaderPluginModelOSG ();

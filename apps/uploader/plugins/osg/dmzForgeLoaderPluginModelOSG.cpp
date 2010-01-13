@@ -7,6 +7,7 @@
 #include <dmzRuntimePluginInfo.h>
 #include <dmzTypesMatrix.h>
 #include <dmzTypesVector.h>
+#include <dmzTypesConsts.h>
 
 #include <osgDB/ReadFile>
 
@@ -20,7 +21,10 @@ dmz::ForgeLoaderPluginModelOSG::ForgeLoaderPluginModelOSG (
       _log (Info),
       _convert (Info),
       _core (0),
-      _portal (0) {
+      _portal (0),
+      _radius (0.0),
+      _heading (0.0),
+      _pitch (0.0) {
 
    _init (local);
 }
@@ -106,14 +110,51 @@ dmz::ForgeLoaderPluginModelOSG::receive_mouse_event (
 
    if (_portal) {
 
+      Boolean setPortal = False;
+
+      const Float64 SizeY = Float64 (Value.get_window_size_y ());
+
       if (Value.is_button_pressed (1)) {
 
+         const Float64 SizeX = Float64 (Value.get_window_size_x ());
+
          const Float64 PercentX =
-            Float64 (Value.get_mouse_delta_x ()) / Float64 (Value.get_window_size_x ());
+            Float64 (Value.get_mouse_delta_x ()) / (SizeX > 0.0 ? SizeX : 0.0);
+
          const Float64 PercentY =
-            Float64 (Value.get_mouse_delta_y ()) / Float64 (Value.get_window_size_y ());
-_log.error << PercentX << " " << PercentY << endl;
+            Float64 (Value.get_mouse_delta_y ()) / (SizeY > 0.0 ? SizeY : 0.0);
+
+         _heading -= PercentX * Pi64;
+         _pitch -= PercentY * Pi64;
+
+         if (_heading < 0) { _heading += TwoPi64; }
+         else if (_heading > TwoPi64) { _heading -= TwoPi64; }
+
+         if (_pitch < 0) { _pitch += TwoPi64; }
+         else if (_pitch > TwoPi64) { _pitch -= TwoPi64; }
+
+         setPortal = True;
       }
+
+      if (Value.is_button_pressed (3)) {
+
+         const Float64 PercentY =
+            Float64 (Value.get_mouse_delta_y ()) / (SizeY > 0.0 ? SizeY : 0.0);
+
+         _radius += PercentY * 5.0;
+
+         setPortal = True;
+      }
+
+      const Int32 ZoomInt = Value.get_scroll_delta_y ();
+
+      if (ZoomInt != 0) {
+
+         _radius += Float64 (ZoomInt) * 0.2;
+         setPortal = True;
+      }
+
+      if (setPortal) { _set_portal (); }
    }
 }
 
@@ -152,7 +193,7 @@ dmz::ForgeLoaderPluginModelOSG::_send_next_file () {
 
                      scene->addChild (_current);
 
-                     _set_portal ();
+                     _reset_portal ();
                   }
                   else { _log.error << "Unable to read file: " << _path + name << endl; }
                }
@@ -170,24 +211,33 @@ dmz::ForgeLoaderPluginModelOSG::_send_next_file () {
 
 
 void
-dmz::ForgeLoaderPluginModelOSG::_set_portal () {
+dmz::ForgeLoaderPluginModelOSG::_reset_portal () {
 
-   if (_portal && _current.valid ()) {
+   if (_current.valid ()) {
 
       osg::BoundingSphere bound = _current->computeBound ();
       osg::Vec3 center = bound.center ();
-      Float64 radius = bound.radius ();
+      _center.set_xyz (center.x (), center.z (), -center.y ());
+      _radius = bound.radius () + 1.0;
+      _heading = 1.25 * Pi64;
+      _pitch = -Pi64 / 8.0;
+      _set_portal ();
+   }
+}
 
-      Vector dir (1.0, 0.0, 1.0);
-      dir.normalize_in_place ();
-      Matrix mat (Vector (0.0, 0.0, -1.0), dir);
-//      Vector pos (center.x () - (radius * 1.4), center.z (), -center.y () - (radius * 1.4));
-//      Vector pos (center.x () - (radius + 1.0), center.z (), -center.y () - (radius + 1.0));
-      Vector pos (0.0, 0.0, -radius -2.0);
-      mat.transform_vector (pos);
-      Vector cpos (center.x (), center.z (), -center.y ());
-      pos = cpos - pos;
-      _portal->set_view (pos, mat);
+
+void
+dmz::ForgeLoaderPluginModelOSG::_set_portal () {
+
+   if (_portal) {
+
+      Matrix hmat (Vector (0.0, 1.0, 0.0), _heading);
+      Matrix pmat (Vector (1.0, 0.0, 0.0), _pitch);
+      Matrix dmat = hmat * pmat;
+      Vector dir (0.0, 0.0, _radius);
+      dmat.transform_vector (dir);
+
+      _portal->set_view (_center + dir, dmat);
    }
 }
 
