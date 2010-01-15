@@ -2,8 +2,8 @@
 <dmz>
 <plugin-list>
    <plugin name="dmzForgePluginAssetDocumentQt"/>
-   <plugin name="dmzPluginMsgDump"/>
 <!--
+   <plugin name="dmzPluginMsgDump"/>
    <plugin name="dmzPluginDefinitionsDump"/>
    <plugin name="dmzPluginTermExit"/>
    <plugin name="dmzRenderPluginPortalSize"/>

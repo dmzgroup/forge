@@ -2,6 +2,7 @@
 #include <dmzFoundationConfigFileIO.h>
 #include <dmzFoundationJSONUtil.h>
 #include <dmzQtUtil.h>
+#include <dmzSystem.h>
 #include <dmzSystemFile.h>
 #include <dmzSystemStreamString.h>
 #include <dmzRuntimeConfigToTypesBase.h>
@@ -10,14 +11,17 @@
 #include <dmzRuntimeSession.h>
 #include <dmzTypesStringTokenizer.h>
 #include <dmzTypesStringUtil.h>
+#include <dmzTypesUUID.h>
 
 namespace {
 
 static const dmz::String LocalName ("name");
+static const dmz::String LocalID ("_id");
 static const dmz::String LocalBrief ("brief");
 static const dmz::String LocalDetails ("details");
 static const dmz::String LocalKeywords ("keywords");
 static const dmz::String LocalValue ("value");
+static const dmz::String LocalIgnore ("ignore");
 
 };
 
@@ -110,17 +114,11 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
 
       if (FileName) {
 
-         Int32 index (0);
+         _init_ui (FileName);
 
-         if (!FileName.find_sub ("_ir_", index) && !FileName.find_sub ("_ir.", index)) {
-
-            _init_ui (FileName);
-
-            _ui.fileLabel->setText (FileName.get_buffer ());
-            show ();
-            activateWindow ();
-         }
-         else { _finished = True; }
+         _ui.fileLabel->setText (FileName.get_buffer ());
+         show ();
+         activateWindow ();
       }
    }
 }
@@ -143,6 +141,35 @@ dmz::ForgePluginAssetDocumentQt::on_buttonBox_rejected () {
 
 
 void
+dmz::ForgePluginAssetDocumentQt::on_ignoreButton_pressed () {
+
+   Config global ("global");
+
+   global.store_attribute (LocalIgnore, "true");
+
+   write_config_file (
+      "",
+      _currentConfigFile,
+      global,
+      ConfigStripGlobal | ConfigPrettyPrint,
+      FileTypeJSON,
+      &_log);
+
+   _finished = True;
+}
+
+
+void
+dmz::ForgePluginAssetDocumentQt::on_clearButton_pressed () {
+
+   _ui.nameEdit->setText ("");
+   _ui.briefEdit->setText ("");
+   _ui.detailsEdit->setPlainText ("");
+   _ui.keywordEdit->setText ("");
+}
+
+
+void
 dmz::ForgePluginAssetDocumentQt::closeEvent (QCloseEvent *) { _finished = True; }
 
 
@@ -151,6 +178,7 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
 
    if (!_currentConfig) { _currentConfig = Config ("global"); }
 
+   _currentConfig.store_attribute (LocalID, qPrintable (_ui.idLabel->text ()));
    _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
    _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
 
@@ -177,11 +205,23 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
 
    String outStr;
    StreamString out (outStr);
-   format_config_to_json (_currentConfig, out, ConfigStripGlobal | ConfigPrettyPrint, &_log);
 
-_log.error << outStr << endl;
-_log.error << _currentConfigFile << endl;
-   write_config_file ("", _currentConfigFile, _currentConfig, ConfigStripGlobal | ConfigPrettyPrint, FileTypeJSON, &_log);
+   format_config_to_json (
+      _currentConfig,
+      out,
+      ConfigStripGlobal | ConfigPrettyPrint,
+      &_log);
+
+//_log.error << outStr << endl;
+//_log.error << _currentConfigFile << endl;
+
+   write_config_file (
+      "",
+      _currentConfigFile,
+      _currentConfig,
+      ConfigStripGlobal | ConfigPrettyPrint,
+      FileTypeJSON,
+      &_log);
 
    _finished = True;
 }
@@ -200,34 +240,51 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
          read_config_file (_currentConfigFile, _currentConfig, FileTypeAutoDetect, &_log);
 
-         const String Name = config_to_string (LocalName, _currentConfig);
-         _ui.nameEdit->setText (Name.get_buffer ());
-         const String Brief = config_to_string (LocalBrief, _currentConfig);
-         _ui.briefEdit->setText (Brief.get_buffer ());
-         const String Details = config_to_string (LocalDetails, _currentConfig);
-         _ui.detailsEdit->setPlainText (Details.get_buffer ());
-         Config keywordList;
-         String keywords;
+         if (config_to_boolean (LocalIgnore, _currentConfig, False)) {
 
-         if (_currentConfig.lookup_all_config (LocalKeywords, keywordList)) {
-
-            ConfigIterator it;
-            Config word;
-
-            while (keywordList.get_next_config (it, word)) {
-
-               const String Value = config_to_string (LocalValue, word);
-
-               if (Value) {
-
-                  if (keywords) { keywords << ", ";}
-                  keywords << Value;
-               }
-            }
-
-            _ui.keywordEdit->setText (keywords.get_buffer ());
+            _finished = True;
          }
-         else { _ui.keywordEdit->setText (""); }
+         else {
+
+            UUID id;
+            create_uuid (id);
+
+            const String ID = config_to_string (
+               LocalID,
+               _currentConfig,
+               id.to_string (UUID::NotFormatted));
+
+            _ui.idLabel->setText (ID.get_buffer ());
+
+            const String Name = config_to_string (LocalName, _currentConfig);
+            _ui.nameEdit->setText (Name.get_buffer ());
+            const String Brief = config_to_string (LocalBrief, _currentConfig);
+            _ui.briefEdit->setText (Brief.get_buffer ());
+            const String Details = config_to_string (LocalDetails, _currentConfig);
+            _ui.detailsEdit->setPlainText (Details.get_buffer ());
+            Config keywordList;
+            String keywords;
+
+            if (_currentConfig.lookup_all_config (LocalKeywords, keywordList)) {
+
+               ConfigIterator it;
+               Config word;
+
+               while (keywordList.get_next_config (it, word)) {
+
+                  const String Value = config_to_string (LocalValue, word);
+
+                  if (Value) {
+
+                     if (keywords) { keywords << ", ";}
+                     keywords << Value;
+                  }
+               }
+
+               _ui.keywordEdit->setText (keywords.get_buffer ());
+            }
+            else { _ui.keywordEdit->setText (""); }
+         }
       }
    }
    else { _currentConfigFile.flush (); }

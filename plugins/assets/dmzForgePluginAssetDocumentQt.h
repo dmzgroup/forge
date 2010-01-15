@@ -51,6 +51,8 @@ namespace dmz {
       protected slots:
          void on_buttonBox_accepted ();
          void on_buttonBox_rejected ();
+         void on_ignoreButton_pressed ();
+         void on_clearButton_pressed ();
 
       protected:
          void _save_info ();

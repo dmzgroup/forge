@@ -11,6 +11,7 @@
    -->
    <plugin name="dmzRenderModuleCoreOSGBasic" scope="render" platform="win32|macos"/>
    <plugin name="dmzRenderModuleCoreOSGBasic" scope="render" platform="linux" unload="false"/>
+   <plugin name="dmzRenderPluginScreenCaptureOSG"/>
    <plugin name="dmzForgeLoaderPluginModelOSG"/>
 </plugin-list>
 <render>
