@@ -87,7 +87,7 @@ dmz::ForgeLoaderPluginModelOSG::receive_message (
 
    if (Type == _startMsg) {
 
-      _fileList.empty ();
+      _fileList.clear ();
 
       _path = _convert.to_string (InData);
 
