@@ -65,7 +65,7 @@ namespace dmz {
 
          osg::ref_ptr<osg::Node> _current;
          String _path;
-         PathContainer _fileList;
+         StringContainer _fileList;
 
          Vector _center;
          Float64 _radius;
