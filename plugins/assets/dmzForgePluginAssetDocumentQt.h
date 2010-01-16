@@ -2,7 +2,7 @@
 #define DMZ_FORGE_PLUGIN_ASSET_DOCUMENT_QT_DOT_H
 
 #include <dmzRuntimeConfig.h>
-#include <dmzRuntimeDataConverters.h>
+#include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>

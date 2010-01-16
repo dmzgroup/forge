@@ -2,7 +2,7 @@
 #define DMZ_FORGE_LOADER_PLUGIN_MODEL_OSG_DOT_H
 
 #include <dmzInputObserverUtil.h>
-#include <dmzRuntimeDataConverters.h>
+#include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
