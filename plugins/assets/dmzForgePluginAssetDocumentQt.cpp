@@ -22,6 +22,8 @@ static const dmz::String LocalDetails ("details");
 static const dmz::String LocalKeywords ("keywords");
 static const dmz::String LocalValue ("value");
 static const dmz::String LocalIgnore ("ignore");
+static const dmz::String LocalThumbnails ("thumbnails");
+static const dmz::String LocalImages ("images");
 
 };
 
@@ -32,7 +34,8 @@ dmz::ForgePluginAssetDocumentQt::ForgePluginAssetDocumentQt (
       TimeSlice (Info),
       MessageObserver (Info),
       _log (Info),
-      _converter (Info),
+      _convert (Info),
+      _listConvert (Info),
       _finished (False) {
 
    _ui.setupUi (this);
@@ -93,6 +96,7 @@ dmz::ForgePluginAssetDocumentQt::update_time_slice (const Float64 TimeDelta) {
 
    if (_finished) {
 
+      _ui.imageList->clear ();
       _finished = False;
       _finishedMsg.send ();
    }
@@ -110,7 +114,7 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
 
    if (Type == _processMsg) {
 
-      const String FileName = _converter.to_string (InData);
+      const String FileName = _convert.to_string (InData);
 
       if (FileName) {
 
@@ -120,6 +124,11 @@ dmz::ForgePluginAssetDocumentQt::receive_message (
          show ();
          activateWindow ();
       }
+   }
+   else if (Type == _doneScreenMsg) {
+
+      StringContainer list = _listConvert.to_string_container (InData);
+      _update_thumbnails (list);
    }
 }
 
@@ -170,6 +179,18 @@ dmz::ForgePluginAssetDocumentQt::on_clearButton_pressed () {
 
 
 void
+dmz::ForgePluginAssetDocumentQt::on_imageButton_pressed () {
+
+   String image (_currentConfigFile);
+   image << ".tdb/";
+   if (!is_valid_path (image)) { create_directory (image); }
+   image << "thumbnail";
+   Data out = _convert.to_data (image);
+   _startScreenMsg.send (&out);
+}
+
+
+void
 dmz::ForgePluginAssetDocumentQt::closeEvent (QCloseEvent *) { _finished = True; }
 
 
@@ -178,6 +199,7 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
 
    if (!_currentConfig) { _currentConfig = Config ("global"); }
 
+   _currentConfig.store_attribute ("type", "3d");
    _currentConfig.store_attribute (LocalID, qPrintable (_ui.idLabel->text ()));
    _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
    _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
@@ -224,6 +246,38 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       &_log);
 
    _finished = True;
+}
+
+
+void
+dmz::ForgePluginAssetDocumentQt::_update_thumbnails (const StringContainer &List) {
+
+   _ui.imageList->clear ();
+
+   if (!_currentConfig) { _currentConfig = Config ("global"); }
+   Config tdb (LocalThumbnails);
+
+   StringContainerIterator it;
+   String file;
+
+   while (List.get_next (it, file)) {
+
+      QSize size;
+      size.scale (200, 200, Qt::KeepAspectRatio);
+      QIcon icon;
+      icon.addFile (file.get_buffer (), size);
+      QListWidgetItem *item = new QListWidgetItem (icon, file.get_buffer ());
+      _ui.imageList->addItem (item);
+      String p, root, ext;
+      split_path_file_ext (file, p, root, ext);
+      Config img (LocalImages);
+      img.store_attribute (LocalValue, root + ext);
+      tdb.add_config (img);
+   }
+
+   _currentConfig.overwrite_config (tdb);
+
+_log.error << List << endl;
 }
 
 
@@ -284,6 +338,29 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
                _ui.keywordEdit->setText (keywords.get_buffer ());
             }
             else { _ui.keywordEdit->setText (""); }
+
+            Config imgList;
+
+            if (_currentConfig.lookup_all_config (
+                  LocalThumbnails + "." + LocalImages,
+                  imgList)) {
+
+ 
+               ConfigIterator it;
+               Config img;
+               StringContainer list;
+
+               while (imgList.get_next_config (it, img)) {
+
+                  const String File = config_to_string (LocalValue, img);
+ 
+                  const String Path = _currentConfigFile + ".tdb/" + File;
+
+                  list.append (Path);
+               }
+
+               _update_thumbnails (list);
+            }
          }
       }
    }
@@ -314,6 +391,20 @@ dmz::ForgePluginAssetDocumentQt::_init (Config &local) {
       local,
       "Finished_Processing_File_Message",
       context);
+
+  _startScreenMsg = config_create_message (
+     "start-screen-capture-message.name",
+     local,
+     "Start_Screen_Capture_Message",
+     context);
+
+  _doneScreenMsg = config_create_message (
+     "finished-screen-capture-message.name",
+     local,
+     "Finished_Screen_Capture_Message",
+     context);
+
+   subscribe_to_message (_doneScreenMsg);
 }
 
 

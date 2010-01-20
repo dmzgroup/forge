@@ -11,20 +11,22 @@
 
 #include <osgDB/ReadFile>
 
-
 dmz::ForgeLoaderPluginModelOSG::ForgeLoaderPluginModelOSG (
       const PluginInfo &Info,
       Config &local) :
       Plugin (Info),
+      TimeSlice (Info),
       MessageObserver (Info),
       InputObserverUtil (Info, local),
       _log (Info),
       _convert (Info),
+      _listConvert (Info),
       _core (0),
       _portal (0),
       _radius (0.0),
       _heading (0.0),
-      _pitch (0.0) {
+      _pitch (0.0),
+      _fileIndex (0) {
 
    _init (local);
 }
@@ -76,6 +78,44 @@ dmz::ForgeLoaderPluginModelOSG::discover_plugin (
 }
 
 
+// Time Slice Interface
+void
+dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
+
+   if (_fileIndex > 0) {
+
+      if (_fileIndex > 1) { _heading += TwoPi64 / 8.0; }
+      _set_portal ();
+      String file (_fileRoot);
+      file << _fileIndex << ".png";
+      _fileList.append (file);
+      Data out = _convert.to_data (file);
+      _doCaptureMsg.send (&out);
+      _fileIndex++;
+      if (_fileIndex > 8) { _fileIndex = -1; }
+   }
+   else if (_fileIndex < 0) {
+
+      const Int32 Size (_fileList.get_count ());
+      Int32 count (0);
+      StringContainerIterator it;
+      String file;
+      while (_fileList.get_next (it, file)) {
+
+         if (is_valid_path (file)) { count++; }
+         else { break; }
+      }
+
+      if (Size == count) {
+
+         Data out = _listConvert.to_data (_fileList);
+         _doneScreenMsg.send (&out);
+         _fileIndex = 0;
+      }
+   }
+}
+
+
 // Message Observer Interface
 void
 dmz::ForgeLoaderPluginModelOSG::receive_message (
@@ -87,7 +127,7 @@ dmz::ForgeLoaderPluginModelOSG::receive_message (
 
    if (Type == _startMsg) {
 
-      _fileList.clear ();
+      _modelList.clear ();
 
       _path = _convert.to_string (InData);
 
@@ -95,10 +135,16 @@ dmz::ForgeLoaderPluginModelOSG::receive_message (
 
          if (_path.get_char (-1) != '/') { _path << "/"; }
 
-         if (get_file_list (_path, _fileList)) { _send_next_file (); }
+         if (get_file_list (_path, _modelList)) { _send_next_file (); }
       }
    }
    else if (Type == _finishedMsg) { _send_next_file (); }
+   else if (Type == _screenMsg) {
+
+      _fileList.clear ();
+      _fileRoot = _convert.to_string (InData);
+      if (_fileRoot) { _fileIndex = 1; }
+   }
 }
 
 
@@ -168,7 +214,7 @@ dmz::ForgeLoaderPluginModelOSG::_send_next_file () {
 
       String name;
 
-      if (_fileList.get_next (name)) {
+      if (_modelList.get_next (name)) {
 
          String path, file, ext;
          split_path_file_ext (name, path, file, ext);
@@ -218,7 +264,7 @@ dmz::ForgeLoaderPluginModelOSG::_reset_portal () {
       osg::BoundingSphere bound = _current->computeBound ();
       osg::Vec3 center = bound.center ();
       _center.set_xyz (center.x (), center.z (), -center.y ());
-      _radius = bound.radius () + 1.0;
+      _radius = bound.radius () + 2.0;
       _heading = 1.25 * Pi64;
       _pitch = -Pi64 / 8.0;
       _set_portal ();
@@ -268,6 +314,26 @@ dmz::ForgeLoaderPluginModelOSG::_init (Config &local) {
       context);
 
    subscribe_to_message (_finishedMsg);
+
+  _screenMsg = config_create_message (
+     "start-screen-capture-message.name",
+     local,
+     "Start_Screen_Capture_Message",
+     context);
+
+   subscribe_to_message (_screenMsg);
+
+   _doCaptureMsg = config_create_message (
+      "screen-capture-message.name",
+      local,
+      "Capture_Render_Screen_Message",
+      context);
+
+  _doneScreenMsg = config_create_message (
+     "finished-screen-capture-message.name",
+     local,
+     "Finished_Screen_Capture_Message",
+     context);
 
    activate_default_input_channel (InputEventMouseMask);
 }
