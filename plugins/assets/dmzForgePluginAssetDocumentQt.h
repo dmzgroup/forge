@@ -68,6 +68,7 @@ namespace dmz {
 
          Boolean _finished;
 
+         String _currentFile;
          String _currentConfigFile;
          Config _currentConfig;
 
