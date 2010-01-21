@@ -2,6 +2,7 @@
 #define DMZ_FORGE_PLUGIN_ASSET_DOCUMENT_QT_DOT_H
 
 #include <dmzRuntimeConfig.h>
+#include <dmzRuntimeDataConverterStringContainer.h>
 #include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
@@ -53,8 +54,10 @@ namespace dmz {
          void on_buttonBox_rejected ();
          void on_ignoreButton_pressed ();
          void on_clearButton_pressed ();
+         void on_imageButton_pressed ();
 
       protected:
+         void _update_thumbnails (const StringContainer &List);
          void _save_info ();
          void _init_ui (const String &FileName);
          void _init (Config &local);
@@ -72,7 +75,10 @@ namespace dmz {
 
          Message _processMsg;
          Message _finishedMsg;
-         DataConverterString _converter;
+         Message _startScreenMsg;
+         Message _doneScreenMsg;
+         DataConverterString _convert;
+         DataConverterStringContainer _listConvert;
 
       private:
          ForgePluginAssetDocumentQt ();

@@ -2,10 +2,12 @@
 #define DMZ_FORGE_LOADER_PLUGIN_MODEL_OSG_DOT_H
 
 #include <dmzInputObserverUtil.h>
+#include <dmzRuntimeDataConverterStringContainer.h>
 #include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzRuntimeTimeSlice.h>
 #include <dmzSystemFile.h>
 #include <dmzTypesVector.h>
 
@@ -18,6 +20,7 @@ namespace dmz {
 
    class ForgeLoaderPluginModelOSG :
          public Plugin,
+         public TimeSlice,
          public MessageObserver,
          public InputObserverUtil {
 
@@ -33,6 +36,9 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
+
+         // Time Slice Interface
+         virtual void update_time_slice (const Float64 TimeDelta);
 
          // Message Observer Interface
          virtual void receive_message (
@@ -55,6 +61,7 @@ namespace dmz {
 
          Log _log;
          DataConverterString _convert;
+         DataConverterStringContainer _listConvert;
 
          RenderModuleCoreOSG *_core;
          RenderModulePortal *_portal;
@@ -62,15 +69,22 @@ namespace dmz {
          Message _startMsg;
          Message _processMsg;
          Message _finishedMsg;
+         Message _screenMsg;
+         Message _doCaptureMsg;
+         Message _doneScreenMsg;
 
          osg::ref_ptr<osg::Node> _current;
          String _path;
-         StringContainer _fileList;
+         StringContainer _modelList;
 
          Vector _center;
          Float64 _radius;
          Float64 _heading;
          Float64 _pitch;
+
+         String _fileRoot;
+         Int32 _fileIndex;
+         StringContainer _fileList;
 
       private:
          ForgeLoaderPluginModelOSG ();
