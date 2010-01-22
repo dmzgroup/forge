@@ -1,9 +1,8 @@
 #!/usr/bin/env ruby
 
-require 'digest/sha1'
+require 'rubygems'
 require 'json'
 require 'CouchRest'
-require 'pp'
 
 def show obj
   puts obj.inspect
@@ -25,7 +24,7 @@ class Uploader
   
   def start(dir, filter='*.ive')
     @dir = dir
-    Dir[File.join(@dir, filter)].each { |file| process_asset(File.join(Dir.pwd, file)) }
+    Dir[File.join(@dir, filter)].each { |file| process_asset(file) }
   end
   
   def save_doc
@@ -43,6 +42,7 @@ class Uploader
   end
   
   def process_asset file
+puts (file)
     jsonFile = file + '.json'
     thumbDir = jsonFile + '.tdb'
     if File.exists? jsonFile
