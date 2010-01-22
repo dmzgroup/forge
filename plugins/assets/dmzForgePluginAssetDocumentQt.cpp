@@ -27,6 +27,7 @@ static const dmz::String LocalThumbnails ("thumbnails");
 static const dmz::String LocalImages ("images");
 static const dmz::String LocalCurrent ("current");
 static const dmz::String LocalMimeIVE ("model/x-ive");
+static const dmz::String LocalOriginalName ("original_name");
 
 };
 
@@ -240,7 +241,17 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       current.store_attribute (LocalMimeIVE, FileSHA + ext);
    }
 
-   _currentConfig.store_attribute ("original_name", file + ext);
+   _currentConfig.remove_attribute (LocalOriginalName);
+
+   Config oname;
+
+   if (!_currentConfig.lookup_config (LocalOriginalName, oname)) {
+
+      oname = Config (LocalOriginalName);
+      _currentConfig.add_config (oname);
+   }
+
+   oname.store_attribute (FileSHA, file + ext);
 
    String outStr;
    StreamString out (outStr);
