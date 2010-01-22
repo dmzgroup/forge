@@ -48,7 +48,7 @@ dmz::ForgeLoaderPluginModelOSG::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      Data inData = _convert.to_data ("/Users/barker/DVTE_Models");
+      Data inData = _convert.to_data ("/Users/barker/archive");
       receive_message (_startMsg, 0, 0, &inData, 0);
    }
    else if (State == PluginStateStop) {

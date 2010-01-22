@@ -203,7 +203,8 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
 
    if (!_currentConfig) { _currentConfig = Config ("global"); }
 
-   _currentConfig.store_attribute ("type", "3d");
+   _currentConfig.store_attribute ("type", "asset");
+   _currentConfig.store_attribute ("media", "3d");
    _currentConfig.store_attribute (LocalID, qPrintable (_ui.idLabel->text ()));
    _currentConfig.store_attribute (LocalName, qPrintable (_ui.nameEdit->text ()));
    _currentConfig.store_attribute (LocalBrief, qPrintable (_ui.briefEdit->text ()));
