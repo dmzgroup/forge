@@ -111,6 +111,8 @@ dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
          Data out = _listConvert.to_data (_fileList);
          _doneScreenMsg.send (&out);
          _fileIndex = 0;
+         _heading += TwoPi64 / 8.0;
+         _set_portal ();
       }
    }
 }

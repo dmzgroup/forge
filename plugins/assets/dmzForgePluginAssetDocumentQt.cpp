@@ -1,6 +1,7 @@
 #include "dmzForgePluginAssetDocumentQt.h"
 #include <dmzFoundationConfigFileIO.h>
 #include <dmzFoundationJSONUtil.h>
+#include <dmzFoundationSHA.h>
 #include <dmzQtUtil.h>
 #include <dmzSystem.h>
 #include <dmzSystemFile.h>
@@ -24,6 +25,8 @@ static const dmz::String LocalValue ("value");
 static const dmz::String LocalIgnore ("ignore");
 static const dmz::String LocalThumbnails ("thumbnails");
 static const dmz::String LocalImages ("images");
+static const dmz::String LocalCurrent ("current");
+static const dmz::String LocalMimeIVE ("model/x-ive");
 
 };
 
@@ -225,6 +228,20 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       else { _currentConfig.add_config (data); }
    }
 
+   Config current (LocalCurrent);
+   _currentConfig.overwrite_config (current);
+
+   String path, file, ext;
+   split_path_file_ext (_currentFile, path, file, ext);
+   const String FileSHA = sha_from_file (_currentFile);
+
+   if (FileSHA) {
+
+      current.store_attribute (LocalMimeIVE, FileSHA + ext);
+   }
+
+   _currentConfig.store_attribute ("original_name", file + ext);
+
    String outStr;
    StreamString out (outStr);
 
@@ -276,8 +293,6 @@ dmz::ForgePluginAssetDocumentQt::_update_thumbnails (const StringContainer &List
    }
 
    _currentConfig.overwrite_config (tdb);
-
-_log.error << List << endl;
 }
 
 
@@ -288,6 +303,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
    if (FileName) {
 
+      _currentFile = FileName;
       _currentConfigFile = FileName + ".json";
 
       if (is_valid_path (_currentConfigFile)) {
@@ -364,7 +380,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
          }
       }
    }
-   else { _currentConfigFile.flush (); }
+   else { _currentConfigFile.flush (); _currentFile.flush (); }
 }
 
 
