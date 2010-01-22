@@ -26,7 +26,6 @@ static const dmz::String LocalIgnore ("ignore");
 static const dmz::String LocalThumbnails ("thumbnails");
 static const dmz::String LocalImages ("images");
 static const dmz::String LocalCurrent ("current");
-static const dmz::String LocalContentType ("content_type");
 static const dmz::String LocalMimeIVE ("model/x-ive");
 
 };
@@ -229,46 +228,19 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       else { _currentConfig.add_config (data); }
    }
 
-   Config current;
-   Config currentList;
+   Config current (LocalCurrent);
+   _currentConfig.overwrite_config (current);
 
-   if (_currentConfig.lookup_all_config (LocalCurrent, currentList)) {
+   String path, file, ext;
+   split_path_file_ext (_currentFile, path, file, ext);
+   const String FileSHA = sha_from_file (_currentFile);
 
-      ConfigIterator it;
-      Config next;
+   if (FileSHA) {
 
-      while (!current && currentList.get_next_config (it, next)) {
-
-         if (config_to_string (LocalContentType, next) == LocalMimeIVE) {
-
-            current = next;
-         }
-      }
+      current.store_attribute (LocalMimeIVE, FileSHA + ext);
    }
 
-   Boolean addCurrent (False);
-
-   if (!current) {
-
-      current = Config (LocalCurrent);
-      current.set_in_array (True);
-      current.store_attribute (LocalContentType, LocalMimeIVE);
-      addCurrent = True;
-   }
-
-   if (current) {
-
-      String path, file, ext;
-      split_path_file_ext (_currentFile, path, file, ext);
-      const String FileSHA = sha_from_file (_currentFile);
-
-      if (FileSHA) {
-
-         current.store_attribute ("attachment", FileSHA + ext);
-
-         if (addCurrent) { _currentConfig.add_config (current); }
-      }
-   }
+   _currentConfig.store_attribute ("original_name", file + ext);
 
    String outStr;
    StreamString out (outStr);
