@@ -236,10 +236,11 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
    String path, file, ext;
    split_path_file_ext (_currentFile, path, file, ext);
    const String FileSHA = sha_from_file (_currentFile);
+   const String Rev ("1-");
 
    if (FileSHA) {
 
-      current.store_attribute (LocalMimeIVE, FileSHA + ext);
+      current.store_attribute (LocalMimeIVE, Rev + FileSHA + ext);
    }
 
    _currentConfig.remove_attribute (LocalOriginalName);
@@ -252,7 +253,8 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       _currentConfig.add_config (oname);
    }
 
-   oname.store_attribute (FileSHA, file + ext);
+   oname.remove_attribute (FileSHA);
+   oname.store_attribute (Rev + FileSHA, file + ext);
 
    String outStr;
    StreamString out (outStr);

@@ -5,8 +5,12 @@
     <link rel="stylesheet" href="style/main.css" type="text/css">
   </head>
   <body>
-    <h1>Generated CouchApp</h1>
-    <p>This is a placeholder page</p>
+  <form action="/assets/_design/test/_list/keyword/keywords" method="get">
+  Key Word: <input type="text" name="key" />
+     <input type="submit" value="Search" />
+     <input type="hidden" name="reduce" value="false" />
+     <input type="hidden" name="include_docs" value="true" />
+  </form>
   </body>
   <script src="/_utils/script/json2.js"></script>
   <script src="/_utils/script/jquery.js?1.3.1"></script>
