@@ -1,52 +1,59 @@
-var http = require('http'),
-   url = require('url'),
-   sys = require("sys");
+var http = require ('http'),
+   url_parse = require ('url').parse,
+   sys = require ('sys'),
+   utils = require ('./utils');
 
-function dump(x){sys.puts(x===undefined?'undefined':JSON.stringify(x,null,1))}
-function inspect(x){sys.puts(sys.inspect(x))}
+var dump = utils.dump;
+var inspect = utils.inspect;
 
 var Server = exports;
 
-var NOT_FOUND = "Not Found!\n";
-
-Server.notFound = function (request, response) {
-  response.sendHeader(404, [["Content-Type", "text/plain"], ["Content-Length", NOT_FOUND.length]]);
-  response.sendBody(NOT_FOUND);
-  response.finish();
-}
+Server.not_found = function (request, response, reason, error, code) {
+   var error = { "error": error || "not_found", "reason": reason || "missing" };
+   var message = JSON.stringify (error);
+   response.sendHeader (code || 404,
+      [["Content-Type", "text/plain"], ["Content-Length", message.length]]);
+   response.sendBody (message);
+   response.finish ();
+};
 
 var routes = [];
 
 addRoute = function (method, pattern, handler) {
-   var route = {
+   routes.push ({
       method: method,
       pattern: pattern,
-      handler: handler
-   };
-   
-   routes.push (route);
+      handler: handler,
+   });
 }
 
-Server.get = function (pattern, handler) { return addRoute("GET", pattern, handler);};
-Server.post = function (pattern, handler, format) { return addRoute("POST", pattern, handler, format); };
-Server.put = function (pattern, handler, format) { return addRoute("PUT", pattern, handler, format); };
-Server.del = function (pattern, handler) { return addRoute("DELETE", pattern, handler); };
+Server.get = function (pattern, handler) {
+   return addRoute ("GET", pattern, handler);
+};
 
-var server = http.createServer (function(request, response) {
-   var uri = url.parse(request.url);
-   var path = uri.pathname;
+Server.post = function (pattern, handler) {
+   return addRoute ("POST", pattern, handler);
+};
 
-sys.puts(request.method + " " + path);
+Server.put = function (pattern, handler) {
+   return addRoute ("PUT", pattern, handler);
+};
 
+Server.del = function (pattern, handler) {
+   return addRoute ("DELETE", pattern, handler);
+};
+
+var server = http.createServer (function (request, response) {
+   var url = url_parse (request.url);
+   var path = url.pathname;
+sys.puts (request.method + ': ' + path);
    for (var ix = 0, maxRoutes = routes.length; ix < maxRoutes; ix += 1) {
       var route = routes[ix];
       if (request.method === route.method) {
          var match = path.match (route.pattern);
          if (match && match[0].length > 0) {
             match.shift ();
-            inspect (match);
             match = match.map (unescape);
-            inspect (match);
             match.unshift (response);
             match.unshift (request);
             route.handler.apply (null, match);
@@ -55,12 +62,14 @@ sys.puts(request.method + " " + path);
       }
    }
 
-   notFound (request, response);
+   Server.not_found (request, response, 'unsupported_request');
 });
 
 Server.listen = function(port, host) {
-  server.listen(port, host);
-  sys.puts("Server at http://" + (host || "127.0.0.1") + ":" + port.toString() + "/");
+   var port = port || 8008;
+   var host = host || '127.0.0.1';
+   server.listen (port, host);
+   sys.puts ('Server at http://' + host + ':' + port);
 };
 
 Server.close = function() {
