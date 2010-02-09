@@ -1,10 +1,6 @@
 var sys = require ('sys'),
    url_parse = require ('url').parse,
-   http = require ('http'),
-   utils = require ('./utils');
-
-var dump = utils.dump;
-var inspect = utils.inspect;
+   http = require ('http');
 
 exports.create = function (port, host) {
    var port = port || 5984;
