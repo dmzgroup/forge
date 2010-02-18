@@ -2,6 +2,7 @@ var sys = require ('sys'),
     http = require ('http'),
     url = require ('url'),
     path = require ('path'),
+    querystring = require ('querystring'),
     config = require ('./config');
 
 var Server = function (port, host, proxy) {
@@ -46,7 +47,6 @@ var Server = function (port, host, proxy) {
          request.uri = {
             path: uri.pathname || '/',
             params: uri.query || {},
-            search: uri.search || '',
          };
          
          request.proxy = request.uri;
@@ -67,8 +67,8 @@ var Server = function (port, host, proxy) {
                'content-length': content.length,
             });
             
-            response.sendBody (content);
-            response.finish ();
+            response.write (content);
+            response.close ();
          };
          
          try {
@@ -96,32 +96,34 @@ var Proxy = function (port, host) {
    var self = this;
    this._port = port || 5984;
    this._host = host || '127.0.0.1';
-   this.client = http.createClient (this._port, this._host)
+   this.client = http.createClient (this._port, this._host);
    
    this.request = function (clientRequest, clientResponse) {
-      var path = clientRequest.proxy.path + clientRequest.proxy.search;
-      
+      var search = querystring.stringify (clientRequest.proxy.params);
+      var path = clientRequest.proxy.path + '?' + search;
+
 sys.puts ('Proxy ' + clientRequest.method + ': ' + clientRequest.uri.path + " -> " + clientRequest.proxy.path);
 
       var request = this.client.request (clientRequest.method, path, clientRequest.headers);
          
-      clientRequest.addListener ('body', function (chunk) {
-         request.sendBody (chunk);
+      clientRequest.addListener ('data', function (chunk) {
+         request.write (chunk);
       });
       
-      clientRequest.addListener ('complete', function () {
-         request.finish (function (response) {
+      clientRequest.addListener ('end', function () {
+         request.addListener ('response', function (response) {
             
             clientResponse.sendHeader (response.statusCode, response.headers);
-            response.addListener ('body', function (chunk) {
-               clientResponse.sendBody (chunk, 'binary');
+            response.addListener ('data', function (chunk) {
+               clientResponse.write (chunk, 'binary');
             });
-            response.addListener ('complete', function () {
-               clientResponse.finish ();
+            response.addListener ('end', function () {
+               clientResponse.close ();
             });
          });
+         request.close ();
       });
-   }
+   };
 };
 
 
@@ -145,18 +147,18 @@ var Forge = function (config) {
 var forge = new Forge (config);
 
 // Search Assets
-// forge.get ('^/assets/search/?$', function (asset) {
-//    sys.p (this.request.headers);
-//    this.request.proxy.path = '/assets/_fti/test/all';
-//    this.proxy.request (this.request, this.response);
-// });
+forge.get ('^/assets/search/?$', function (asset) {
+   sys.p (this.request.headers);
+   this.request.proxy.path = '/forge/_fti/assets/all';
+   this.proxy.request (this.request, this.response);
+});
 
 // Get All Assets
-// forge.get ('^/assets/?$', function () {
-//    sys.puts ('assets_all_docs')
-//    this.request.proxy.path = '/assets/_all_docs';
-//    this.proxy.request (this.request, this.response);
-// });
+forge.get ('^/assets/?$', function () {
+   this.request.proxy.path = '/forge/_design/assets/_view/by_date';
+   this.request.proxy.params.descending = 'true';
+   this.proxy.request (this.request, this.response);
+});
 
 // Get Asset Attachemnt
 // forge.get ('^/assets/([^/]*)/([^/]*)', function (asset, attachment) {
