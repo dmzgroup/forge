@@ -1,5 +1,8 @@
-process.mixin(exports, {
-   serverPort: 8080,
-   couchPort: 5984,
-   couchHost: 'dmzforge'
-});
+exports.server = {
+  port: 8080,
+};
+
+exports.couchdb = {
+  port: 5984,
+  host: 'dmzforge',
+};
