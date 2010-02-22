@@ -1,0 +1,23 @@
+%h1 Search
+%form{:action => "/assets/search", :method => "get"}
+  %input{:name      => "q",
+         :type      => "text",
+         :tabindex  => 1,
+         :maxlength => 2048,
+         :size      => 15}
+  %input{:type     => "submit",
+         :tabindex => 2,
+         :value    => "Search",
+         :name     => "b"}
+
+%h1 Assets
+- @assets.each do |asset|
+  %a{:href => "/assets/#{asset['_id']}"}
+    = (thumbnail_link asset, {:width => 200, :height => 150})
+  %h2
+    %a{:href => "/assets/#{asset['_id']}"}= asset['name']
+
+  %h3= asset['brief']
+  %p= asset['details']
+  %p= asset['_id']
+  

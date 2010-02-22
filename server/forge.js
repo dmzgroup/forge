@@ -49,7 +49,10 @@ var Server = function (port, host, proxy) {
             params: uri.query || {},
          };
          
-         request.proxy = request.uri;
+         request.proxy = {
+            path: uri.pathname || '/',
+            params: uri.query || {},
+         };
          
          for (ix = 0; ix < self._routes.length; ix++) {
             route = self._routes[ix];
@@ -102,7 +105,9 @@ var Proxy = function (port, host) {
       var search = querystring.stringify (clientRequest.proxy.params);
       var path = clientRequest.proxy.path + '?' + search;
 
-sys.puts ('Proxy ' + clientRequest.method + ': ' + clientRequest.uri.path + " -> " + clientRequest.proxy.path);
+sys.puts ('Proxy ' + clientRequest.method + ': '
+                   + clientRequest.uri.path + " -> "
+                   + clientRequest.proxy.path);
 
       var request = this.client.request (clientRequest.method, path, clientRequest.headers);
          
@@ -147,11 +152,11 @@ var Forge = function (config) {
 var forge = new Forge (config);
 
 // Search Assets
-forge.get ('^/assets/search/?$', function (asset) {
-   sys.p (this.request.headers);
-   this.request.proxy.path = '/forge/_fti/assets/all';
-   this.proxy.request (this.request, this.response);
-});
+// forge.get ('^/assets/search/?$', function (asset) {
+//    sys.p (this.request.headers);
+//    this.request.proxy.path = '/forge/_fti/assets/all';
+//    this.proxy.request (this.request, this.response);
+// });
 
 // Get All Assets
 forge.get ('^/assets/?$', function () {
@@ -161,34 +166,16 @@ forge.get ('^/assets/?$', function () {
 });
 
 // Get Asset Attachemnt
-// forge.get ('^/assets/([^/]*)/([^/]*)', function (asset, attachment) {
-//    sys.puts ('get asset attachment: ' + asset);
-//    this.proxy.request (this.request, this.response);
-// });
-
-// Get Asset
-// forge.get ('^/assets/(\d+)', function (year, month, day) {
-// sys.puts (year + '-' + month + '-' + day);
-//    this.request.proxy.path = '/assets/_design/test/_view/by_date_short';
-//    this.proxy.request (this.request, this.response);
-// });
-
-// forge.get ('^/assets/([^/]*)', function (asset) {
-//    sys.puts ('get asset : ' + asset);
-//    this.proxy.request (this.request, this.response);
-// });
-
-
-// Update/Create Asset
-forge.get ('^/assets/([^/]*)', function (asset) {
-   sys.puts ('get asset: ' + asset);
+forge.get ('^/assets/([^/]*)/([^/]*)', function (asset, attachment) {
+   this.request.proxy.path = '/forge/' + asset + '/' + attachment;
    this.proxy.request (this.request, this.response);
 });
 
-// forge.del ('^/assets/([^/]*)', function (asset) {
-//    this.response.reply (403, { error: 'forbidden', reason: 'deleting and asssets is not permitted'});
-// });
-
+// Get Asset
+forge.get ('^/assets/([^/]*)', function (asset) {
+   this.request.proxy.path = '/forge/' + asset;
+   this.proxy.request (this.request, this.response);
+});
 
 // Get new UUID's
 forge.get ('^/uuids/?$', function () {
