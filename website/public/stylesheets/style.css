@@ -1,0 +1,26 @@
+html, body {
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+}
+#main {
+	margin: 5px 20px;
+}
+div.left {
+	float: left;
+	margin-right: 20px;
+	width: 200px;
+	margin-bottom: 30px;
+}
+div.left p {
+	text-align: center;
+}
+img {
+	border: 0px none;
+}
+div.center {
+	width: 600px;
+}
+.clear {
+  clear : both;
+}

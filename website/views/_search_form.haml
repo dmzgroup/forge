@@ -1,9 +1,0 @@
-%form{:method => "get", :action => "/assets/search", :id => "search-form"}
-  %input{:type      => "text",
-         :value     => @query.to_s.gsub(%r{#{DEFAULT_QUERY}}, ''),
-         :name      => "q",
-         :size      => 31,
-         :maxlength => 2048}
-  %input{:type  => "submit",
-         :value => "Search",
-         :name  => "s"}

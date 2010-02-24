@@ -148,20 +148,25 @@ var Forge = function (config) {
    };
 };
 
-
 var forge = new Forge (config);
 
 // Search Assets
-// forge.get ('^/assets/search/?$', function (asset) {
-//    sys.p (this.request.headers);
-//    this.request.proxy.path = '/forge/_fti/assets/all';
-//    this.proxy.request (this.request, this.response);
-// });
+forge.get ('^/assets/search/?$', function (asset) {
+   this.request.proxy.path = '/forge/_fti/assets/all';
+   // if (!this.request.proxy.params.q) {
+   //    this.request.proxy.params.q = 'type:assets';
+   // }
+   this.proxy.request (this.request, this.response);
+});
 
 // Get All Assets
 forge.get ('^/assets/?$', function () {
    this.request.proxy.path = '/forge/_design/assets/_view/by_date';
-   this.request.proxy.params.descending = 'true';
+   //if (!this.request.proxy.params.descending) {
+      //this.request.proxy.params.descending = 'true';
+   //}
+   //this.request.proxy.path = '/forge/_fti/assets/all';
+   // this.request.proxy.params.q = 'type:assets';
    this.proxy.request (this.request, this.response);
 });
 

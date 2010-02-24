@@ -1,20 +1,17 @@
-#search
-  = partial :_search_form
+#image.span-15.colborder
+  %h2= @asset['name']
+  .slideshow
+    - @thumbnails.each do |thumb|
+      %img{:src => "/images/#{@asset['_id']}/#{thumb}", :width => "600", :height => "400"}
+  %br
 
-%h1
-  = @asset['name']
-
-.slideshow
-  - @thumbnails.each do |thumb|
-    %img{:src => "#{@@forge}/assets/#{@asset['_id']}/#{thumb}", :width => "600", :height => "400"}
-
-#brief
-  %h2= @asset['brief']
-
-#description
-  %p= @asset['details']
-
-%ul#keywords
-  - @asset['keywords'].each do |keyword|
-    %li= keyword
-
+#info.span-8.last
+  .box
+    %h3.caps Brief
+    %p= @asset['brief']
+    %h3.caps Details
+    %p= @asset['details']
+    %h3.caps Keywords
+    %ul
+      - @asset['keywords'].each do |keyword|
+        %li= keyword

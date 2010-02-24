@@ -1,25 +1,30 @@
 function (rec) {
    
-   if (rec['type'] == 'asset') {
-      
+   if (rec.type == 'asset') {
+
       var doc = new Document ();
       var ix;
       
       doc.add (rec.brief);
       doc.add (rec.brief, {'field' : 'brief'});
-
+      
       doc.add (rec.details);
       doc.add (rec.details, {'field' : 'details'});
-
+      
       doc.add (rec.name);
       doc.add (rec.name, {'field' : 'name'});
-
+      
       doc.add (rec.media, {'field' : 'media'});
       doc.add (rec.creator, {'field' : 'creator'});
       doc.add (rec.license, {'field' : 'license'});
 
-      doc.add ((rec.keywords || []).join (', '));
-      doc.add ((rec.keywords || []).join (', '), {'field' : 'keyword'});
+      // doc.add ((rec.keywords || []).join (', '));
+      // doc.add ((rec.keywords || []).join (', '), {'field' : 'keyword'});
+      
+      for (ix in rec.keywords) {
+         doc.add (rec.keywords[ix]);
+         doc.add (rec.keywords[ix], {'field' : 'keyword'});
+      }
       
       for (ix in rec.current) {
          doc.add (ix);
@@ -36,7 +41,7 @@ function (rec) {
       //    }
       // }
       
-      doc.add ('asset', {'field':'type'})
+      doc.add (rec.type, {'field':'type'});
       
       return doc;
    }
