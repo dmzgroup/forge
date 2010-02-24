@@ -24,6 +24,7 @@ static const dmz::String LocalKeywords ("keywords");
 static const dmz::String LocalValue ("value");
 static const dmz::String LocalIgnore ("ignore");
 static const dmz::String LocalThumbnails ("thumbnails");
+static const dmz::String LocalPreviews ("previews");
 static const dmz::String LocalImages ("images");
 static const dmz::String LocalCurrent ("current");
 static const dmz::String LocalMimeIVE ("model/x-ive");
@@ -188,7 +189,7 @@ dmz::ForgePluginAssetDocumentQt::on_imageButton_pressed () {
    String image (_currentConfigFile);
    image << ".tdb/";
    if (!is_valid_path (image)) { create_directory (image); }
-   image << "thumbnail";
+   image << "preview";
    Data out = _convert.to_data (image);
    _startScreenMsg.send (&out);
 }
@@ -243,18 +244,9 @@ dmz::ForgePluginAssetDocumentQt::_save_info () {
       current.store_attribute (LocalMimeIVE, Rev + FileSHA + ext);
    }
 
-   _currentConfig.remove_attribute (LocalOriginalName);
-
-   Config oname;
-
-   if (!_currentConfig.lookup_config (LocalOriginalName, oname)) {
-
-      oname = Config (LocalOriginalName);
-      _currentConfig.add_config (oname);
-   }
-
-   oname.remove_attribute (FileSHA);
+   Config oname (LocalOriginalName);
    oname.store_attribute (Rev + FileSHA, file + ext);
+   _currentConfig.overwrite_config (oname);
 
    String outStr;
    StreamString out (outStr);
@@ -286,7 +278,7 @@ dmz::ForgePluginAssetDocumentQt::_update_thumbnails (const StringContainer &List
    _ui.imageList->clear ();
 
    if (!_currentConfig) { _currentConfig = Config ("global"); }
-   Config tdb (LocalThumbnails);
+   Config previews (LocalPreviews);
 
    StringContainerIterator it;
    String file;
@@ -303,10 +295,11 @@ dmz::ForgePluginAssetDocumentQt::_update_thumbnails (const StringContainer &List
       split_path_file_ext (file, p, root, ext);
       Config img (LocalImages);
       img.store_attribute (LocalValue, root + ext);
-      tdb.add_config (img);
+      previews.add_config (img);
    }
 
-   _currentConfig.overwrite_config (tdb);
+   _currentConfig.remove_config (LocalThumbnails);
+   _currentConfig.overwrite_config (previews);
 }
 
 
@@ -372,7 +365,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
             Config imgList;
 
             if (_currentConfig.lookup_all_config (
-                  LocalThumbnails + "." + LocalImages,
+                  LocalPreviews + "." + LocalImages,
                   imgList)) {
 
  
