@@ -1,8 +1,18 @@
 #image.span-15.colborder
   %h2= @asset['name']
-  .slideshow
-    - @thumbnails.each do |thumb|
-      %img{:src => "/images/#{@asset['_id']}/#{thumb}", :width => "600", :height => "400"}
+  #slideshow
+    #controls
+      %span
+        %a#prev{:href => ""}Prev
+      %span
+        %a#next{:href => ""}Next
+      %span
+        %a#pause{:href => ""}Pause
+      %span
+        %a#play{:href => ""}Play
+    #slides
+      - @thumbnails.each do |thumb|
+        %img{:src => "/images/#{@asset['_id']}/#{thumb}", :width => "600", :height => "400"}
   %br
 
 #info.span-8.last
@@ -14,4 +24,5 @@
     %h3.caps Keywords
     %ul
       - @asset['keywords'].each do |keyword|
-        %li= keyword
+        %li
+          %a{:href => "/search?q=keyword:#{keyword}"}= keyword

@@ -24,3 +24,9 @@ div.center {
 .clear {
   clear : both;
 }
+#controls { z-index: 1000; position: absolute; top: 0; left: 0; display: none;
+    background-color: #ffc; border: 1px solid #ddd; margin: 0; padding: 6px; 
+    width: 200px;
+}
+#controls span { margin: 0 5px }
+#slideshow { position: relative; width: 0px; margin: 0px; }

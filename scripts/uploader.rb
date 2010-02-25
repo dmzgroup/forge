@@ -17,7 +17,7 @@ end
 
 class Uploader
   def initialize args={}
-    @db = CouchRest.database! 'http://localhost:5984/assets'
+    @db = CouchRest.database! 'http://dmzforge:5984/forge'
     @db.recreate!
     @uuid = []
   end
@@ -28,7 +28,7 @@ class Uploader
   end
   
   def save_doc
-    @doc['updated'] = create_date_array
+    @doc['updated_at'] = create_date_array
     response = @db.save_doc @doc
     @doc['_rev'] = response['rev']
     response['ok']
@@ -42,7 +42,7 @@ class Uploader
   end
   
   def process_asset file
-puts (file)
+    puts ('processing: ' + file)
     jsonFile = file + '.json'
     thumbDir = jsonFile + '.tdb'
     if File.exists? jsonFile
@@ -54,7 +54,7 @@ puts (file)
         @doc.database = @db
         @id = @doc['_id']
         @uuid << @id
-        @doc['created'] = create_date_array
+        @doc['created_at'] = create_date_array
         if save_doc
           upload_attachment file
           upload_thumbnails thumbDir
@@ -72,7 +72,7 @@ puts (file)
   
   def upload_thumbnails dir
     type = 'image/png'
-    images = @doc['thumbnails']['images']
+    images = @doc['previews']['images']
     images.each do |image|
       file = File.join(dir, image)
       put_attachment(image, file, type)

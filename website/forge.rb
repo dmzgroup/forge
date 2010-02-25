@@ -9,7 +9,7 @@ require 'pp'
 
 helpers do
   def thumbnail_link(doc, options={})
-    filename = doc['thumbnails']['images'][0]
+    filename = doc['previews']['images'][0]
     attrs = options.map{|kv| %Q|#{kv.first}="#{kv.last}"|}.join(" ")
     %Q|<img #{attrs} src="/images/#{doc['_id']}/#{filename}"|
   end
@@ -36,7 +36,7 @@ get '/assets/:asset' do
   data = RestClient.get "#{@@forge}/assets/#{params['asset']}"
   @asset = JSON.parse(data)
   # etag(@asset['_rev'])
-  @thumbnails = @asset['thumbnails']['images'];
+  @thumbnails = @asset['previews']['images'];
   @title = @asset['name']
   haml :asset
 end

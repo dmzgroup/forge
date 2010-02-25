@@ -10,15 +10,24 @@
     %link{:rel => "stylesheet", :href => "/stylesheets/style.css", :type => "text/css", :media => "screen, projection"}
     %script{:src => "http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js", :type => "text/javascript"}
     %script{:src => "/javascript/jquery.cycle.all.2.72.js", :type => "text/javascript"}
-    %script{:type => "text/javascript"}
-      :plain
-        $(document).ready(function() {
-          $('.slideshow').cycle({
-            fx: 'fade',
-            timeout: 500,
-            speed: 0,
-          });
-        });
+    :javascript
+      $(function() {
+         $('#pause').click(function() { $('#slides').cycle('pause'); return false; });
+         $('#play').click(function() { $('#slides').cycle('resume'); return false; });
+
+         $('#slideshow').hover(
+             function() { $('#controls').fadeIn(); },
+             function() { $('#controls').fadeOut(); }
+         );
+
+         $('#slides').cycle({
+             fx:     'fade',
+             timeout: 250,
+             speed:   0,
+             next:   '#next',
+             prev:   '#prev'
+         });
+      });
 
 %body
   .container
@@ -26,8 +35,8 @@
     %hr
     #header.span-24.last
       #logo.span-14
-        %h1 DMZ Forge*
-        %h3.alt *Some Assembly Required
+        %a{:href => '/'}
+          %img{:src => '/images/DMZ_Forge_v1_Invert.png', :width => 324, :height => 127, :alt => 'DMZ Forge'}
       #search.span-10.last
         %form{:method => "get", :action => "/search", :id => "search-form"}
           %input.title{:type => "text", :value => "", :name => "q"}
