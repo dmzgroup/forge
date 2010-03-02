@@ -84,6 +84,7 @@ namespace dmz {
 
          String _fileRoot;
          Int32 _fileIndex;
+         Int32 _maxFiles;
          StringContainer _fileList;
 
       private:

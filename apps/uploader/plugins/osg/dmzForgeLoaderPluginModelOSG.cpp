@@ -26,7 +26,8 @@ dmz::ForgeLoaderPluginModelOSG::ForgeLoaderPluginModelOSG (
       _radius (0.0),
       _heading (0.0),
       _pitch (0.0),
-      _fileIndex (0) {
+      _fileIndex (0),
+      _maxFiles (16) {
 
    _init (local);
 }
@@ -84,7 +85,7 @@ dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
 
    if (_fileIndex > 0) {
 
-      if (_fileIndex > 1) { _heading += TwoPi64 / 8.0; }
+      if (_fileIndex > 1) { _heading += TwoPi64 / Float64 (_maxFiles); }
       _set_portal ();
       String file (_fileRoot);
       file << _fileIndex << ".png";
@@ -92,7 +93,7 @@ dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
       Data out = _convert.to_data (file);
       _doCaptureMsg.send (&out);
       _fileIndex++;
-      if (_fileIndex > 8) { _fileIndex = -1; }
+      if (_fileIndex > _maxFiles) { _fileIndex = -1; }
    }
    else if (_fileIndex < 0) {
 
@@ -111,7 +112,7 @@ dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
          Data out = _listConvert.to_data (_fileList);
          _doneScreenMsg.send (&out);
          _fileIndex = 0;
-         _heading += TwoPi64 / 8.0;
+         _heading += TwoPi64 / Float64 (_maxFiles);
          _set_portal ();
       }
    }
