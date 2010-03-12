@@ -87,7 +87,7 @@ struct QtExtAppShellResources::State {
    ResourceStruct *current;
    QNetworkAccessManager *networkAccessManager;
    QNetworkReply *reply;
-   QFile downloadFile;
+   QTemporaryFile *downloadFile;
    QTime downloadTime;
    Int32 downloadCount;
    Int32 totalCount;
@@ -98,6 +98,7 @@ struct QtExtAppShellResources::State {
    
    Boolean init_cache_dir ();
    void build_resources_list (const Config &Resources);
+   void update_resources ();
 };
 
 
@@ -112,7 +113,7 @@ QtExtAppShellResources::State::State (AppShellResourcesStruct &res) :
       current (0),
       networkAccessManager (0),
       reply (0),
-      downloadFile (),
+      downloadFile (0),
       downloadTime (),
       downloadCount (0),
       totalCount (0),
@@ -122,6 +123,8 @@ QtExtAppShellResources::State::State (AppShellResourcesStruct &res) :
 
 
 QtExtAppShellResources::State::~State () {
+
+   if (downloadFile) { delete downloadFile; downloadFile = 0;}
 
    resourceTable.empty ();
    downloadQueue.clear ();
@@ -207,6 +210,23 @@ QtExtAppShellResources::State::build_resources_list (const Config &Resources) {
 }
 
 
+void
+QtExtAppShellResources::State::update_resources () {
+
+   ResourcesUpdate updater (app.get_context ());
+
+   HashTableStringIterator it;
+   ResourceStruct *rs (resourceTable.get_first (it));
+
+   while (rs) {
+      
+      log.debug << "Updating resource: " << rs->Name << endl;
+      updater.update_resource_config (rs->Name, rs->file);
+      rs = resourceTable.get_next (it);
+   }
+}
+
+
 QtExtAppShellResources::QtExtAppShellResources (
       AppShellResourcesStruct &resources,
       QObject *parent) :
@@ -283,13 +303,17 @@ QtExtAppShellResources::exec () {
       _state.networkAccessManager = 0;
    }
    
-   if (_state.app.is_error ()) {
-   
-      _state.app.quit ("Unable to verify resources.");
-   }
-   
    delete _state.ui; _state.ui = 0;
    delete dialog; dialog = 0;
+
+   if (_state.app.is_error ()) {
+   
+      _state.app.quit ("Unable to update resources.");
+   }
+   else {
+      
+      _state.update_resources ();
+   }
 }
 
 
@@ -307,13 +331,14 @@ QtExtAppShellResources::_start_next_download () {
 
       if (_state.current) {
          
-         _state.downloadFile.setFileName (_state.current->file.get_buffer ());
-
-         if (_state.downloadFile.open (QIODevice::WriteOnly)) {
+         if (_state.downloadFile) { delete _state.downloadFile; _state.downloadFile = 0; }
+         
+         _state.downloadFile = new QTemporaryFile (QDir::tempPath () + "/dmz_forge_download.XXXXXX");
+         
+         if (_state.downloadFile->open ()) {
 
             String forge (_state.forge);
             forge << "/assets/" << _state.current->Id << "/" << _state.current->Version;
-            // forge << "/forge/" << _state.current->Id << "/" << _state.current->Version;
             
             QNetworkRequest request;
             request.setUrl (QUrl (forge.get_buffer ()));
@@ -360,9 +385,9 @@ QtExtAppShellResources::_start_next_download () {
             _state.downloadTime.start ();
             _state.log.debug << "Downloading resource: " << forge << endl;
          }
-         else {
+         else if (_state.downloadFile) {
 
-            _set_error (qPrintable (_state.downloadFile.errorString ()));
+            _set_error (qPrintable (_state.downloadFile->errorString ()));
          }
       }
       else {
@@ -401,59 +426,77 @@ QtExtAppShellResources::_download_progress (qint64 bytesReceived, qint64 bytesTo
 void
 QtExtAppShellResources::_download_finished () {
    
-   if (_state.ui) {
+   if (_state.ui && _state.reply && _state.downloadFile && _state.current) {
 
       _state.ui->currentProgressBar->reset ();
       _state.ui->infoLabel->setText ("");
       _state.ui->nameLabel->setText ("");
-   }
    
-   _state.downloadFile.close ();
+      Boolean validDownload (False);
+      
+      if (_state.reply->error () != QNetworkReply::NoError) {
    
-   if (_state.reply->error () != QNetworkReply::NoError) {
-   
-      _set_error (qPrintable (_state.reply->errorString ()));
-   }
-   else {
+         _set_error (qPrintable (_state.reply->errorString ()));
+      }
+      else {
 
-      if (_state.current && _state.current->hash) {
+         validDownload = True;
+         _state.downloadFile->close ();
          
-         const String Hash (sha_from_file (_state.current->file));
+         if (_state.current->hash) {
+         
+            const QString FileName (_state.downloadFile->fileName ());
+            const String Hash (sha_from_file (qPrintable (FileName)));
+         
+            if (Hash == _state.current->hash) {
 
-         if (Hash == _state.current->hash) {
+               _state.log.info << "Resource verified: " << _state.current->Name << endl;
+            }
+            else {
 
-            _state.log.info << "Resource verified: " << _state.current->Name << endl;
+               validDownload = False;
+               
+               String msg ("Invalid hash for resource: ");
+               msg << _state.current->Name;
+               _set_error (msg);
+            }
          }
-         else {
-
-            String msg ("Invalid hash for resource: ");
+         
+         _state.downloadCount++;
+      }
+      
+      if (validDownload) {
+         
+         _state.downloadFile->setAutoRemove (False);
+         
+         if (!_state.downloadFile->rename (_state.current->file.get_buffer ())) {
+         
+            _state.downloadFile->setAutoRemove (True);
+            
+            String msg ("Failed to rename downloaded file for resource: ");
             msg << _state.current->Name;
             _set_error (msg);
          }
       }
       
-      _state.downloadCount++;
-   }
-   
-   if (_state.app.is_error () && _state.current) {
+      delete _state.downloadFile;
+      _state.downloadFile = 0;
       
-      remove_file (_state.current->file);
+      _state.reply->deleteLater ();
+      _state.reply = 0;
+      _state.current = 0;
+      
+      _start_next_download ();
    }
-
-   _state.reply->deleteLater ();
-   _state.reply = 0;
-   _state.current = 0;
-
-   _start_next_download ();
 }
 
 
 void
 QtExtAppShellResources::_download_ready_read () {
    
-   if (_state.reply) {
+   if (_state.reply && _state.downloadFile) {
       
-      _state.downloadFile.write (_state.reply->readAll ());
+      _state.downloadFile->write (_state.reply->readAll ());
    }
 }
 

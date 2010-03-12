@@ -47,6 +47,7 @@ var Server = function (port, host, proxy) {
          request.uri = {
             path: uri.pathname || '/',
             params: uri.query || {},
+            search: uri.search || '',
          };
          
          request.proxy = {
@@ -95,22 +96,24 @@ var Server = function (port, host, proxy) {
 };
 
 
-var Proxy = function (port, host) {
+var Proxy = function (port, host, db) {
    var self = this;
    this._port = port || 5984;
    this._host = host || '127.0.0.1';
+   this.db = db || 'forge';
    this.client = http.createClient (this._port, this._host);
+   this._log = http.createClient (this._port, this._host);
    
    this.request = function (clientRequest, clientResponse) {
-      var search = querystring.stringify (clientRequest.proxy.params);
-      var path = clientRequest.proxy.path + '?' + search;
+      var search = '?' + querystring.stringify (clientRequest.proxy.params);
+      var path = clientRequest.proxy.path + search;
 
-sys.puts ('Proxy ' + clientRequest.method + ': '
-                   + clientRequest.uri.path + " -> "
-                   + clientRequest.proxy.path);
+sys.puts ('Proxy ' + clientRequest.method + ': ' + Date ());
+sys.puts ('  ' + clientRequest.uri.path + " -> " + clientRequest.proxy.path);
+//sys.puts ('  ' + clientRequest.uri.search + " -> " + search);
 
       var request = this.client.request (clientRequest.method, path, clientRequest.headers);
-         
+      
       clientRequest.addListener ('data', function (chunk) {
          request.write (chunk);
       });
@@ -135,7 +138,7 @@ sys.puts ('Proxy ' + clientRequest.method + ': '
 var Forge = function (config) {
    var self = this;
    this.config = config;
-   this.proxy = new Proxy (this.config.couchdb.port, this.config.couchdb.host);
+   this.proxy = new Proxy (this.config.couchdb.port, this.config.couchdb.host, this.config.couchdb.db);
    this.server = new Server (this.config.server.port, this.config.server.host, this.proxy);
    
    this.get = this.server.get;
@@ -152,7 +155,7 @@ var forge = new Forge (config);
 
 // Search Assets
 forge.get ('^/assets/search/?$', function (asset) {
-   this.request.proxy.path = '/forge/_fti/assets/all';
+   this.request.proxy.path = path ('/', this.proxy.db, '_fti/assets/all');
    // if (!this.request.proxy.params.q) {
    //    this.request.proxy.params.q = 'type:assets';
    // }
@@ -161,24 +164,24 @@ forge.get ('^/assets/search/?$', function (asset) {
 
 // Get All Assets
 forge.get ('^/assets/?$', function () {
-   this.request.proxy.path = '/forge/_design/assets/_view/by_date';
+   this.request.proxy.path = path.join ('/', this.proxy.db, '_design/assets/_view/by_date');
    //if (!this.request.proxy.params.descending) {
       //this.request.proxy.params.descending = 'true';
    //}
-   //this.request.proxy.path = '/forge/_fti/assets/all';
+   //this.request.proxy.path = '/' + this.proxy.db + '/_fti/assets/all';
    // this.request.proxy.params.q = 'type:assets';
    this.proxy.request (this.request, this.response);
 });
 
 // Get Asset Attachemnt
 forge.get ('^/assets/([^/]*)/([^/]*)', function (asset, attachment) {
-   this.request.proxy.path = '/forge/' + asset + '/' + attachment;
+   this.request.proxy.path = path.join ('/', this.proxy.db, asset, attachment);
    this.proxy.request (this.request, this.response);
 });
 
 // Get Asset
 forge.get ('^/assets/([^/]*)', function (asset) {
-   this.request.proxy.path = '/forge/' + asset;
+   this.request.proxy.path = path.join ('/', this.proxy.db, asset);
    this.proxy.request (this.request, this.response);
 });
 

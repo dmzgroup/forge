@@ -17,8 +17,8 @@ end
 
 class Uploader
   def initialize args={}
-    @db = CouchRest.database! 'http://dmzforge:5984/forge'
-    @db.recreate!
+    @db = CouchRest.database! 'http://localhost:5984/forge'
+    # @db.recreate!
     @uuid = []
   end
   

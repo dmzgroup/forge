@@ -386,6 +386,13 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
             }
          }
       }
+      else {
+         
+         UUID id;
+         create_uuid (id);
+
+         _ui.idLabel->setText (id.to_string (UUID::NotFormatted).get_buffer ());
+      }
    }
    else { _currentConfigFile.flush (); _currentFile.flush (); }
 }
