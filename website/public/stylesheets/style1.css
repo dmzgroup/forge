@@ -1,0 +1,341 @@
+@charset "UTF-8";
+
+h1{
+	font-size:28px;
+	margin-bottom:2px;
+}
+
+h2{
+	font-size:24px;
+	margin-bottom:2px;
+	margin-top:50px;
+}
+
+h3 {
+	font-size:18px;
+	margin-bottom:2px;
+	margin-top:50px;
+}
+
+h4 {
+	font-size:16px;
+	margin-bottom:0px;
+}
+
+h5 {
+	font-size:14px;
+	margin-bottom:0px;
+	margin-top:50px;
+}
+
+h6 {
+	font-size:12px;
+	margin-bottom:0px;
+	margin-top:50px;
+}
+
+p{
+	font-size:10px;
+	margin-top:0px;
+	margin-left:10px;
+	margin-bottom:20px;
+}
+
+.underline{
+	display: block;
+	border-bottom-style: solid;
+	margin-left: 0px;
+	padding-left:43px;
+	margin-top: 0px;
+}
+
+.fullblock{
+	color:#2D2A15;
+	background-color:#FFF;
+	display:block;
+	padding:2px;
+}
+
+.leftblock{
+	margin-left:43px;
+	margin-top:19px;
+	padding:3px;
+	color:#2D2A15;
+	background-color:#FFF;
+	display:block;
+}
+
+.leftborder{
+	border-left:43px solid #FFF;
+	padding-left:2px;
+}
+
+.outline{
+	border-left:41px solid #FFF;
+	padding-left:2px;
+	display: block;
+	border-top-style: solid;
+	border-bottom-style: solid;
+	margin-left: 0px;
+	margin-top: 0px;
+}
+
+.leftspace{
+	padding-left:36px;
+}
+
+body  {
+	font: 100% Verdana, Arial, Helvetica, sans-serif;
+	background-image:url(/images/bg.jpg);
+	background-position:top center;
+	background-repeat:repeat-y;
+	margin: 0; /* it's good practice to zero the margin and padding of the body element to account for differing browser defaults */
+	padding: 0;
+	text-align: center; /* this centers the container in IE 5* browsers. The text is then set to the left aligned default in the #container selector */
+	color: #FFF;
+}
+
+#container { 
+	width: 780px;  /* using 20px less than a full 800px width allows for browser chrome and avoids a horizontal scroll bar */
+	margin: 0 auto; /* the auto margins (in conjunction with a width) center the page */
+	margin-top:30px;
+	border:20px solid #FFF; /* background for left sidebar 1 */
+	text-align: left; /* this overrides the text-align: center on the body element. */
+	padding:1px;
+	background-image:url(/images/bg_content2.jpg);
+} 
+
+#sidebar1 {
+	float: left; /* since this element is floated, a width must be given */
+	width: 150px; /* the actual width of this div, in standards-compliant browsers, or standards mode in Internet Explorer will include the padding and border in addition to the width */
+	padding: 15px 10px 15px 20px; /* padding keeps the content of the div away from the edges */
+	margin-left:-180px;
+}
+
+#sidebar2 {
+	float: right; /* since this element is floated, a width must be given */
+	width: 150px; /* the actual width of this div, in standards-compliant browsers, or standards mode in Internet Explorer will include the padding and border in addition to the width */
+	height:100%;
+	padding: 15px 10px 15px 20px; /* padding keeps the content of the div away from the edges */
+	margin-right:-180px;
+	background:url(/images/imageside.gif);
+}
+
+#mainContent { 
+	margin: 0px; /* the right and left margins on this div element creates the two outer columns on the sides of the page. No matter how much content the sidebar divs contain, the column space will remain. You can remove this margin if you want the #mainContent div's text to fill the sidebar spaces when the content in each sidebar ends. */
+	padding: 0px; /* remember that padding is the space inside the div box and margin is the space outside the div box */
+}
+.fltrt { /* this class can be used to float an element right in your page. The floated element must precede the element it should be next to on the page. */
+	float: right;
+	margin-left: 8px;
+}
+.fltlft { /* this class can be used to float an element left in your page */
+	float: left;
+	margin-right: 8px;
+}
+.clearfloat { /* this class should be placed on a div or break element and should be the final element before the close of a container that should fully contain a float */
+	clear:both;
+    height:0;
+    font-size: 1px;
+    line-height: 0px;
+}
+
+#leftnob {
+	float: left; /* since this element is floated, a width must be given */
+	width: 231px; /* the actual width of this div, in standards-compliant browsers, or standards mode in Internet Explorer will include the padding and border in addition to the width */
+	height:37px;
+	padding: 15px 10px 15px 20px; /* padding keeps the content of the div away from the edges */
+	margin-left:-261px;
+	background-image:url(/images/sidebar_left.gif);
+	background-repeat:no-repeat;
+}
+
+#banner {
+	background-image:url(/images/banner2.jpg);
+	width:780px;
+	height:198px;
+	margin:0px;
+}
+
+#topframe {
+	width:780px;
+	height:90px;
+	margin:0px;
+	background-image:url(/images/frametop.gif);
+}
+
+#bottomframe {
+	width:780px;
+	height:80px;
+	margin:0px;
+	background-image:url(/images/bottomframe.gif);
+}
+
+#item {
+	background-image:url(/images/middleframe.gif);
+	width:780px;
+	height:100px;
+	margin:0px;
+}
+
+#itemspacer {
+	width:780px;
+	height:55px;
+	margin:0px;
+	background-image:url(/images/itemspacer2.gif);
+}
+
+
+
+#num {
+	width:46px;
+	height:27px;
+	color:#999;
+	font-family:sans-serif;
+	text-align:center;
+	font-size:18px;
+	font-weight:600;
+	position:relative;
+	top:22px;
+	left:48px;
+	background-image:url(/images/nob.gif);
+	padding-top: 12px;
+}
+
+
+#item img {
+	position:relative;
+	top:-30px;
+	left:105px;
+	border:1px solid #FFF;
+}
+
+#itemcontent{
+	width:520px;
+	position:relative;
+	top:-105px;
+	left:207px;
+}
+
+#item p{
+	font-size:10px;
+	margin-left:43px;
+	margin-top:19px;
+	padding:3px;
+	color:#2D2A15;
+	background-color:#FFF;
+	display:block;
+}
+
+#imagetag {
+	padding:5px;
+	font-size:10px;
+	position:relative;
+	left:525px;
+	margin-top:15px;
+	width:165px;
+	color:#292A14;
+	background-color:white;
+}
+
+#largeimage {
+	display: block;
+	text-align:center;
+	margin-bottom:30px;
+}
+
+#largeimage img {
+	border:solid #FFF;
+}
+
+#searchform {
+	padding:5px;
+	font-size:10px;
+	position:relative;
+	left:525px;
+	top:15px;
+	width:165px;
+	color:#292A14;
+	background-color:white;
+}
+
+
+#searchform input{
+	width:115px;
+	color:white;
+	background-color:#5F6449;
+	border-style:none;
+}
+
+#nav {
+	position:relative;
+	left:530px;
+	top:60px;
+	width:165px;
+	font-size:14px;
+	color:white;
+}
+
+#navlink{
+	height:37px;
+	margin:0px;
+	padding:0px;
+}
+
+ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 
+
+
+
+a {
+	font-size:14px;
+}
+
+a:link {
+	color:#690;
+	text-decoration: none;
+}
+
+a:visited {
+	text-decoration: none;
+	color:#9A9F7F;
+}
+
+a:hover {
+	color:#B7A100;
+	text-decoration:none;
+}
+
+a:active {
+	text-decoration: none;
+}
+
+
+#navlink a {
+	font-size:14px;
+}
+
+#navlink a:link {
+	color:#FFF;
+	text-decoration: none;
+}
+
+#navlink a:visited {
+	text-decoration: none;
+	color:#9A9F7F;
+}
+
+#navlink a:hover {
+	color:#FF9;
+	text-decoration:none;
+}
+
+#navlink a:active {
+	text-decoration: none;
+}
+
+#controls { z-index: 1000; position: absolute; top: 0; left: 0; display: none;
+    background-color: #ffc; border: 1px solid #ddd; margin: 0; padding: 6px; 
+    width: 250px;
+}
+#controls span { margin: 0 5px }
+#slideshow { position: relative; width: 0px; margin: 0px; }

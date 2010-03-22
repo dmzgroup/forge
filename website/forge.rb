@@ -20,7 +20,7 @@ helpers do
 end
 
 get '/' do
-  data = RestClient.get "#{@@forge}/assets?limit=16&descending=true"
+  data = RestClient.get "#{@@forge}/assets?limit=10&descending=true"
   assetList = JSON.parse(data)['rows']
   
   @assets = assetList.inject([]) do |result, doc|
@@ -29,7 +29,7 @@ get '/' do
     result << asset
   end
 
-  haml :index
+  haml :page1_list
 end
 
 get '/assets/:asset' do
@@ -38,7 +38,7 @@ get '/assets/:asset' do
   # etag(@asset['_rev'])
   @thumbnails = @asset['previews']['images'];
   @title = @asset['name']
-  haml :asset
+  haml :page2_info
 end
 
 get '/search' do
@@ -64,7 +64,7 @@ get '/search' do
     results = JSON.parse(data)
   rescue
     query = "type:asset"
-    redirect("/assets/search?q=#{query}")
+    redirect("/search?q=#{query}")
   end
   
   @assets = results['rows'].inject([]) do |result, doc|
@@ -73,8 +73,7 @@ get '/search' do
     result << asset
   end
 
-  @title = "Search Results"
-  haml results['total_rows'] == 0 ? :no_results : :search
+  haml :page1_list
 end
 
 get '/images/:asset/:image.:ext' do
@@ -84,12 +83,4 @@ get '/images/:asset/:image.:ext' do
   rescue
     404
   end
-end
-
-not_found do
-  haml :'404'
-end
-
-error do
-  haml :'500'
 end

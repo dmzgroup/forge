@@ -1,0 +1,28 @@
+#imagetag
+  = @asset['name']
+#largeimage
+  #slideshow
+    #controls
+      %span
+        %a#prev{:href => ""}Prev
+      %span
+        %a#next{:href => ""}Next
+      %span
+        %a#pause{:href => ""}Pause
+      %span
+        %a#play{:href => ""}Play
+    #slides
+      - @thumbnails.each do |thumb|
+        %img{:src => "/images/#{@asset['_id']}/#{thumb}", :width => "774", :height => "600"}
+
+%h2.underline
+  = @asset['name']
+%p.leftspace
+  = @asset['brief']
+%p.leftblock
+  = @asset['details']
+%p.leftspace
+  Keywords -
+  - @asset['keywords'].each do |keyword|
+    %a{:href => "/search?q=keyword:#{keyword}"}
+      = keyword
