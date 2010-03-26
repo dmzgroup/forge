@@ -1,0 +1,6 @@
+lmk.set_name "dmzForgeFramework"
+lmk.add_files {
+   "dmzForgeConsts.h",
+   "dmzForgeModule.h",
+   "dmzForgeObserver.h",
+}

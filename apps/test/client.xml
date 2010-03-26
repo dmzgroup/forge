@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<plugin-list>
+   <plugin name="dmzForgeQtPluginClient" unique="forge-client"/>
+</plugin-list>
+<forge-client>
+   <webservice host="localhost" port="8080"/>
+</forge-client>
+</dmz>
