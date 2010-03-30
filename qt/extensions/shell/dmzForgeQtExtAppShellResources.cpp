@@ -1,4 +1,4 @@
-#include "dmzQtExtAppShellResources.h"
+#include "dmzForgeQtExtAppShellResources.h"
 #include <dmzApplication.h>
 #include <dmzAppShellExt.h>
 #include <dmzFoundationSHA.h>
@@ -75,7 +75,7 @@ struct ResourceStruct {
 };
 
 
-struct QtExtAppShellResources::State {
+struct ForgeQtExtAppShellResources::State {
    
    AppShellResourcesStruct &resources;
    Application &app;
@@ -102,10 +102,10 @@ struct QtExtAppShellResources::State {
 };
 
 
-QtExtAppShellResources::State::State (AppShellResourcesStruct &res) :
+ForgeQtExtAppShellResources::State::State (AppShellResourcesStruct &res) :
       resources (res),
       app (res.app),
-      log ("dmzQtExtAppShellResources", res.app.get_context ()),
+      log ("dmzForgeQtExtAppShellResources", res.app.get_context ()),
       cacheDir (),
       forge ("http://api.dmzforge.org"),
       resourceTable (),
@@ -122,7 +122,7 @@ QtExtAppShellResources::State::State (AppShellResourcesStruct &res) :
 }
 
 
-QtExtAppShellResources::State::~State () {
+ForgeQtExtAppShellResources::State::~State () {
 
    if (downloadFile) { delete downloadFile; downloadFile = 0;}
 
@@ -132,7 +132,7 @@ QtExtAppShellResources::State::~State () {
 
 
 Boolean
-QtExtAppShellResources::State::init_cache_dir () {
+ForgeQtExtAppShellResources::State::init_cache_dir () {
 
    Boolean retVal (False);
    cacheDir = get_home_directory ();
@@ -164,7 +164,7 @@ QtExtAppShellResources::State::init_cache_dir () {
 
 
 void
-QtExtAppShellResources::State::build_resources_list (const Config &Resources) {
+ForgeQtExtAppShellResources::State::build_resources_list (const Config &Resources) {
    
    Config list;
    if (Resources.lookup_all_config ("resource", list)) {
@@ -211,7 +211,7 @@ QtExtAppShellResources::State::build_resources_list (const Config &Resources) {
 
 
 void
-QtExtAppShellResources::State::update_resources () {
+ForgeQtExtAppShellResources::State::update_resources () {
 
    ResourcesUpdate updater (app.get_context ());
 
@@ -227,7 +227,7 @@ QtExtAppShellResources::State::update_resources () {
 }
 
 
-QtExtAppShellResources::QtExtAppShellResources (
+ForgeQtExtAppShellResources::ForgeQtExtAppShellResources (
       AppShellResourcesStruct &resources,
       QObject *parent) :
       QObject (parent),
@@ -262,14 +262,14 @@ QtExtAppShellResources::QtExtAppShellResources (
 }
 
 
-QtExtAppShellResources::~QtExtAppShellResources () {
+ForgeQtExtAppShellResources::~ForgeQtExtAppShellResources () {
 
    delete &_state;
 }
 
 
 void
-QtExtAppShellResources::exec () {
+ForgeQtExtAppShellResources::exec () {
 
    QDialog *dialog = new QDialog (0);
    
@@ -318,7 +318,7 @@ QtExtAppShellResources::exec () {
 
 
 void
-QtExtAppShellResources::_start_next_download () {
+ForgeQtExtAppShellResources::_start_next_download () {
 
    if (_state.downloadQueue.isEmpty ()) {
       
@@ -399,7 +399,7 @@ QtExtAppShellResources::_start_next_download () {
 
 
 void
-QtExtAppShellResources::_download_progress (qint64 bytesReceived, qint64 bytesTotal) {
+ForgeQtExtAppShellResources::_download_progress (qint64 bytesReceived, qint64 bytesTotal) {
 
    static const Float64 ToMB (1024.0*1024.0);
    Float64 received = bytesReceived / ToMB;
@@ -424,7 +424,7 @@ QtExtAppShellResources::_download_progress (qint64 bytesReceived, qint64 bytesTo
 
 
 void
-QtExtAppShellResources::_download_finished () {
+ForgeQtExtAppShellResources::_download_finished () {
    
    if (_state.ui && _state.reply && _state.downloadFile && _state.current) {
 
@@ -492,7 +492,7 @@ QtExtAppShellResources::_download_finished () {
 
 
 void
-QtExtAppShellResources::_download_ready_read () {
+ForgeQtExtAppShellResources::_download_ready_read () {
    
    if (_state.reply && _state.downloadFile) {
       
@@ -502,7 +502,7 @@ QtExtAppShellResources::_download_ready_read () {
 
 
 void
-QtExtAppShellResources::_set_error (const String &Message) {
+ForgeQtExtAppShellResources::_set_error (const String &Message) {
    
    _state.app.set_error (Message);
    emit error ();
@@ -510,7 +510,7 @@ QtExtAppShellResources::_set_error (const String &Message) {
 
 
 void
-QtExtAppShellResources::_init (Config &local) {
+ForgeQtExtAppShellResources::_init (Config &local) {
 
    _state.forge = config_to_string ("forge.url", local, _state.forge);
 }
@@ -521,7 +521,7 @@ extern "C" {
 DMZ_PLUGIN_FACTORY_LINK_SYMBOL void
 dmz_resources_validate (AppShellResourcesStruct &resources) {
 
-   QtExtAppShellResources validate (resources);
+   ForgeQtExtAppShellResources validate (resources);
    validate.exec ();
 }
 

@@ -1,0 +1,22 @@
+#topframe
+  %form#searchform{ :name => "search", :action => "/search", :method => "get" }
+    %label{ :for => "Search" }
+      Search:
+    %input#Search{ :name => "q", :type => "text" }
+- asset_number = 1
+- @assets.each do |asset|
+  #item
+    #num= asset_number
+    %a{:href => "/assets/#{asset['_id']}"}
+      = (thumbnail_link asset, {:width => 100, :height => 75})
+    #itemcontent
+      %h4.underline
+        %a{:href => "/assets/#{asset['_id']}"}= asset['name']
+      %p
+        = asset['brief']
+        %br
+        %a{:href => "/assets/#{asset['_id']}"} Read more
+        
+  #itemspacer
+  - asset_number += 1
+#bottomframe

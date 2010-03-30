@@ -1,7 +1,0 @@
-%h2 Recent Assets
-- @assets.each do |asset|
-  .left
-    %a{:href => "/assets/#{asset['_id']}"}
-      = (thumbnail_link asset, {:width => 200, :height => 150})
-      %p
-        %a{:href => "/assets/#{asset['_id']}"}= asset['name']

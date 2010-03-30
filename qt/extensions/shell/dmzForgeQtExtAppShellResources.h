@@ -1,18 +1,18 @@
-#ifndef DMZ_QT_EXT_APP_SHELL_RESOURCES_DOT_H
-#define DMZ_QT_EXT_APP_SHELL_RESOURCES_DOT_H
+#ifndef DMZ_FORGE_QT_EXT_APP_SHELL_RESOURCES_DOT_H
+#define DMZ_FORGE_QT_EXT_APP_SHELL_RESOURCES_DOT_H
 
 #include <dmzAppShellExt.h>
 #include <QtCore/QObject>
 
 namespace dmz {
 
-class QtExtAppShellResources : public QObject {
+class ForgeQtExtAppShellResources : public QObject {
 
    Q_OBJECT
 
    public:
-      QtExtAppShellResources (AppShellResourcesStruct &resources, QObject *parent = 0);
-      ~QtExtAppShellResources ();
+      ForgeQtExtAppShellResources (AppShellResourcesStruct &resources, QObject *parent = 0);
+      ~ForgeQtExtAppShellResources ();
       
       void exec ();
 
@@ -36,4 +36,4 @@ class QtExtAppShellResources : public QObject {
 
 };
 
-#endif // DMZ_QT_EXT_APP_SHELL_RESOURCES_DOT_H
+#endif // DMZ_FORGE_QT_EXT_APP_SHELL_RESOURCES_DOT_H

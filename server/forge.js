@@ -155,7 +155,7 @@ var forge = new Forge (config);
 
 // Search Assets
 forge.get ('^/assets/search/?$', function (asset) {
-   this.request.proxy.path = path ('/', this.proxy.db, '_fti/assets/all');
+   this.request.proxy.path = path.join ('/', this.proxy.db, '_fti/assets/all');
    // if (!this.request.proxy.params.q) {
    //    this.request.proxy.params.q = 'type:assets';
    // }
