@@ -1,5 +1,5 @@
 require "lmkQt"
-lmkQt.set_name "dmzForgeQtWebService"
+--lmkQt.set_name "dmzForgeQtWebService"
 lmk.set_type "shared"
 lmk.add_files ({"dmzForgeQtWebService.h",}, {src = "moc"})
 lmk.add_files {"dmzForgeQtWebServiceExport.h","dmzForgeQtWebService.h",}

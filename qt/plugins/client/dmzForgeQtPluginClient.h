@@ -1,15 +1,14 @@
 #ifndef DMZ_FORGE_QT_PLUGIN_CLIENT_DOT_H
 #define DMZ_FORGE_QT_PLUGIN_CLIENT_DOT_H
 
+#include <dmzForgeObserver.h>
 #include <dmzRuntimePlugin.h>
-#include <dmzRuntimeMessaging.h>
 #include <QtCore/QObject>
+
 
 namespace dmz {
 
-   class ForgeQtWebService;
-
-   class ForgeQtPluginClient : public QObject, public Plugin {
+   class ForgeQtPluginClient : public QObject, public Plugin, public ForgeObserver {
 
       Q_OBJECT
       
@@ -25,11 +24,14 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
-            
-      protected Q_SLOTS:
-         void _handle_asset_list (const StringContainer &Results);
-         void _handle_asset (const Config &Results);
-
+         
+         // ForgeObserver Interface
+         virtual void handle_reply (
+            const UInt64 RequestId,
+            const ForgeRequestTypeEnum ReqeustType,
+            const Boolean Error,
+            const StringContainer &Results);
+         
       protected:
          void _init (Config &local);
 

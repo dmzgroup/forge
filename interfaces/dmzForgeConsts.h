@@ -2,7 +2,7 @@
 #define DMZ_FORGE_CONSTS_DOT_H
 
 #include <dmzTypesBase.h>
-#include <dmzTypesString.h>
+// #include <dmzTypesString.h>
 
 /*!
 
@@ -17,24 +17,24 @@ namespace dmz {
 //! \addtogroup Forge
 //! @{
 
-   //! Asset typeObject locality enumeration. Defined in dmzObjectConsts.h.
-   enum AssetTypeEnum {
-      ObjectLocalityUnknown, //!< Unknown Locality.
-      ObjectLocal,           //!< Object is local.
-      ObjectRemote,          //!< Object is remote.
+   //! Forge request type enumeraions. Definded in dmzForgeConsts.h.
+   enum ForgeRequestTypeEnum {
+      ForgeRequestUnknown,         //!< unknown request.
+      ForgeRequestSearch,          //!< search request.
+      ForgeRequestGetAsset,        //!< get_asset request.
+      ForgeRequestPutAsset,        //!< put_asset request.
+      ForgeRequestDeleteAsset,     //!< delete_asset request.
+      ForgeRequestGetAssetMedia,   //!< get_asset_media request.
+      ForgeRequestPutAssetMedia,   //!< put_asset_media request.
+      ForgeRequestGetAssetPreview, //!< get_preview request.
+      ForgeRequestPutAssetPreview  //!< put_preview request.
    };
-
-   //! Forge event enumeraion. Definded in dmzForgeConsts.h.
-   enum ForgeEventEnum {
-      ForgeEventSearch,        //!< search event.
-      ForgeEventGetAsset,      //!< get_asset event.
-      ForgeEventPutAsset,      //!< put_asset event.
-      ForgeEventDeleteAsset,   //!< delete_asset event.
-      ForgeEventGetAssetMedia, //!< get_asset_media event.
-      ForgeEventPutAssetMedia, //!< put_asset_media event.
-      ForgeEventGetPreview,    //!< get_preview event.
-      ForgeEventPutPreview     //!< put_preview event.
-   };
+   
+   const char ForgeSearchName[] = "Forge_Search";
+   const char ForgeGetAssetName[] = "Forge_Get_Asset";
+   const char ForgePutAssetName[] = "Forge_Put_Asset";
+   const char ForgeGetAssetMediaName[] = "Forge_Get_Asset_Media";
+   const char ForgeGetAssetPreviewName[] = "Forge_Get_Asset_Preview";
    
    //! Forge media asset type. Defined in dmzForgeConsts.h.
    enum ForgeAssetTypeEnum {

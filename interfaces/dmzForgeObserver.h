@@ -26,11 +26,10 @@ namespace dmz {
          Handle get_forge_observer_handle ();
          String get_forge_observer_name ();
          
-         virtual void receive_results (
-            const UInt32 EventId,
-            const ForgeEventEnum EventType,
-            const String &AssetId,
-            const Boolean Succeeded,
+         virtual void handle_reply (
+            const UInt64 RequestId,
+            const ForgeRequestTypeEnum RequestType,
+            const Boolean Error,
             const StringContainer &Results) = 0;
 
       protected:
@@ -83,11 +82,11 @@ dmz::ForgeObserver::~ForgeObserver () {
 
 
 inline dmz::String
-dmz::ForgeObserver::get_object_observer_name () { return __Info.get_name (); }
+dmz::ForgeObserver::get_forge_observer_name () { return __Info.get_name (); }
 
 
 inline dmz::Handle
-dmz::ForgeObserver::get_object_observer_handle () { return __Info.get_handle (); }
+dmz::ForgeObserver::get_forge_observer_handle () { return __Info.get_handle (); }
 
 
 #endif // DMZ_FORGE_OBSERVER_DOT_H

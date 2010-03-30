@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <dmz>
 <plugin-list>
-   <plugin name="dmzArchiveModuleBasic"/>
-   <plugin name="dmzArchivePluginAutoLoad"/>
-   <plugin name="dmzArchivePluginObject"/>
-   <plugin name="dmzObjectModuleBasic"/>
-   <plugin name="dmzQtPluginObjectInspector" unique="object-inspector"/>
+   <!-- <plugin name="dmzArchiveModuleBasic"/> -->
+   <!-- <plugin name="dmzArchivePluginAutoLoad"/> -->
+   <!-- <plugin name="dmzArchivePluginObject"/> -->
+   <plugin name="dmzForgeModuleQt"/>
+   <!-- <plugin name="dmzObjectModuleBasic"/> -->
    <plugin name="dmzPluginTermExit"/>
 <!--
+   <plugin name="dmzQtPluginObjectInspector" unique="object-inspector"/>
    <plugin name="dmzPluginMsgDump"/>
    <plugin name="dmzObjectPluginDump"/>
    <plugin name="dmzPluginDefinitionsDump"/>
@@ -16,18 +17,8 @@
 <dmzArchivePluginObject>
    <archive>
       <attribute name="Last_Network_Value" contains="True"/>
-      <attribute name="Forge_Asset_Revision">
-         <mask name="text"/>
-      </attribute>
-      <attribute name="Forge_Asset_Name">
-         <mask name="text"/>
-      </attribute>
-      <attribute name="Forge_Asset_Brief">
-         <mask name="text"/>
-      </attribute>
-      <attribute name="Forge_Asset_Details">
-         <mask name="text"/>
-      </attribute>
    </archive>
 </dmzArchivePluginObject>
+<dmzForgeModuleQt>
+</dmzForgeModuleQt>
 </dmz>

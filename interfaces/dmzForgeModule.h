@@ -8,6 +8,8 @@
 #include <dmzTypesString.h>
 
 namespace dmz {
+   
+   class ForgeObserver;
 
    class ForgeModule {
 
@@ -54,31 +56,34 @@ namespace dmz {
          
          // methods that communicate with api.dmzforge.org
          
-         virutal UInt32 search (const String &Value, ForgeObserver *observer) = 0;
+         virtual UInt64 search (
+            const String &Value,
+            ForgeObserver *observer,
+            const UInt32 Limit = 0) = 0;
          
-         virtual UInt32 get_asset (const String &AssetId, ForgeObserver *observer) = 0;
-         virtual UInt32 put_asset (const String &AssetId, ForgeObserver *observer) = 0;
-         virtual UInt32 delete_asset (const String &AssetId, ForgeObserver *observer) = 0;
+         virtual UInt64 get_asset (const String &AssetId, ForgeObserver *observer) = 0;
+         virtual UInt64 put_asset (const String &AssetId, ForgeObserver *observer) = 0;
+         virtual UInt64 delete_asset (const String &AssetId, ForgeObserver *observer) = 0;
          
-         virtual UInt32 get_asset_media (
+         virtual UInt64 get_asset_media (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer) = 0;
          
-         virtual UInt32 put_asset_media (
+         virtual UInt64 put_asset_media (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer,
             const String &MimeType = "") = 0;
 
-         virtual UInt32 get_preview (
+         virtual UInt64 get_preview (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer) = 0;
          
-         virtual UInt32 put_preview (
+         virtual UInt64 put_preview (
             const String &AssetId,
-            const String &Preview,
+            const String &File,
             ForgeObserver *observer) = 0;
          
       protected:

@@ -49,10 +49,11 @@ const Boolean Succeeded,
 const StringContainer &Results)
 \brief Receives the results from an asyncronous forge method call.
 \param[in] EventId Events unique id.
-\param[in] EventType Event type enumeration
-\param[in] AssetId Assets unique id
-\param[in] Succeeded True if the call succeeded. False if an error was encountered.
-\param[in] Results One or more results. If Succeeded is false then results will contain
-a string that describes the reason that the call did not succeed.
+\param[in] EventType Event type enumeration.
+\param[in] AssetId Assets unique id.
+\param[in] Error True if an error was encountered.
+\param[in] Results One or more strings returned from the server. If Error was true then 
+results will conatian a string that describes the specific error.
+
 
 */
