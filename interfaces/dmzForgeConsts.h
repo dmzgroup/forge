@@ -17,19 +17,6 @@ namespace dmz {
 //! \addtogroup Forge
 //! @{
 
-   //! Forge request type enumeraions. Definded in dmzForgeConsts.h.
-   enum ForgeRequestTypeEnum {
-      ForgeRequestUnknown,         //!< unknown request.
-      ForgeRequestSearch,          //!< search request.
-      ForgeRequestGetAsset,        //!< get_asset request.
-      ForgeRequestPutAsset,        //!< put_asset request.
-      ForgeRequestDeleteAsset,     //!< delete_asset request.
-      ForgeRequestGetAssetMedia,   //!< get_asset_media request.
-      ForgeRequestPutAssetMedia,   //!< put_asset_media request.
-      ForgeRequestGetAssetPreview, //!< get_preview request.
-      ForgeRequestPutAssetPreview  //!< put_preview request.
-   };
-   
    const char ForgeSearchName[] = "Forge_Search";
    const char ForgeGetAssetName[] = "Forge_Get_Asset";
    const char ForgePutAssetName[] = "Forge_Put_Asset";

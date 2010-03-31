@@ -421,29 +421,6 @@ dmz::ForgeModuleQt::put_preview (
 }
 
 
-dmz::ForgeRequestTypeEnum
-dmz::ForgeModuleQt::_get_request_type (QNetworkReply *reply) {
-
-   ForgeRequestTypeEnum requestType (ForgeRequestUnknown);
-   
-   if (reply) {
-      
-      const QString Type (reply->property ("requestType").toString ());
-      
-      if (Type == QLatin1String ("search")) {
-
-         requestType = ForgeRequestSearch;
-      }
-      else if (Type == QLatin1String ("get_asset")) {
-
-         requestType = ForgeRequestGetAsset;
-      }
-   }
-   
-   return requestType;
-}
-
-
 dmz::UInt64
 dmz::ForgeModuleQt::_get_request_id (QNetworkReply *reply) {
 
@@ -458,7 +435,7 @@ dmz::ForgeModuleQt::_handle_reply (QNetworkReply *reply) {
    
    if (reply) {
 
-      const ForgeRequestTypeEnum RequestType (_get_request_type (reply));
+      const QString RequestType (reply->property ("requestType").toString ());
       const UInt64 RequestId (_get_request_id (reply));
       
 qDebug () << "_handle_reply: " << reply->property ("requestType").toString ();
@@ -468,37 +445,24 @@ qDebug () << "_handle_reply: " << reply->property ("requestType").toString ();
          QString data (reply->readAll ());
          const String JsonData (qPrintable (data));
          
-         if (RequestType == ForgeRequestUnknown) {
-
-            const QString Type (reply->property ("requestType").toString ());
+         if (RequestType == ForgeSearchName) {
             
-            if (Type == "get_uuids") {
-               
-               _handle_get_uuids (RequestId, JsonData);
-            }
-            else {
-               
-               String msg ("Unknown request type: ");
-               msg << qPrintable (Type);
-
-               _handle_error (RequestId, RequestType, msg);
-            }
+            _handle_search (RequestId, JsonData);
+         }
+         else if (RequestType == "get_uuids") {
+            
+            _handle_get_uuids (RequestId, JsonData);
+         }
+         else if (RequestType == ForgeGetAssetName) {
+            
+            _handle_get_asset (RequestId, JsonData);
          }
          else {
             
-            switch (RequestType) {
-               
-               case ForgeRequestSearch:
-                  _handle_search (RequestId, JsonData);
-                  break;
+            String msg ("Unknown request type: ");
+            msg << qPrintable (RequestType);
 
-               case ForgeRequestGetAsset:
-                  _handle_get_asset (RequestId, JsonData);
-                  break;
-
-               default:
-                  break;
-            }
+            _handle_error (RequestId, qPrintable (RequestType), msg);
          }
       }
       else {
@@ -506,7 +470,7 @@ qDebug () << "_handle_reply: " << reply->property ("requestType").toString ();
          String msg ("Network Error: ");
          msg << qPrintable (reply->errorString ());
          
-         _handle_error (RequestId, RequestType, msg);
+         _handle_error (RequestId, qPrintable (RequestType), msg);
       }
       
       _state.obsTable.remove (RequestId);
@@ -536,11 +500,11 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
          }
       }
       
-      _handle_reply (RequestId, ForgeRequestSearch, container);
+      _handle_reply (RequestId, ForgeSearchName, container);
    }
    else {
       
-      _handle_error (RequestId, ForgeRequestSearch, JsonParseErrorMessage);
+      _handle_error (RequestId, ForgeSearchName, JsonParseErrorMessage);
    }
 }
 
@@ -569,10 +533,6 @@ dmz::ForgeModuleQt::_handle_get_uuids (const UInt64 RequestId, const String &Jso
 _state.log.error << "uuids: " << _state.uuids << endl;
       }
    }
-   else {
-      
-      _handle_error (RequestId, ForgeRequestUnknown, JsonParseErrorMessage);
-   }
 }
 
 
@@ -588,11 +548,11 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
       StringContainer container;
       container.append (JsonData);
       
-      _handle_reply (RequestId, ForgeRequestGetAsset, container);
+      _handle_reply (RequestId, ForgeGetAssetName, container);
    }
    else {
       
-      _handle_error (RequestId, ForgeRequestGetAsset, JsonParseErrorMessage);
+      _handle_error (RequestId, ForgeGetAssetName, JsonParseErrorMessage);
    }
 }
 
@@ -600,7 +560,7 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
 void
 dmz::ForgeModuleQt::_handle_reply (
       const UInt64 RequestId,
-      const ForgeRequestTypeEnum RequestType,
+      const String &RequestType,
       StringContainer &Container) {
 
    ForgeObserver *observer = _state.obsTable.lookup (RequestId);
@@ -614,7 +574,7 @@ dmz::ForgeModuleQt::_handle_reply (
 void
 dmz::ForgeModuleQt::_handle_error (
       const UInt64 RequestId,
-      const ForgeRequestTypeEnum RequestType,
+      const String &RequestType,
       const String &Message) {
 
    ForgeObserver *observer = _state.obsTable.lookup (RequestId);

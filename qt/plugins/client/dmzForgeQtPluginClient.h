@@ -28,7 +28,7 @@ namespace dmz {
          // ForgeObserver Interface
          virtual void handle_reply (
             const UInt64 RequestId,
-            const ForgeRequestTypeEnum ReqeustType,
+            const String &ReqeustType,
             const Boolean Error,
             const StringContainer &Results);
          

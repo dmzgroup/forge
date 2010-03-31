@@ -5,6 +5,7 @@
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzTypesStringContainer.h>
 
 
 struct dmz::ForgeQtPluginClient::State {
@@ -50,32 +51,30 @@ dmz::ForgeQtPluginClient::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      if (0 && _state.forgeModule) {
+      if (_state.forgeModule) {
          
-         UInt64 request = _state.forgeModule->search ("blue", this);
+         UInt64 request = _state.forgeModule->search ("blue", this, 50);
          _state.log.warn << "search request id: " << request << endl;
          
-         request = _state.forgeModule->get_asset (
-            "6928c289b75540399ac03880a65a96d5", this);
-            
-         _state.log.warn << "get_asset request id: " << request << endl;
-
-         request = _state.forgeModule->get_asset (
-            "884c8da1f7a34502ba6581e63fd823d3", this);
-            
-         _state.log.warn << "get_asset request id: " << request << endl;
-
-         request = _state.forgeModule->get_asset (
-            "35d09081c13747d0b29048e6b79c13f9", this);
-            
-         _state.log.warn << "get_asset request id: " << request << endl;
-
-         request = _state.forgeModule->get_asset (
-            "04178f3be17d4b0d923370373d32a240", this);
-            
-         _state.log.warn << "get_asset request id: " << request << endl;
-
-
+         // request = _state.forgeModule->get_asset (
+         //    "6928c289b75540399ac03880a65a96d5", this);
+         //    
+         // _state.log.warn << "get_asset request id: " << request << endl;
+         // 
+         // request = _state.forgeModule->get_asset (
+         //    "884c8da1f7a34502ba6581e63fd823d3", this);
+         //    
+         // _state.log.warn << "get_asset request id: " << request << endl;
+         // 
+         // request = _state.forgeModule->get_asset (
+         //    "35d09081c13747d0b29048e6b79c13f9", this);
+         //    
+         // _state.log.warn << "get_asset request id: " << request << endl;
+         // 
+         // request = _state.forgeModule->get_asset (
+         //    "04178f3be17d4b0d923370373d32a240", this);
+         //    
+         // _state.log.warn << "get_asset request id: " << request << endl;
       }
    }
    else if (State == PluginStateStop) {
@@ -112,12 +111,24 @@ dmz::ForgeQtPluginClient::discover_plugin (
 void
 dmz::ForgeQtPluginClient::handle_reply (
       const UInt64 RequestId,
-      const ForgeRequestTypeEnum ReqeustType,
+      const String &ReqeustType,
       const Boolean Error,
       const StringContainer &Results) {
 
-   _state.log.warn << "handle_reply: " << RequestId << " - " << (Int32)ReqeustType << endl;
-   _state.log.warn << Results << endl;
+   if (ReqeustType == ForgeSearchName) {
+
+      String assetId;
+      while (Results.get_next (assetId)) {
+
+_state.log.info << "getting asset: " << assetId << endl;
+         _state.forgeModule->get_asset (assetId, this);
+      }
+   }
+   else {
+      
+_state.log.error << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
+      _state.log.warn << Results << endl;
+   }
 }
 
    

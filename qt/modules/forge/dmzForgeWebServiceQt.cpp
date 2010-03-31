@@ -1,3 +1,4 @@
+#include <dmzForgeConsts.h>
 #include "dmzForgeWebServiceQt.h"
 #include <QtCore/QtCore>
 #include <QtNetwork/QtNetwork>
@@ -5,11 +6,18 @@
 #include <QtCore/QDebug>
 
 
+namespace dmz {
+  
+   const char ForgeApiEndpoint[] = "http://api.dmzforge.org";
+   const char ForgeUserAgentName[] = "dmzForgeModuleQt";
+};
+
+
 dmz::ForgeWebServiceQt::ForgeWebServiceQt (Log *log, QObject *parent) :
       QObject (parent),
       _log (log),
       _nam (0),
-      _baseUrl ("http://api.dmzforge.org"),
+      _baseUrl (ForgeApiEndpoint),
       _requestCounter (100) {
 
    _nam = new QNetworkAccessManager (this);
@@ -48,7 +56,7 @@ dmz::ForgeWebServiceQt::search (const String &Value, const UInt32 Limit) {
    
    if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
    
-   return _get (url, "search");
+   return _get (url, ForgeSearchName);
 }
 
 
@@ -71,7 +79,7 @@ dmz::ForgeWebServiceQt::get_asset (const String &AssetId) {
    QString path ("/assets/%1");
    url.setPath (path.arg (AssetId.get_buffer ()));
    
-   return _get (url, "get_asset");
+   return _get (url, ForgeGetAssetName);
 }
 
 
@@ -92,7 +100,7 @@ dmz::ForgeWebServiceQt::delete_asset (const String &AssetId) {
 QNetworkReply *
 dmz::ForgeWebServiceQt::get_asset_media (const String &AssetId, const String &File) {
    
-   return _get_attachment (AssetId, File, "get_asset_media");
+   return _get_attachment (AssetId, File, ForgeGetAssetMediaName);
 }
 
 
@@ -109,7 +117,7 @@ dmz::ForgeWebServiceQt::put_asset_media (
 QNetworkReply *
 dmz::ForgeWebServiceQt::get_asset_preview (const String &AssetId, const String &File) {
    
-   return _get_attachment (AssetId, File, "get_asset_preview");
+   return _get_attachment (AssetId, File, ForgeGetAssetPreviewName);
 }
 
 
@@ -124,7 +132,7 @@ QNetworkReply *
 dmz::ForgeWebServiceQt::_get (const QUrl &Url, const String &RequestType) {
 
    QNetworkRequest request (Url);
-   request.setRawHeader("User-Agent", "dmzForgeModuleQt");
+   request.setRawHeader("User-Agent", ForgeUserAgentName);
 
    QNetworkReply *reply = _nam->get (request);
    if (reply) {
@@ -136,10 +144,6 @@ dmz::ForgeWebServiceQt::_get (const QUrl &Url, const String &RequestType) {
       reply->setProperty ("requestId", id);
       
       connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
-      
-qDebug () << "_get: " << reply->url ();
-qDebug () << "type: " << reply->property ("requestType");
-qDebug () << "  id: " << reply->property ("requestId");
    }
    
    return reply;

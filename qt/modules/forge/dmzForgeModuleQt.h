@@ -100,7 +100,6 @@ namespace dmz {
          void _handle_reply (QNetworkReply *reply);
 
       protected:
-         ForgeRequestTypeEnum _get_request_type (QNetworkReply *reply);
          UInt64 _get_request_id (QNetworkReply *reply);
          
          void _handle_search (const UInt64 RequestId, const String &JsonData);
@@ -115,12 +114,12 @@ namespace dmz {
          
          void _handle_reply (
             const UInt64 RequestId,
-            const ForgeRequestTypeEnum RequestType,
+            const String &RequestType,
             StringContainer &Container);
                   
          void _handle_error (
             const UInt64 RequestId,
-            const ForgeRequestTypeEnum RequestType,
+            const String &RequestType,
             const String &Message);
          
          void _handle_asset (const Config &Data);
