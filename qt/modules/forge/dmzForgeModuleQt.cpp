@@ -2,15 +2,20 @@
 #include <dmzForgeObserver.h>
 #include "dmzForgeWebServiceQt.h"
 #include <dmzFoundationJSONUtil.h>
+#include <dmzFoundationSHA.h>
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzRuntimeLog.h>
+#include <dmzSystem.h>
+#include <dmzSystemFile.h>
+#include <dmzSystemStreamString.h>
 #include <dmzTypesHashTableStringTemplate.h>
 #include <dmzTypesHashTableUInt64Template.h>
 #include <dmzTypesString.h>
 #include <dmzTypesStringContainer.h>
+#include <dmzTypesUUID.h>
 #include <QtCore/QtCore>
 #include <QtNetwork/QtNetwork>
 
@@ -18,6 +23,22 @@
 namespace {
 
    static const dmz::String JsonParseErrorMessage ("Error parsing json response.");
+
+   static const dmz::String LocalID ("_id");
+   static const dmz::String LocalRev ("_rev");
+   static const dmz::String LocalName ("name");
+   static const dmz::String LocalBrief ("brief");
+   static const dmz::String LocalDetails ("details");
+   static const dmz::String LocalKeywords ("keywords");
+   static const dmz::String LocalThumbnails ("thumbnails");
+   static const dmz::String LocalPreviews ("previews");
+   static const dmz::String LocalImages ("images");
+   static const dmz::String LocalType ("type");
+   static const dmz::String LocalMedia ("media");
+   static const dmz::String LocalCurrent ("current");
+   static const dmz::String LocalMimeIVE ("model/x-ive");
+   static const dmz::String LocalOriginalName ("original_name");
+   static const dmz::String LocalValue ("value");
 };
 
 
@@ -91,10 +112,7 @@ dmz::ForgeModuleQt::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      if (_state.ws) {
-         
-         _state.ws->get_uuids (100);
-      }
+      _get_uuid (); // this will prefetch a bunch of uuids from the server -ss
    }
    else if (State == PluginStateStart) {
 
@@ -136,6 +154,24 @@ dmz::ForgeModuleQt::is_saved (const String &AssetId) {
 dmz::String
 dmz::ForgeModuleQt::create_asset (const String &AssetId) {
 
+   String retVal;
+   
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   
+   if (!as) {
+   
+      as = new AssetStruct (AssetId ? AssetId : _get_uuid ());
+      
+      if (!_state.assetTable.store (as->Id, as)) {
+         
+         delete as;
+         as = 0;
+      }
+   }
+   
+   if (as) { retVal = as->Id; }
+   
+   return retVal;
 }
 
 
@@ -357,9 +393,26 @@ dmz::ForgeModuleQt::get_asset (const String &AssetId, ForgeObserver *observer) {
 dmz::UInt64
 dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
 
-   UInt64 retVal (0);
+   UInt64 requestId (0);
    
-   return retVal;
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   
+   if (_state.ws && observer && as) {
+
+      String assetJson;
+      
+      if (_asset_to_json (AssetId, assetJson)) {
+         
+         QNetworkReply *reply = _state.ws->put_asset (AssetId, assetJson);
+         if (reply) {
+            
+            requestId = _get_request_id (reply);
+            _state.obsTable.store (requestId, observer);
+         }
+      }
+   }
+   
+   return requestId;
 }
 
 
@@ -438,7 +491,7 @@ dmz::ForgeModuleQt::_handle_reply (QNetworkReply *reply) {
       const QString RequestType (reply->property ("requestType").toString ());
       const UInt64 RequestId (_get_request_id (reply));
       
-qDebug () << "_handle_reply: " << reply->property ("requestType").toString ();
+qDebug () << "_handle_reply: " << RequestType;
       
       if (reply->error() == QNetworkReply::NoError) {
 
@@ -516,7 +569,6 @@ dmz::ForgeModuleQt::_handle_get_uuids (const UInt64 RequestId, const String &Jso
    
    if (json_string_to_config (JsonData, global)) { 
 
-      _state.uuids.clear ();
       Config list;
    
       if (global.lookup_all_config ("uuids", list)) {
@@ -530,7 +582,7 @@ dmz::ForgeModuleQt::_handle_get_uuids (const UInt64 RequestId, const String &Jso
             if (id) { _state.uuids.append (id); }
          }
          
-_state.log.error << "uuids: " << _state.uuids << endl;
+_state.log.error << "uuids count: " << _state.uuids.get_count () << endl;
       }
    }
 }
@@ -591,6 +643,84 @@ dmz::ForgeModuleQt::_handle_error (
 void
 dmz::ForgeModuleQt::_handle_asset (const Config &Data) {
    
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::_asset_to_json (const String &AssetId, String &assetJson) {
+
+   Boolean retVal (False);
+   
+   Config config ("global");
+      
+   if (_asset_to_config (AssetId, config)) {
+         
+      String data;
+      StreamString out (data);
+
+      retVal = format_config_to_json (config, out, ConfigStripGlobal, &_state.log);
+
+      if (retVal) { assetJson = data; }
+   }
+   
+   return retVal;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig) {
+
+   Boolean retVal (False);
+   
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   if (as) {
+      
+      assetConfig.store_attribute (LocalID, as->Id);
+      assetConfig.store_attribute (LocalType, "asset");
+      assetConfig.store_attribute (LocalName, as->name);
+      assetConfig.store_attribute (LocalBrief, as->brief);
+      assetConfig.store_attribute (LocalDetails, as->details);
+      
+      String keyword;
+      Boolean first = True;
+      
+      while (as->keywords.get_next (keyword)) {
+      
+         Config data (LocalKeywords);
+         data.store_attribute (LocalValue, keyword);
+         
+         if (first) { assetConfig.overwrite_config (data); first = False; }
+         else { assetConfig.add_config (data); }
+      }
+      
+      retVal = True;
+   }
+   
+   return retVal;
+}
+
+
+dmz::String
+dmz::ForgeModuleQt::_get_uuid () {
+   
+   String retVal;
+   
+   if (_state.uuids.get_count () < 5) {
+      
+      if (_state.ws) { _state.ws->get_uuids (100); }
+      
+      UUID id;
+      create_uuid (id);
+      retVal = id.to_string (UUID::NotFormatted);
+   }
+   else {
+      
+      _state.uuids.get_first (retVal);
+      _state.uuids.remove (retVal);
+   }
+   
+   
+   return retVal;
 }
 
 

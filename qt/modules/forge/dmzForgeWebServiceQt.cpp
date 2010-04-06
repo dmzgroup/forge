@@ -86,7 +86,11 @@ dmz::ForgeWebServiceQt::get_asset (const String &AssetId) {
 QNetworkReply *
 dmz::ForgeWebServiceQt::put_asset (const String &AssetId, const String &JsonData) {
 
-   return 0;
+   QUrl url (_baseUrl);
+   QString path ("/assets/%1");
+   url.setPath (path.arg (AssetId.get_buffer ()));
+   
+   return _put (url, ForgePutAssetName, JsonData);
 }
 
 
@@ -134,7 +138,38 @@ dmz::ForgeWebServiceQt::_get (const QUrl &Url, const String &RequestType) {
    QNetworkRequest request (Url);
    request.setRawHeader("User-Agent", ForgeUserAgentName);
 
+qDebug () << "_get: " << request.url ().toString ();
+
    QNetworkReply *reply = _nam->get (request);
+   if (reply) {
+      
+      QVariant type (RequestType.get_buffer ());
+      reply->setProperty ("requestType", type);
+      
+      QVariant id (_requestCounter++);
+      reply->setProperty ("requestId", id);
+      
+      connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
+   }
+   
+   return reply;
+}
+
+
+QNetworkReply *
+dmz::ForgeWebServiceQt::_put (
+      const QUrl &Url,
+      const String &RequestType,
+      const String &Data) {
+
+   QNetworkRequest request (Url);
+   request.setRawHeader("User-Agent", ForgeUserAgentName);
+
+qDebug () << "_put: " << request.url ().toString ();
+
+   QByteArray byteArray (Data.get_buffer ());
+
+   QNetworkReply *reply = _nam->put (request, byteArray);
    if (reply) {
       
       QVariant type (RequestType.get_buffer ());

@@ -4,7 +4,7 @@
    <!-- <plugin name="dmzArchiveModuleBasic"/> -->
    <!-- <plugin name="dmzArchivePluginAutoLoad"/> -->
    <!-- <plugin name="dmzArchivePluginObject"/> -->
-   <plugin name="dmzForgeModuleQt"/>
+   <plugin name="dmzForgeModuleQt" scope="forge-qt" unload="false"/>
    <!-- <plugin name="dmzObjectModuleBasic"/> -->
    <plugin name="dmzPluginTermExit"/>
 <!--
@@ -19,6 +19,6 @@
       <attribute name="Last_Network_Value" contains="True"/>
    </archive>
 </dmzArchivePluginObject>
-<dmzForgeModuleQt>
-</dmzForgeModuleQt>
+<forge-qt>
+</forge-qt>
 </dmz>

@@ -123,7 +123,12 @@ namespace dmz {
             const String &Message);
          
          void _handle_asset (const Config &Data);
-            
+         
+         Boolean _asset_to_json (const String &AssetId, String &jsonData);
+         Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
+         
+         String _get_uuid ();
+         
          void _init (Config &local);
 
       protected:

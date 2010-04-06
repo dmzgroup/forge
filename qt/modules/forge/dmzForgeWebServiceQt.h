@@ -49,6 +49,11 @@ namespace dmz {
       protected:
          QNetworkReply *_get (const QUrl &Url, const String &RequestType);
          
+         QNetworkReply *_put (
+            const QUrl &Url,
+            const String &RequestType,
+            const String &Data);
+         
          QNetworkReply *_get_attachment (
             const String &AssetId,
             const String &Attachemnt,

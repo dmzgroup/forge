@@ -53,28 +53,38 @@ dmz::ForgeQtPluginClient::update_plugin_state (
 
       if (_state.forgeModule) {
          
-         UInt64 request = _state.forgeModule->search ("blue", this, 50);
-         _state.log.warn << "search request id: " << request << endl;
-         
-         // request = _state.forgeModule->get_asset (
-         //    "6928c289b75540399ac03880a65a96d5", this);
-         //    
-         // _state.log.warn << "get_asset request id: " << request << endl;
-         // 
-         // request = _state.forgeModule->get_asset (
-         //    "884c8da1f7a34502ba6581e63fd823d3", this);
-         //    
-         // _state.log.warn << "get_asset request id: " << request << endl;
-         // 
-         // request = _state.forgeModule->get_asset (
-         //    "35d09081c13747d0b29048e6b79c13f9", this);
-         //    
-         // _state.log.warn << "get_asset request id: " << request << endl;
-         // 
+         // UInt64 request = _state.forgeModule->search ("blue", this, 50);
+         // _state.log.warn << "search request id: " << request << endl;
+         //
          // request = _state.forgeModule->get_asset (
          //    "04178f3be17d4b0d923370373d32a240", this);
-         //    
+         //
          // _state.log.warn << "get_asset request id: " << request << endl;
+         
+         String assetId = _state.forgeModule->create_asset ("1111");
+         
+         _state.forgeModule->store_name (assetId, "BRDM-2");
+         _state.forgeModule->store_brief (assetId, "An amphibious armoured patrol car.");
+         
+         _state.forgeModule->store_details (assetId,
+            "The BRDM-2 (Boyevaya Razvedyvatelnaya Dozornaya Mashina, literally "
+            "\"Combat Reconnaissance/Patrol Vehicle\") is an amphibious armoured "
+            "patrol car used by Russia and the former Soviet Union. It was also "
+            "known under designations BTR-40PB, BTR-40P-2 and GAZ 41-08. This "
+            "vehicle, like many other Soviet designs, has been exported extensively "
+            "and is in use in at least 38 countries. It was intended to replace the "
+            "earlier BRDM-1 with a vehicle that had improved amphibious capabilities "
+            "and better armament.");
+         
+         StringContainer keywords;
+         keywords.append ("amphibious");
+         keywords.append ("car");
+         keywords.append ("russian");
+         keywords.append ("damaged");
+         _state.forgeModule->store_keywords (assetId, keywords);
+         
+         UInt64 request = _state.forgeModule->put_asset (assetId, this);
+         _state.log.warn << "put asset request id: " << request << endl;
       }
    }
    else if (State == PluginStateStop) {
@@ -120,14 +130,19 @@ dmz::ForgeQtPluginClient::handle_reply (
       String assetId;
       while (Results.get_next (assetId)) {
 
-_state.log.info << "getting asset: " << assetId << endl;
-         _state.forgeModule->get_asset (assetId, this);
+// _state.log.info << "getting asset: " << assetId << endl;
+//         _state.forgeModule->get_asset (assetId, this);
       }
+   }
+   else if (ReqeustType == ForgePutAssetName) {
+      
+_state.log.warn << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
+_state.log.warn << Results << endl;
    }
    else {
       
 _state.log.error << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
-      _state.log.warn << Results << endl;
+_state.log.error << Results << endl;
    }
 }
 
