@@ -3,12 +3,17 @@
 
 #include <dmzForgeObserver.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzRuntimeTimeSlice.h>
 #include <QtCore/QObject>
 
 
 namespace dmz {
 
-   class ForgeQtPluginClient : public QObject, public Plugin, public ForgeObserver {
+   class ForgeQtPluginClient :
+      public QObject,
+      public Plugin,
+      public TimeSlice,
+      public ForgeObserver {
 
       Q_OBJECT
       
@@ -24,6 +29,9 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
+         
+         // TimeSlice Interface
+         virtual void update_time_slice (const Float64 TimeDelta);
          
          // ForgeObserver Interface
          virtual void handle_reply (

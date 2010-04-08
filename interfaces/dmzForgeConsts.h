@@ -20,8 +20,10 @@ namespace dmz {
    const char ForgeSearchName[] = "Forge_Search";
    const char ForgeGetAssetName[] = "Forge_Get_Asset";
    const char ForgePutAssetName[] = "Forge_Put_Asset";
+   const char ForgeDeleteAssetName[] = "Forge_Delete_Asset";
    const char ForgeGetAssetMediaName[] = "Forge_Get_Asset_Media";
    const char ForgeGetAssetPreviewName[] = "Forge_Get_Asset_Preview";
+   const char ForgePutAssetPreviewName[] = "Forge_Put_Asset_Preview";
    
    //! Forge media asset type. Defined in dmzForgeConsts.h.
    enum ForgeAssetTypeEnum {

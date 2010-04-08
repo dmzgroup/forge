@@ -105,7 +105,7 @@ namespace dmz {
          void _handle_search (const UInt64 RequestId, const String &JsonData);
          void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
          void _handle_get_asset (const UInt64 RequestId, const String &JsonData);
-         // void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
+         void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
          // void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_media (const UInt64 RequestId, const String &JsonData);
          // void _handle_put_asset_media (const UInt64 RequestId, const String &JsonData);
@@ -116,16 +116,18 @@ namespace dmz {
             const UInt64 RequestId,
             const String &RequestType,
             StringContainer &Container);
-                  
+         
          void _handle_error (
             const UInt64 RequestId,
             const String &RequestType,
             const String &Message);
          
-         void _handle_asset (const Config &Data);
+         Boolean _store_revision (const String &AssetId, const String &Value);
+         Boolean _lookup_revision (const String &AssetId, String &value);
          
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
+         Boolean _config_to_asset (const String &AssetId, const Config &AssetConfig);
          
          String _get_uuid ();
          

@@ -24,7 +24,7 @@ namespace {
 
    static const dmz::String JsonParseErrorMessage ("Error parsing json response.");
 
-   static const dmz::String LocalID ("_id");
+   static const dmz::String LocalId ("_id");
    static const dmz::String LocalRev ("_rev");
    static const dmz::String LocalName ("name");
    static const dmz::String LocalBrief ("brief");
@@ -45,6 +45,7 @@ namespace {
 struct dmz::ForgeModuleQt::AssetStruct {
 
    const String Id;
+   String revision;
    ForgeAssetTypeEnum type;
    String name;
    String brief;
@@ -88,12 +89,6 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       ForgeModule (Info),
       _state (*(new State (Info))) {
 
-   _state.ws = new ForgeWebServiceQt (&_state.log, this);
-   
-   connect (
-      _state.ws, SIGNAL (finished (QNetworkReply *)),
-      this, SLOT (_handle_reply (QNetworkReply *)));
-   
    _init (local);
 }
 
@@ -112,7 +107,7 @@ dmz::ForgeModuleQt::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      _get_uuid (); // this will prefetch a bunch of uuids from the server -ss
+      _get_uuid (); // this will prefetch some uuids from the server -ss
    }
    else if (State == PluginStateStart) {
 
@@ -179,10 +174,8 @@ dmz::ForgeAssetTypeEnum
 dmz::ForgeModuleQt::lookup_asset_type (const String &AssetId) {
 
    ForgeAssetTypeEnum retVal (ForgeAssetUnknown);
-
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) { retVal = asset->type; }
-
    return retVal;
 }
 
@@ -191,14 +184,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::store_name (const String &AssetId, const String &Value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      asset->name = Value;
-      retVal = True;
-   }
-   
+   if (asset) { asset->name = Value; retVal = True; }
    return retVal;
 }
 
@@ -207,14 +194,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_name (const String &AssetId, String &value) {
    
    Boolean retVal (False);
-
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->name;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->name; retVal = True; }
    return retVal;
 }
 
@@ -223,14 +204,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::store_brief (const String &AssetId, const String &Value) {
    
    Boolean retVal (False);
-
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      asset->brief = Value;
-      retVal = True;
-   }
-   
+   if (asset) { asset->brief = Value; retVal = True; }
    return retVal;
 }
 
@@ -239,14 +214,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_brief (const String &AssetId, String &value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->brief;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->brief; retVal = True; }
    return retVal;
 }
 
@@ -255,14 +224,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::store_details (const String &AssetId, const String &Value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      asset->details = Value;
-      retVal = True;
-   }
-   
+   if (asset) { asset->details = Value; retVal = True; }
    return retVal;
 }
 
@@ -271,14 +234,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_details (const String &AssetId, String &value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->details;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->details; retVal = True; }
    return retVal;
 }
 
@@ -287,14 +244,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::store_keywords (const String &AssetId, const StringContainer &Value) {
 
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      asset->keywords = Value;
-      retVal = True;
-   }
-   
+   if (asset) { asset->keywords = Value; retVal = True; }
    return retVal;
 }
 
@@ -303,14 +254,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_keywords (const String &AssetId, StringContainer &value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->keywords;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->keywords; retVal = True; }
    return retVal;
 }
 
@@ -319,14 +264,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_asset_media (const String &AssetId, StringContainer &value) {
    
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->media;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->media; retVal = True; }
    return retVal;
 }
 
@@ -335,14 +274,8 @@ dmz::Boolean
 dmz::ForgeModuleQt::lookup_previews (const String &AssetId, StringContainer &value) {
       
    Boolean retVal (False);
-   
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) {
-      
-      value = asset->previews;
-      retVal = True;
-   }
-   
+   if (asset) { value = asset->previews; retVal = True; }
    return retVal;
 }
 
@@ -456,9 +389,9 @@ dmz::ForgeModuleQt::get_preview (
       const String &File,
       ForgeObserver *observer) {
 
-         UInt64 retVal (0);
+   UInt64 retVal (0);
 
-         return retVal;
+   return retVal;
 }
 
 
@@ -468,9 +401,21 @@ dmz::ForgeModuleQt::put_preview (
       const String &Preview,
       ForgeObserver *observer) {
 
-   UInt64 retVal (0);
+   UInt64 requestId (0);
 
-   return retVal;
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   
+   if (_state.ws && observer) {
+
+      QNetworkReply *reply = _state.ws->put_asset_preview (AssetId, as->revision, Preview);
+      if (reply) {
+         
+         requestId = _get_request_id (reply);
+         _state.obsTable.store (requestId, observer);
+      }
+   }
+   
+   return requestId;
 }
 
 
@@ -510,6 +455,10 @@ qDebug () << "_handle_reply: " << RequestType;
             
             _handle_get_asset (RequestId, JsonData);
          }
+         else if (RequestType == ForgePutAssetName) {
+            
+            _handle_put_asset (RequestId, JsonData);
+         }
          else {
             
             String msg ("Unknown request type: ");
@@ -520,6 +469,9 @@ qDebug () << "_handle_reply: " << RequestType;
       }
       else {
          
+         QString data (reply->readAll ());
+         _state.log.warn << "json: " << qPrintable (data) << endl;
+
          String msg ("Network Error: ");
          msg << qPrintable (reply->errorString ());
          
@@ -582,7 +534,7 @@ dmz::ForgeModuleQt::_handle_get_uuids (const UInt64 RequestId, const String &Jso
             if (id) { _state.uuids.append (id); }
          }
          
-_state.log.error << "uuids count: " << _state.uuids.get_count () << endl;
+_state.log.info << "uuids count: " << _state.uuids.get_count () << endl;
       }
    }
 }
@@ -595,7 +547,11 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
    
    if (json_string_to_config (JsonData, global)) { 
    
-      _handle_asset (global);
+      const String AssetId (config_to_string (LocalId, global));
+_state.log.error << "_handle_get_asset: " << AssetId << endl;
+_state.log.error << "json: " << JsonData << endl;
+
+      _config_to_asset (AssetId, global);
       
       StringContainer container;
       container.append (JsonData);
@@ -605,6 +561,29 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
    else {
       
       _handle_error (RequestId, ForgeGetAssetName, JsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &JsonData) {
+
+   Config global ("global");
+   
+   if (json_string_to_config (JsonData, global)) { 
+   
+      const String AssetId (config_to_string ("id", global));
+      const String Revision (config_to_string ("rev", global));
+      _store_revision (AssetId, Revision);
+      
+      StringContainer container;
+      container.append (JsonData);
+      
+      _handle_reply (RequestId, ForgePutAssetName, container);
+   }
+   else {
+      
+      _handle_error (RequestId, ForgePutAssetName, JsonParseErrorMessage);
    }
 }
 
@@ -640,9 +619,24 @@ dmz::ForgeModuleQt::_handle_error (
 }
 
 
-void
-dmz::ForgeModuleQt::_handle_asset (const Config &Data) {
+dmz::Boolean
+dmz::ForgeModuleQt::_store_revision (const String &AssetId, const String &Value) {
    
+_state.log.error << "store revision: " << Value << " for asset: " << AssetId << endl;
+   Boolean retVal (False);
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset && Value) { asset->revision = Value; retVal = True; }
+   return retVal;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::_lookup_revision (const String &AssetId, String &value) {
+   
+   Boolean retVal (False);
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset) { value = asset->revision; retVal = True; }
+   return retVal;
 }
 
 
@@ -675,7 +669,10 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
    AssetStruct *as = _state.assetTable.lookup (AssetId);
    if (as) {
       
-      assetConfig.store_attribute (LocalID, as->Id);
+      assetConfig.store_attribute (LocalId, as->Id);
+
+      if (as->revision) { assetConfig.store_attribute (LocalRev, as->revision); }
+
       assetConfig.store_attribute (LocalType, "asset");
       assetConfig.store_attribute (LocalName, as->name);
       assetConfig.store_attribute (LocalBrief, as->brief);
@@ -692,6 +689,45 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
          if (first) { assetConfig.overwrite_config (data); first = False; }
          else { assetConfig.add_config (data); }
       }
+      
+      retVal = True;
+   }
+   
+   return retVal;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::_config_to_asset (const String &AssetId, const Config &AssetConfig) {
+
+   Boolean retVal (False);
+   
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   if (!as && AssetId) { create_asset (AssetId); }
+   
+   if (as) {
+      
+      _store_revision (AssetId, config_to_string (LocalRev, AssetConfig));
+      
+      store_name (AssetId, config_to_string (LocalName, AssetConfig));
+      store_brief (AssetId, config_to_string (LocalBrief, AssetConfig));
+      store_details (AssetId, config_to_string (LocalDetails, AssetConfig));
+      
+      StringContainer keywords;
+      Config keywordList;
+      
+      if (AssetConfig.lookup_all_config (LocalKeywords, keywordList)) {
+         
+         ConfigIterator it;
+         Config word;
+         
+         while (keywordList.get_next_config (it, word)) {
+            
+            keywords.append (config_to_string (LocalValue, word));
+         }
+      }
+      
+      store_keywords (AssetId, keywords);
       
       retVal = True;
    }
@@ -728,6 +764,15 @@ void
 dmz::ForgeModuleQt::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
+   
+   Config webservice;
+   local.lookup_config ("webservice", webservice);
+
+   _state.ws = new ForgeWebServiceQt (webservice, &_state.log, this);
+
+   connect (
+      _state.ws, SIGNAL (finished (QNetworkReply *)),
+      this, SLOT (_handle_reply (QNetworkReply *)));
 }
 
 

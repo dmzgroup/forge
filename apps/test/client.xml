@@ -4,6 +4,5 @@
    <plugin name="dmzForgeQtPluginClient" unique="forge-client"/>
 </plugin-list>
 <forge-client>
-   <webservice host="localhost" port="8080"/>
 </forge-client>
 </dmz>

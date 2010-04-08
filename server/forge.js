@@ -42,7 +42,7 @@ var Server = function (port, host, proxy) {
          var ix;
          var route;
          
-         request.headers['accept'] = 'application/json';
+         //request.headers['accept'] = 'application/json';
 
          request.uri = {
             path: uri.pathname || '/',
@@ -67,8 +67,8 @@ var Server = function (port, host, proxy) {
          response.reply = function (code, data) {
             var content = JSON.stringify (data);
             response.sendHeader (code, {
-               'content-type': 'application/json',
-               'content-length': content.length,
+               'Content-Type': 'application/json',
+               'Content-Length': content.length,
             });
             
             response.write (content);
@@ -109,8 +109,8 @@ var Proxy = function (port, host, db) {
       var path = clientRequest.proxy.path + search;
 
 sys.puts ('Proxy ' + clientRequest.method + ': ' + Date ());
-sys.puts ('  ' + clientRequest.uri.path + " -> " + clientRequest.proxy.path);
-//sys.puts ('  ' + clientRequest.uri.search + " -> " + search);
+sys.puts ('  in: ' + clientRequest.uri.path + clientRequest.uri.search);
+sys.puts (' out: ' + path);
 
       var request = this.client.request (clientRequest.method, path, clientRequest.headers);
       
@@ -181,6 +181,18 @@ forge.get ('^/assets/([^/]*)/([^/]*)', function (asset, attachment) {
 
 // Get Asset
 forge.get ('^/assets/([^/]*)', function (asset) {
+   this.request.proxy.path = path.join ('/', this.proxy.db, asset);
+   this.proxy.request (this.request, this.response);
+});
+
+// Put Asset
+forge.put ('^/assets/([^/]*)', function (asset) {
+   this.request.proxy.path = path.join ('/', this.proxy.db, asset);
+   this.proxy.request (this.request, this.response);
+});
+
+// Delete Asset
+forge.del ('^/assets/([^/]*)', function (asset) {
    this.request.proxy.path = path.join ('/', this.proxy.db, asset);
    this.proxy.request (this.request, this.response);
 });
