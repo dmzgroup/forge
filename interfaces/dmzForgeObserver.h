@@ -28,7 +28,7 @@ namespace dmz {
          
          virtual void handle_reply (
             const UInt64 RequestId,
-            const String &RequestType,
+            const ForgeTypeEnum &RequestType,
             const Boolean Error,
             const StringContainer &Results) = 0;
 

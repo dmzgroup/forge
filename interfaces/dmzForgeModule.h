@@ -76,12 +76,12 @@ namespace dmz {
             ForgeObserver *observer,
             const String &MimeType = "") = 0;
 
-         virtual UInt64 get_preview (
+         virtual UInt64 get_asset_preview (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer) = 0;
          
-         virtual UInt64 put_preview (
+         virtual UInt64 put_asset_preview (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer) = 0;

@@ -1,6 +1,5 @@
 #include "dmzForgeModuleQt.h"
 #include <dmzForgeObserver.h>
-#include "dmzForgeWebServiceQt.h"
 #include <dmzFoundationJSONUtil.h>
 #include <dmzFoundationSHA.h>
 #include <dmzRuntimeConfig.h>
@@ -22,7 +21,10 @@
 
 namespace {
 
-   static const dmz::String JsonParseErrorMessage ("Error parsing json response.");
+   static const char ForgeApiEndpoint[] = "http://api.dmzforge.org:80";
+   static const char ForgeUserAgentName[] = "dmzForgeModuleQt";
+   
+   static const dmz::String LocalJsonParseErrorMessage ("Error parsing json response.");
 
    static const dmz::String LocalId ("_id");
    static const dmz::String LocalRev ("_rev");
@@ -39,6 +41,23 @@ namespace {
    static const dmz::String LocalMimeIVE ("model/x-ive");
    static const dmz::String LocalOriginalName ("original_name");
    static const dmz::String LocalValue ("value");
+   
+   enum LocalTypeEnum {
+      LocalGetUuids = 201
+   };
+   
+   static QNetworkRequest::Attribute LocalAttrType =
+      (QNetworkRequest::Attribute) (QNetworkRequest::User + 1);
+      
+   static QNetworkRequest::Attribute LocalAttrId =
+      (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
+   
+   struct UploadStruct {
+      
+      dmz::UInt64 requestId;
+      dmz::String assetId;
+      dmz::String file;
+   };
 };
 
 
@@ -54,17 +73,28 @@ struct dmz::ForgeModuleQt::AssetStruct {
    StringContainer media;
    StringContainer previews;
    
-   AssetStruct (const String AssetId) : Id (AssetId) {;}
+   AssetStruct (const String &AssetId) : Id (AssetId) {;}
 };
+
+
+// struct dmz::ForgeModuleQt::UploadStruct {
+// 
+// 
+// };
 
 
 struct dmz::ForgeModuleQt::State {
 
    Log log;
-   ForgeWebServiceQt *ws;
+   QNetworkAccessManager *networkAccessManager;
    StringContainer uuids;
+   UInt64 requestCounter;
    HashTableUInt64Template<ForgeObserver> obsTable;
    HashTableStringTemplate<AssetStruct> assetTable;
+   QQueue<UploadStruct *> uploadQueue;
+   Boolean uploading;
+   QUrl baseUrl;
+   QString db;
    
    State (const PluginInfo &Info);
    ~State ();
@@ -73,11 +103,16 @@ struct dmz::ForgeModuleQt::State {
 
 dmz::ForgeModuleQt::State::State (const PluginInfo &Info) :
       log (Info),
-      ws (0) {;}
+      networkAccessManager (0),
+      requestCounter (1000),
+      uploading (False),
+      baseUrl (ForgeApiEndpoint) {;}
 
 
 dmz::ForgeModuleQt::State::~State () {
 
+   if (networkAccessManager) { networkAccessManager->deleteLater (); }
+   
    obsTable.clear ();
    assetTable.empty ();
 }
@@ -88,6 +123,12 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       Plugin (Info),
       ForgeModule (Info),
       _state (*(new State (Info))) {
+
+   _state.networkAccessManager = new QNetworkAccessManager (this);
+
+   connect (
+      _state.networkAccessManager, SIGNAL (finished (QNetworkReply *)),
+      this, SLOT (_handle_reply (QNetworkReply *)));
 
    _init (local);
 }
@@ -290,14 +331,23 @@ dmz::ForgeModuleQt::search (
 
    UInt64 requestId (0);
    
-   if (_state.ws && observer) {
+   if (_state.networkAccessManager && observer) {
       
-      QNetworkReply *reply = _state.ws->search (Value, Limit);
-      if (reply) {
-         
-         requestId = _get_request_id (reply);
-         _state.obsTable.store (requestId, observer);
-      }
+      requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
+      
+      QUrl url (_state.baseUrl);
+      QString path ("/%1/search");
+      url.setPath (path.arg (_state.db));
+      url.addQueryItem ("q", Value.get_buffer ());
+
+      if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
+
+      QNetworkRequest request (url);
+      request.setAttribute (LocalAttrId, requestId);
+      request.setAttribute (LocalAttrType, ForgeSearch);
+
+      QNetworkReply *reply = _state.networkAccessManager->get (request);
    }
    
    return requestId;
@@ -309,14 +359,20 @@ dmz::ForgeModuleQt::get_asset (const String &AssetId, ForgeObserver *observer) {
 
    UInt64 requestId (0);
    
-   if (_state.ws && observer) {
+   if (_state.networkAccessManager && observer) {
       
-      QNetworkReply *reply = _state.ws->get_asset (AssetId);
-      if (reply) {
-         
-         requestId = _get_request_id (reply);
-         _state.obsTable.store (requestId, observer);
-      }
+      requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
+      
+      QUrl url (_state.baseUrl);
+      QString path ("/%1/%2");
+      url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
+
+      QNetworkRequest request (url);
+      request.setAttribute (LocalAttrId, requestId);
+      request.setAttribute (LocalAttrType, ForgeGetAsset);
+
+      QNetworkReply *reply = _state.networkAccessManager->get (request);
    }
    
    return requestId;
@@ -330,18 +386,28 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
    
    AssetStruct *as = _state.assetTable.lookup (AssetId);
    
-   if (_state.ws && observer && as) {
+   if (_state.networkAccessManager && observer && as) {
 
       String assetJson;
       
       if (_asset_to_json (AssetId, assetJson)) {
          
-         QNetworkReply *reply = _state.ws->put_asset (AssetId, assetJson);
-         if (reply) {
-            
-            requestId = _get_request_id (reply);
-            _state.obsTable.store (requestId, observer);
-         }
+         requestId = _state.requestCounter++;
+
+         _state.obsTable.store (requestId, observer);
+         
+         QUrl url (_state.baseUrl);
+         QString path ("/%1/%2");
+         url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
+
+         QByteArray byteArray (assetJson.get_buffer ());
+         
+         QNetworkRequest request (url);
+         // request.setRawHeader("User-Agent", ForgeUserAgentName);
+         request.setAttribute (LocalAttrId, requestId);
+         request.setAttribute (LocalAttrType, ForgePutAsset);
+
+         QNetworkReply *reply = _state.networkAccessManager->put (request, byteArray);
       }
    }
    
@@ -384,7 +450,7 @@ dmz::ForgeModuleQt::put_asset_media (
 
 
 dmz::UInt64
-dmz::ForgeModuleQt::get_preview (
+dmz::ForgeModuleQt::get_asset_preview (
       const String &AssetId,
       const String &File,
       ForgeObserver *observer) {
@@ -396,7 +462,7 @@ dmz::ForgeModuleQt::get_preview (
 
 
 dmz::UInt64
-dmz::ForgeModuleQt::put_preview (
+dmz::ForgeModuleQt::put_asset_preview (
       const String &AssetId,
       const String &Preview,
       ForgeObserver *observer) {
@@ -405,25 +471,22 @@ dmz::ForgeModuleQt::put_preview (
 
    AssetStruct *as = _state.assetTable.lookup (AssetId);
    
-   if (_state.ws && observer) {
+   if (AssetId && observer) {
 
-      QNetworkReply *reply = _state.ws->put_asset_preview (AssetId, as->revision, Preview);
-      if (reply) {
-         
-         requestId = _get_request_id (reply);
-         _state.obsTable.store (requestId, observer);
-      }
+      requestId = _state.requestCounter++;
+
+      _state.obsTable.store (requestId, observer);
+
+      UploadStruct *us = new UploadStruct;
+      us->requestId = requestId;
+      us->assetId = AssetId;
+      us->file = Preview;
+      
+      _state.uploadQueue.enqueue (us);
+
+      // if (!_state.uploading) { _start_next_upload (); }
    }
    
-   return requestId;
-}
-
-
-dmz::UInt64
-dmz::ForgeModuleQt::_get_request_id (QNetworkReply *reply) {
-
-   UInt64 requestId (0);
-   if (reply) { requestId = reply->property ("requestId").toULongLong (); }
    return requestId;
 }
 
@@ -433,52 +496,74 @@ dmz::ForgeModuleQt::_handle_reply (QNetworkReply *reply) {
    
    if (reply) {
 
-      const QString RequestType (reply->property ("requestType").toString ());
-      const UInt64 RequestId (_get_request_id (reply));
-      
-qDebug () << "_handle_reply: " << RequestType;
-      
-      if (reply->error() == QNetworkReply::NoError) {
+      const Int32 StatusCode =
+         reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-         QString data (reply->readAll ());
-         const String JsonData (qPrintable (data));
+      QNetworkRequest request = reply->request ();
+      
+      const Int32 Type = request.attribute (LocalAttrType).toInt ();
+      const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
+
+      QString data (reply->readAll ());
+      const String JsonData (qPrintable (data));
+      
+_state.log.warn << "_handle_reply[" << StatusCode << "]: " << Type << endl;
+_state.log.warn << "json: " << JsonData << endl;
+
+      switch (Type) {
+
+         case ForgeSearch:
+            _handle_search (Id, JsonData);
+            break;
          
-         if (RequestType == ForgeSearchName) {
+         case ForgeGetAsset:
+            _handle_get_asset (Id, JsonData);
+            break;
             
-            _handle_search (RequestId, JsonData);
-         }
-         else if (RequestType == "get_uuids") {
-            
-            _handle_get_uuids (RequestId, JsonData);
-         }
-         else if (RequestType == ForgeGetAssetName) {
-            
-            _handle_get_asset (RequestId, JsonData);
-         }
-         else if (RequestType == ForgePutAssetName) {
-            
-            _handle_put_asset (RequestId, JsonData);
-         }
-         else {
-            
+         case ForgePutAsset:
+            _handle_put_asset (Id, JsonData);
+            break;
+         
+         case ForgeDeleteAsset:
+         break;
+         
+         case ForgeGetAssetMedia:
+         break;
+         
+         case ForgePutAssetMedia:
+         break;
+         
+         case ForgeGetAssetPreview:
+         break;
+         
+         case ForgePutAssetPreview:
+         break;
+         
+         case LocalGetUuids:
+            _handle_get_uuids (Id, JsonData);
+            break;
+         
+         default:
             String msg ("Unknown request type: ");
-            msg << qPrintable (RequestType);
+            msg << Type;
 
-            _handle_error (RequestId, qPrintable (RequestType), msg);
-         }
-      }
-      else {
-         
-         QString data (reply->readAll ());
-         _state.log.warn << "json: " << qPrintable (data) << endl;
-
-         String msg ("Network Error: ");
-         msg << qPrintable (reply->errorString ());
-         
-         _handle_error (RequestId, qPrintable (RequestType), msg);
+            _handle_error (Id, (ForgeTypeEnum)Type, msg);
       }
       
-      _state.obsTable.remove (RequestId);
+      // else {
+      //    
+      //    QString data (reply->readAll ());
+      //    _state.log.warn << "json: " << qPrintable (data) << endl;
+      // 
+      //    String msg ("Network Error: ");
+      //    msg << qPrintable (reply->errorString ());
+      //    
+      //    _handle_error (RequestId, qPrintable (RequestType), msg);
+      // }
+      
+      _state.obsTable.remove (Id);
+      
+      reply->deleteLater ();
    }
 }
 
@@ -505,11 +590,60 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
          }
       }
       
-      _handle_reply (RequestId, ForgeSearchName, container);
+      _handle_reply (RequestId, ForgeSearch, container);
    }
    else {
       
-      _handle_error (RequestId, ForgeSearchName, JsonParseErrorMessage);
+      _handle_error (RequestId, ForgeSearch, LocalJsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &JsonData) {
+
+   Config global ("global");
+   
+   if (json_string_to_config (JsonData, global)) { 
+   
+      const String AssetId (config_to_string (LocalId, global));
+
+_state.log.error << "_handle_get_asset: " << AssetId << endl;
+_state.log.error << "json: " << JsonData << endl;
+
+      _config_to_asset (AssetId, global);
+
+      StringContainer container;
+      container.append (JsonData);
+      
+      _handle_reply (RequestId, ForgeGetAsset, container);
+   }
+   else {
+      
+      _handle_error (RequestId, ForgeGetAsset, LocalJsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &JsonData) {
+
+   Config global ("global");
+   
+   if (json_string_to_config (JsonData, global)) { 
+   
+      const String AssetId (config_to_string ("id", global));
+      const String Revision (config_to_string ("rev", global));
+      _store_revision (AssetId, Revision);
+      
+      StringContainer container;
+      container.append (JsonData);
+      
+      _handle_reply (RequestId, ForgePutAsset, container);
+   }
+   else {
+      
+      _handle_error (RequestId, ForgePutAsset, LocalJsonParseErrorMessage);
    }
 }
 
@@ -541,57 +675,9 @@ _state.log.info << "uuids count: " << _state.uuids.get_count () << endl;
 
 
 void
-dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &JsonData) {
-
-   Config global ("global");
-   
-   if (json_string_to_config (JsonData, global)) { 
-   
-      const String AssetId (config_to_string (LocalId, global));
-_state.log.error << "_handle_get_asset: " << AssetId << endl;
-_state.log.error << "json: " << JsonData << endl;
-
-      _config_to_asset (AssetId, global);
-      
-      StringContainer container;
-      container.append (JsonData);
-      
-      _handle_reply (RequestId, ForgeGetAssetName, container);
-   }
-   else {
-      
-      _handle_error (RequestId, ForgeGetAssetName, JsonParseErrorMessage);
-   }
-}
-
-
-void
-dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &JsonData) {
-
-   Config global ("global");
-   
-   if (json_string_to_config (JsonData, global)) { 
-   
-      const String AssetId (config_to_string ("id", global));
-      const String Revision (config_to_string ("rev", global));
-      _store_revision (AssetId, Revision);
-      
-      StringContainer container;
-      container.append (JsonData);
-      
-      _handle_reply (RequestId, ForgePutAssetName, container);
-   }
-   else {
-      
-      _handle_error (RequestId, ForgePutAssetName, JsonParseErrorMessage);
-   }
-}
-
-
-void
 dmz::ForgeModuleQt::_handle_reply (
       const UInt64 RequestId,
-      const String &RequestType,
+      const ForgeTypeEnum &RequestType,
       StringContainer &Container) {
 
    ForgeObserver *observer = _state.obsTable.lookup (RequestId);
@@ -605,7 +691,7 @@ dmz::ForgeModuleQt::_handle_reply (
 void
 dmz::ForgeModuleQt::_handle_error (
       const UInt64 RequestId,
-      const String &RequestType,
+      const ForgeTypeEnum &RequestType,
       const String &Message) {
 
    ForgeObserver *observer = _state.obsTable.lookup (RequestId);
@@ -637,6 +723,46 @@ dmz::ForgeModuleQt::_lookup_revision (const String &AssetId, String &value) {
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) { value = asset->revision; retVal = True; }
    return retVal;
+}
+
+
+void
+dmz::ForgeModuleQt::_start_next_upload () {
+
+//    if (!_state.uploading && !_state.uploadQueue.isEmpty ()) {
+//    
+// _state.log.warn << "_start_next_upload: " << (Int32)_state.uploadQueue.count () << endl;
+//       
+//       UploadStruct *us = _state.uploadQueue.dequeue ();
+// 
+//       if (us && _state.ws) {
+// 
+// _state.log.debug << "us: requestId: " << us->requestId << endl;
+// _state.log.debug << "us: assetId: " << us->assetId << endl;
+// _state.log.debug << "us: file: " << us->file << endl;
+// 
+//          String revision;
+// 
+//          if (_lookup_revision (us->assetId, revision)) {
+// 
+//             QNetworkReply *reply =
+//                _state.ws->put_asset_preview (us->assetId, revision, us->file);
+// 
+//             if (reply) {
+// 
+//                _state.uploading = True;
+// 
+//                // connect (reply, SIGNAL (finished ()), this, SLOT (_start_next_upload ()));
+// 
+//                reply->setProperty ("requestId", us->requestId);
+//             }
+//          } 
+//       }
+//       else {
+//          
+//          _state.uploading = False;
+//       }
+//    }
 }
 
 
@@ -703,7 +829,11 @@ dmz::ForgeModuleQt::_config_to_asset (const String &AssetId, const Config &Asset
    Boolean retVal (False);
    
    AssetStruct *as = _state.assetTable.lookup (AssetId);
-   if (!as && AssetId) { create_asset (AssetId); }
+   if (!as && AssetId) {
+      
+      create_asset (AssetId);
+      as = _state.assetTable.lookup (AssetId);
+   }
    
    if (as) {
       
@@ -743,7 +873,20 @@ dmz::ForgeModuleQt::_get_uuid () {
    
    if (_state.uuids.get_count () < 5) {
       
-      if (_state.ws) { _state.ws->get_uuids (100); }
+      if (_state.networkAccessManager) {
+         
+         UInt64 requestId = _state.requestCounter++;
+         
+         QUrl url (_state.baseUrl);
+         url.setPath ("/_uuids");
+         url.addQueryItem ("count", QString::number (100));
+
+         QNetworkRequest request (url);
+         request.setAttribute (LocalAttrId, requestId);
+         request.setAttribute (LocalAttrType, LocalGetUuids);
+
+         QNetworkReply *reply = _state.networkAccessManager->get (request);
+      }
       
       UUID id;
       create_uuid (id);
@@ -765,14 +908,31 @@ dmz::ForgeModuleQt::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
    
-   Config webservice;
-   local.lookup_config ("webservice", webservice);
+   Config proxy;
+   if (local.lookup_config ("webservice.proxy", proxy)) {
+      
+      String host = config_to_string ("webservice.host", proxy, "localhost");
+      Int32 port = config_to_int32 ("webservice.port", proxy, 8888);
+      
+      QNetworkProxy proxy;
+      proxy.setType (QNetworkProxy::HttpProxy);
+      proxy.setHostName (host.get_buffer ());
+      proxy.setPort (port);
+      
+      QNetworkProxy::setApplicationProxy(proxy);
+      
+      _state.log.info << "Using proxy: " << host << ":" << port << endl;
+   }
 
-   _state.ws = new ForgeWebServiceQt (webservice, &_state.log, this);
-
-   connect (
-      _state.ws, SIGNAL (finished (QNetworkReply *)),
-      this, SLOT (_handle_reply (QNetworkReply *)));
+   String host =  config_to_string ("host", local, qPrintable (_state.baseUrl.host ()));
+   _state.baseUrl.setHost (host.get_buffer ());
+      
+   _state.baseUrl.setPort (config_to_int32 ("port", local, _state.baseUrl.port ()));
+   
+   _state.log.info << "Using API endpoint: "
+                   << qPrintable (_state.baseUrl.toString ()) << endl;
+   
+   _state.db = config_to_string ("webservice.db", local, "assets").get_buffer ();
 }
 
 

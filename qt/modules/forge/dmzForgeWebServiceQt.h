@@ -1,6 +1,7 @@
 #ifndef DMZ_FORGE_WEB_SERVICE_QT_DOT_H
 #define DMZ_FORGE_WEB_SERVICE_QT_DOT_H
 
+#include <dmzForgeConsts.h>
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeLog.h>
 #include <dmzTypesString.h>
@@ -19,6 +20,26 @@ namespace dmz {
       Q_OBJECT
       
       public:
+         
+         static const QString ApiEndpoint;
+         
+         enum RoleEnum {
+            RoleSearch = 101,
+            RoleSetUuids,
+            RoleGetAsset,
+            RolePutAsset,
+            RoleDeleteAsset,
+            RolePutAssetMedia,
+            RoleGetAssetMedia,
+            RoleGetAssetPreview,
+            RolePutAssetPreview
+         };
+         
+         enum AttributeEnum {
+            AttributeRole = QNetworkRequest::User,
+            AttributeId
+         };
+         
          ForgeWebServiceQt (Config &local, Log *log = 0, QObject *parent = 0);
          virtual ~ForgeWebServiceQt ();
 
@@ -54,29 +75,29 @@ namespace dmz {
          
       Q_SIGNALS:
          void finished (QNetworkReply *reply);
-
+         
       protected Q_SLOTS:
          void _upload_progress (qint64 bytesSent, qint64 bytesTotal);
          
       protected:
-         QNetworkReply *_get (const QUrl &Url, const String &RequestType);
+         QNetworkReply *_get (const QUrl &Url, const RoleEnum &Role);
          
          QNetworkReply *_put (
             const QUrl &Url,
-            const String &RequestType,
+            const RoleEnum &Role,
             const String &Data);
 
          QNetworkReply *_put_file (
             const QUrl &Url,
-            const String &RequestType,
+            const RoleEnum &Role,
             const String &File);
          
-         QNetworkReply *_delete (const QUrl &Url, const String &RequestType);
-            
+         QNetworkReply *_delete (const QUrl &Url, const RoleEnum &Role);
+         
          QNetworkReply *_get_attachment (
             const String &AssetId,
             const String &Attachemnt,
-            const String &RequestType);
+            const RoleEnum &Role);
             
          void _init (Config &local);
          
@@ -85,7 +106,6 @@ namespace dmz {
          QNetworkAccessManager *_nam;
          QUrl _baseUrl;
          QString _db;
-         UInt64 _requestCounter;
    };
 };
 

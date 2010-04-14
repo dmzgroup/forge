@@ -20,7 +20,7 @@
    </archive>
 </dmzArchivePluginObject>
 <forge-qt>
-   <webservice host="localhost" port="8080" db="assets">
+   <webservice host="localhost" port="5984" db="forge">
    <!-- <webservice host="api.dmzforge.org" port="5984" db="forge"> -->
       <proxy host="localhost" port="8888"/>
    </webservice>

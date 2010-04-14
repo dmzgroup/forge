@@ -4,7 +4,7 @@ exports.server = {
 
 exports.couchdb = {
   port: 5984,
-  // host: 'localhost',
-  host: 'dmzforge',
+  host: 'localhost',
+  // host: 'dmzforge',
   // db: 'forge',
 };

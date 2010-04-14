@@ -124,8 +124,13 @@ dmz::ForgeQtPluginClient::update_time_slice (const Float64 TimeDelta) {
    }
    else if (updateCounter == 3) {
 
-      _state.forgeModule->put_preview (_state.assetId, "preview1.jpg", this);
+      String file ("preview1.jpg");
+      _state.requestId = _state.forgeModule->put_asset_preview (_state.assetId, file, this);
       _state.log.warn << "put_preview: " << _state.requestId << endl;
+      
+      file = "preview2.jpg";
+      _state.requestId = _state.forgeModule->put_asset_preview (_state.assetId, file, this);
+      _state.log.warn << "put_preview: " << _state.requestId << endl;      
    }
    else if (updateCounter == 4) {
       
@@ -137,43 +142,45 @@ dmz::ForgeQtPluginClient::update_time_slice (const Float64 TimeDelta) {
 void
 dmz::ForgeQtPluginClient::handle_reply (
       const UInt64 RequestId,
-      const String &ReqeustType,
+      const ForgeTypeEnum &ReqeustType,
       const Boolean Error,
       const StringContainer &Results) {
 
-   if (ReqeustType == ForgeSearchName) {
+   switch (ReqeustType) {
+   
+      case ForgeSearch: {
+         String assetId;
+         while (Results.get_next (assetId)) {
 
-      String assetId;
-      while (Results.get_next (assetId)) {
-
-// _state.log.info << "getting asset: " << assetId << endl;
-//         _state.forgeModule->get_asset (assetId, this);
+            _state.log.info << "getting asset: " << assetId << endl;
+            // _state.forgeModule->get_asset (assetId, this);
+         }
+         break;
       }
-   }
-   else if (ReqeustType == ForgeGetAssetName) {
-
-_state.log.debug << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
-_state.log.debug << Results << endl;
-
-      start_time_slice ();
-   }
-   else if (ReqeustType == ForgePutAssetName) {
       
-_state.log.debug << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
+      case ForgeGetAsset:
+_state.log.debug << "handle_reply: ForgeGetAsset[" << RequestId << "]" << endl;
 _state.log.debug << Results << endl;
 
-      start_time_slice ();
-   }
-   else if (ReqeustType == ForgePutAssetPreviewName) {
+         start_time_slice ();
+         break;
+         
+      case ForgePutAsset:
+_state.log.debug << "handle_reply: ForgePutAsset[" << RequestId << "]" << endl;
+_state.log.debug << Results << endl;
 
-_state.log.warn << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
+         start_time_slice ();
+         break;
+      
+      case ForgePutAssetPreview:
+_state.log.warn << "handle_reply: ForgePutAssetPreview[" << RequestId << "]" << endl;
 _state.log.warn << Results << endl;
 
-      start_time_slice ();
-   }
-   else {
-      
-_state.log.error << "handle_reply: " << ReqeustType << "[" << RequestId << "]" << endl;
+         start_time_slice ();
+         break;
+
+      default:
+_state.log.error << "handle_reply: Unknown[" << RequestId << "]" << endl;
 _state.log.error << Results << endl;
    }
 }

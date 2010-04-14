@@ -10,6 +10,7 @@
 class QNetworkReply;
 class QNetworkRequest;
 
+
 namespace dmz {
 
    class ForgeModuleQt :
@@ -86,24 +87,22 @@ namespace dmz {
             ForgeObserver *observer,
             const String &MimeType);
 
-         virtual UInt64 get_preview (
+         virtual UInt64 get_asset_preview (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer);
          
-         virtual UInt64 put_preview (
+         virtual UInt64 put_asset_preview (
             const String &AssetId,
             const String &Preview,
             ForgeObserver *observer);
 
       protected Q_SLOTS:
          void _handle_reply (QNetworkReply *reply);
+         void _start_next_upload ();
 
       protected:
-         UInt64 _get_request_id (QNetworkReply *reply);
-         
          void _handle_search (const UInt64 RequestId, const String &JsonData);
-         void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
          void _handle_get_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
          // void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
@@ -111,15 +110,16 @@ namespace dmz {
          // void _handle_put_asset_media (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_preview (const UInt64 RequestId, const String &JsonData);
          // void _handle_put_asset_preview (const UInt64 RequestId, const String &JsonData);
+         void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
          
          void _handle_reply (
             const UInt64 RequestId,
-            const String &RequestType,
+            const ForgeTypeEnum &RequestType,
             StringContainer &Container);
          
          void _handle_error (
             const UInt64 RequestId,
-            const String &RequestType,
+            const ForgeTypeEnum &RequestType,
             const String &Message);
          
          Boolean _store_revision (const String &AssetId, const String &Value);
@@ -135,6 +135,7 @@ namespace dmz {
 
       protected:
          struct AssetStruct;
+         // sgruct UploadStruct;
 
          struct State;
          State &_state;

@@ -1,4 +1,3 @@
-#include <dmzForgeConsts.h>
 #include "dmzForgeWebServiceQt.h"
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <QtCore/QtCore>
@@ -18,8 +17,7 @@ dmz::ForgeWebServiceQt::ForgeWebServiceQt (Config &local, Log *log, QObject *par
       QObject (parent),
       _log (log),
       _nam (0),
-      _baseUrl (ForgeApiEndpoint),
-      _requestCounter (100) {
+      _baseUrl (ForgeApiEndpoint) {
 
    _init (local);
 }
@@ -27,6 +25,7 @@ dmz::ForgeWebServiceQt::ForgeWebServiceQt (Config &local, Log *log, QObject *par
 
 dmz::ForgeWebServiceQt::~ForgeWebServiceQt () { 
    
+   if (_nam) { _nam->deleteLater (); _nam = 0; }
 }
 
 
@@ -68,7 +67,11 @@ dmz::ForgeWebServiceQt::search (const String &Value, const UInt32 Limit) {
    
    if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
    
-   return _get (url, ForgeSearchName);
+   QNetworkRequest request (url);
+   
+   request.setAttribute (AttributeRole, RoleSearch);
+   
+   return _get (url, RoleSearch);
 }
 
 
@@ -76,7 +79,7 @@ QNetworkReply *
 dmz::ForgeWebServiceQt::get_uuids (const UInt32 Count) {
 
    QUrl url (_baseUrl);
-   url.setPath ("/uuids");
+   url.setPath ("/_uuids");
    
    if (Count) { url.addQueryItem ("count", QString::number (Count)); }
    
@@ -153,12 +156,12 @@ dmz::ForgeWebServiceQt::put_asset_preview (
 
    QFileInfo fi (File.get_buffer ());
 
-//   QUrl url (_baseUrl);
-   QUrl url ("http://api.dmzforge.org:5984");
+   QUrl url (_baseUrl);
+   // QUrl url ("http://api.dmzforge.org:5984");
    QString path ("/%1/%2/%3");
    url.setPath (path.arg (_db).arg (AssetId.get_buffer ()).arg (fi.fileName ()));
    
-   url.addQueryItem ("rev", Revision.get_buffer ());
+   if (Revision) { url.addQueryItem ("rev", Revision.get_buffer ()); }
    
    return _put_file (url, ForgePutAssetPreviewName, File);
 }
@@ -175,12 +178,8 @@ qDebug () << "_get: " << request.url ().toString ();
    QNetworkReply *reply = _nam->get (request);
    if (reply) {
       
-      QVariant type (RequestType.get_buffer ());
-      reply->setProperty ("requestType", type);
-      
-      QVariant id (_requestCounter++);
-      reply->setProperty ("requestId", id);
-      
+      reply->setProperty ("requestType", RequestType.get_buffer ());
+
       connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
    }
    
@@ -204,12 +203,8 @@ qDebug () << "_put: " << request.url ().toString ();
    QNetworkReply *reply = _nam->put (request, byteArray);
    if (reply) {
       
-      QVariant type (RequestType.get_buffer ());
-      reply->setProperty ("requestType", type);
-      
-      QVariant id (_requestCounter++);
-      reply->setProperty ("requestId", id);
-      
+      reply->setProperty ("requestType", RequestType.get_buffer ());
+
       connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
    }
    
@@ -234,19 +229,15 @@ dmz::ForgeWebServiceQt::_put_file (
    
    if (file->open (QIODevice::ReadOnly)) {
       
-      qDebug () << "_put_file: " << request.url ().toString ();
+qDebug () << "_put_file: " << request.url ().toString ();
 
       reply = _nam->put (request, file);
       if (reply) {
 
-         QVariant type (RequestType.get_buffer ());
-         reply->setProperty ("requestType", type);
-
-         QVariant id (_requestCounter++);
-         reply->setProperty ("requestId", id);
+         reply->setProperty ("requestType", RequestType.get_buffer ());
 
          connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
-
+                  
          connect (
             reply, SIGNAL (uploadProgress (qint64, qint64)),
             this, SLOT (_upload_progress (qint64, qint64)));
@@ -267,27 +258,17 @@ dmz::ForgeWebServiceQt::_delete (const QUrl &Url, const String &RequestType) {
    QNetworkRequest request (Url);
    request.setRawHeader("User-Agent", ForgeUserAgentName);
 
-qWarning () << "deleteResource is only available in Qt 4.6";
-
 qDebug () << "_delete: " << request.url ().toString ();
 
-   // deleteResource is only available in Qt 4.6
+   QNetworkReply *reply = _nam->deleteResource (request);
+   if (reply) {
+      
+      reply->setProperty ("requestType", RequestType.get_buffer ());
+
+      connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
+   }
    
-   // QNetworkReply *reply = _nam->deleteResource (request);
-   // if (reply) {
-   //    
-   //    QVariant type (RequestType.get_buffer ());
-   //    reply->setProperty ("requestType", type);
-   //    
-   //    QVariant id (_requestCounter++);
-   //    reply->setProperty ("requestId", id);
-   //    
-   //    connect (reply, SIGNAL (finished ()), reply, SLOT (deleteLater ()));
-   // }
-   // 
-   // return reply;
-   
-   return 0;
+   return reply;
 }
 
 
@@ -315,8 +296,28 @@ dmz::ForgeWebServiceQt::_upload_progress (qint64 bytesSent, qint64 bytesTotal) {
 
    if (_log) {
       
-      _log->warn << "_upload_progress: " << bytesSent << " of " << bytesTotal << endl;
+      QNetworkReply *reply = (QNetworkReply *)sender ();
+      Int64 requestId = reply->property ("requestId").toULongLong ();
+      
+      _log->warn << "_upload_progress["  << requestId << "]: " << bytesSent << " of " << bytesTotal << endl;
    }
+}
+
+
+void
+dmz::ForgeWebServiceQt::_handle_finsihed (QNetworkReply *reply) {
+   
+   if (reply) {
+      
+      const QString RequestType (reply->property ("requestType").toString ());
+      UInt64 RequestId (reply->property ("requestId").toULongLong ());
+   }
+}
+
+
+void
+dmz::ForgeWebServiceQt::_handle_error (QNetworkReply::NetworkError code) {
+   
 }
 
 
@@ -344,6 +345,10 @@ dmz::ForgeWebServiceQt::_init (Config &local) {
    connect (
       _nam, SIGNAL (finished (QNetworkReply *)),
       this, SIGNAL (finished (QNetworkReply *)));
+      
+   connect (
+      _nam, SIGNAL (error (QNetworkReply *)),
+      this, SIGNAL (error (QNetworkReply *)));
    
    set_host (config_to_string ("host", local, get_host ()));
    set_port (config_to_int32 ("port", local, get_port ()));
