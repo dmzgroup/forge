@@ -99,19 +99,28 @@ namespace dmz {
 
       protected Q_SLOTS:
          void _handle_reply (QNetworkReply *reply);
+         void _upload_progress (qint64 bytesSent, qint64 bytesTotal);
+         void _upload_finished ();
          void _start_next_upload ();
 
       protected:
          void _handle_search (const UInt64 RequestId, const String &JsonData);
          void _handle_get_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
-         // void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
+         void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_media (const UInt64 RequestId, const String &JsonData);
          // void _handle_put_asset_media (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_preview (const UInt64 RequestId, const String &JsonData);
-         // void _handle_put_asset_preview (const UInt64 RequestId, const String &JsonData);
+         void _handle_put_asset_preview (const UInt64 RequestId, const String &JsonData);
+         
          void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
          
+         void _handle_not_found (
+            const String &AssetId,
+            const UInt64 RequestId,
+            const ForgeTypeEnum &RequestType,
+            ForgeObserver *observer);
+            
          void _handle_reply (
             const UInt64 RequestId,
             const ForgeTypeEnum &RequestType,
