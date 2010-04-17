@@ -42,10 +42,12 @@ namespace {
    static const dmz::String LocalOriginalName ("original_name");
    static const dmz::String LocalValue ("value");
    
+   static char LocalDefaultMimeType[] = "application/octet-stream";
    static QHash<QString, QByteArray> localMimeTypes;
    
    enum LocalTypeEnum {
-      LocalGetUuids = 201
+      LocalGetUuids = 201,
+      LocalPutAsset = 203
    };
    
    static QNetworkRequest::Attribute LocalAttrType =
@@ -53,15 +55,21 @@ namespace {
       
    static QNetworkRequest::Attribute LocalAttrId =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
+
+   // static QNetworkRequest::Attribute LocalAttrFilesCount =
+   //    (QNetworkRequest::Attribute) (QNetworkRequest::User + 3);
    
    struct UploadStruct {
       
       dmz::UInt64 requestId;
+      dmz::ForgeTypeEnum type;
       dmz::String assetId;
-      dmz::String file;
+      dmz::StringContainer files;
+      dmz::String mimeType;
+      
+      UploadStruct () : requestId (0), type (dmz::ForgeTypeUnknown) {;}
    };
 };
-
 
 struct dmz::ForgeModuleQt::AssetStruct {
 
@@ -79,12 +87,6 @@ struct dmz::ForgeModuleQt::AssetStruct {
 };
 
 
-// struct dmz::ForgeModuleQt::UploadStruct {
-// 
-// 
-// };
-
-
 struct dmz::ForgeModuleQt::State {
 
    Log log;
@@ -97,6 +99,7 @@ struct dmz::ForgeModuleQt::State {
    Boolean uploading;
    QUrl baseUrl;
    QString db;
+   UploadStruct *upload;
    QNetworkReply *uploadReply;
    QFile *uploadFile;
    
@@ -108,8 +111,16 @@ struct dmz::ForgeModuleQt::State {
 void
 local_init_mime_types () {
 
-   localMimeTypes["jpg"] = "image/jpeg";
-   localMimeTypes["png"] = "image/png";
+   // images
+   localMimeTypes["png"]      = "image/png";
+   localMimeTypes["jpg"]      = "image/jpeg";
+   localMimeTypes["tiff"]     = "image/tiff";
+   localMimeTypes["svg"]      = "image/svg+xml";
+   localMimeTypes["collads"]  = "model/x-collada+xml";
+   localMimeTypes["ive"]      = "model/x-ive";
+   localMimeTypes["wav"]      = "audio/x-wav";
+   localMimeTypes["xml"]      = "application/x-dmz+xml";
+   localMimeTypes["json"]     = "application/x-dmz+json";
 }
 
 
@@ -119,6 +130,7 @@ dmz::ForgeModuleQt::State::State (const PluginInfo &Info) :
       requestCounter (1000),
       uploading (False),
       baseUrl (ForgeApiEndpoint),
+      upload (0),
       uploadReply (0),
       uploadFile (0) {;}
 
@@ -144,7 +156,7 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
 
    connect (
       _state.networkAccessManager, SIGNAL (finished (QNetworkReply *)),
-      this, SLOT (_handle_reply (QNetworkReply *)));
+      this, SLOT (_reply_finished (QNetworkReply *)));
 
    _init (local);
 }
@@ -360,6 +372,8 @@ dmz::ForgeModuleQt::search (
       if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
 
       QNetworkRequest request (url);
+      request.setRawHeader ("User-Agent", ForgeUserAgentName);
+      request.setRawHeader ("Accept", "application/json");
       request.setAttribute (LocalAttrId, requestId);
       request.setAttribute (LocalAttrType, ForgeSearch);
 
@@ -385,6 +399,8 @@ dmz::ForgeModuleQt::get_asset (const String &AssetId, ForgeObserver *observer) {
       url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
       QNetworkRequest request (url);
+      request.setRawHeader ("User-Agent", ForgeUserAgentName);
+      request.setRawHeader ("Accept", "application/json");
       request.setAttribute (LocalAttrId, requestId);
       request.setAttribute (LocalAttrType, ForgeGetAsset);
 
@@ -420,7 +436,8 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
             QByteArray byteArray (assetJson.get_buffer ());
          
             QNetworkRequest request (url);
-            // request.setRawHeader("User-Agent", ForgeUserAgentName);
+            request.setRawHeader ("User-Agent", ForgeUserAgentName);
+            request.setRawHeader ("Accept", "application/json");
             request.setAttribute (LocalAttrId, requestId);
             request.setAttribute (LocalAttrType, ForgePutAsset);
 
@@ -455,6 +472,8 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
          url.addQueryItem ("rev", as->revision.get_buffer ());
 
          QNetworkRequest request (url);
+         request.setRawHeader("User-Agent", ForgeUserAgentName);
+         request.setRawHeader ("Accept", "application/json");
          request.setAttribute (LocalAttrId, requestId);
          request.setAttribute (LocalAttrType, ForgeDeleteAsset);
 
@@ -487,9 +506,34 @@ dmz::ForgeModuleQt::put_asset_media (
       ForgeObserver *observer,
       const String &MimeType) {
 
-   UInt64 retVal (0);
+   UInt64 requestId (0);
 
-   return retVal;
+   if (observer) {
+      
+      requestId = _state.requestCounter++;
+      
+      AssetStruct *as = _state.assetTable.lookup (AssetId);
+      if (as) {
+
+         //as->preview.append (Preview);
+         
+         _state.obsTable.store (requestId, observer);
+         
+         UploadStruct *us = new UploadStruct;
+         us->requestId = requestId;
+         us->type = ForgePutAssetMedia;
+         us->assetId = AssetId;
+         us->files.append (File);
+         us->mimeType = MimeType;
+         
+         _state.uploadQueue.enqueue (us);
+         
+         QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
+      }
+      else { _handle_not_found (AssetId, requestId, ForgePutAssetMedia, observer); }
+   }
+   
+   return requestId;
 }
 
 
@@ -506,9 +550,9 @@ dmz::ForgeModuleQt::get_asset_preview (
 
 
 dmz::UInt64
-dmz::ForgeModuleQt::put_asset_preview (
+dmz::ForgeModuleQt::add_asset_preview (
       const String &AssetId,
-      const String &Preview,
+      const StringContainer &Files,
       ForgeObserver *observer) {
 
    UInt64 requestId (0);
@@ -520,26 +564,64 @@ dmz::ForgeModuleQt::put_asset_preview (
       AssetStruct *as = _state.assetTable.lookup (AssetId);
       if (as) {
 
+         //as->preview.append (Preview);
+         
          _state.obsTable.store (requestId, observer);
 
          UploadStruct *us = new UploadStruct;
          us->requestId = requestId;
+         us->type = ForgeAddAssetPreview;
          us->assetId = AssetId;
-         us->file = Preview;
+         us->files = Files;
 
          _state.uploadQueue.enqueue (us);
 
          QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
       }
-      else { _handle_not_found (AssetId, requestId, ForgePutAssetPreview, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeAddAssetPreview, observer); }
    }
    
    return requestId;
 }
 
 
+dmz::UInt64
+dmz::ForgeModuleQt::remove_asset_preview (
+      const String &AssetId,
+      const StringContainer &Files,
+      ForgeObserver *observer) {
+
+   UInt64 requestId (0);
+
+   // if (observer) {
+   //    
+   //    requestId = _state.requestCounter++;
+   //    
+   //    AssetStruct *as = _state.assetTable.lookup (AssetId);
+   //    if (as) {
+   // 
+   //       as->preview.append (Preview);
+   //       
+   //       _state.obsTable.store (requestId, observer);
+   // 
+   //       UploadStruct *us = new UploadStruct;
+   //       us->requestId = requestId;
+   //       us->assetId = AssetId;
+   //       us->file = Preview;
+   // 
+   //       _state.uploadQueue.enqueue (us);
+   // 
+   //       QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
+   //    }
+   //    else { _handle_not_found (AssetId, requestId, ForgeAddAssetPreview, observer); }
+   // }
+   
+   return requestId;
+}
+
+
 void
-dmz::ForgeModuleQt::_handle_reply (QNetworkReply *reply) {
+dmz::ForgeModuleQt::_reply_finished (QNetworkReply *reply) {
    
    if (reply) {
 
@@ -554,7 +636,7 @@ dmz::ForgeModuleQt::_handle_reply (QNetworkReply *reply) {
       QString data (reply->readAll ());
       const String JsonData (qPrintable (data));
       
-_state.log.warn << "_handle_reply[" << StatusCode << "]: " << Id << endl;
+// _state.log.warn << "_reply_finished[" << StatusCode << "]: " << Id << endl;
 
       if (!JsonData) {
 
@@ -565,27 +647,27 @@ _state.log.warn << "_handle_reply[" << StatusCode << "]: " << Id << endl;
       }
       else {
          
-_state.log.warn << "json: " << JsonData << endl;
+// _state.log.warn << "json: " << JsonData << endl;
 
          switch (Type) {
 
             case ForgeSearch:
-_state.log.info << "ForgeSearch" << endl;
+_state.log.warn << "<-- ForgeSearch" << endl;
                _handle_search (Id, JsonData);
                break;
          
             case ForgeGetAsset:
-_state.log.info << "ForgeGetAsset" << endl;
+_state.log.warn << "<-- ForgeGetAsset" << endl;
                _handle_get_asset (Id, JsonData);
                break;
             
             case ForgePutAsset:
-_state.log.info << "ForgePutAsset" << endl;
-               _handle_put_asset (Id, JsonData);
+                  _handle_put_asset (Id, JsonData);
+_state.log.warn << "<-- ForgePutAsset" << endl;
                break;
          
             case ForgeDeleteAsset:
-_state.log.info << "ForgeDeleteAsset" << endl;
+_state.log.warn << "<-- ForgeDeleteAsset" << endl;
                _handle_delete_asset (Id, JsonData);
                break;
          
@@ -593,19 +675,25 @@ _state.log.info << "ForgeDeleteAsset" << endl;
             break;
          
             case ForgePutAssetMedia:
-            break;
+_state.log.warn << "<-- ForgePutAssetMedia" << endl;
+               _handle_put_asset_media (Id, JsonData);
+               break;
          
             case ForgeGetAssetPreview:
             break;
          
-            case ForgePutAssetPreview:
-_state.log.info << "ForgePutAssetPreview" << endl;
-               _handle_put_asset_preview (Id, JsonData);
+            case ForgeAddAssetPreview:
+_state.log.warn << "<-- ForgeAddAssetPreview" << endl;
+               _handle_add_asset_preview (Id, JsonData);
                break;
          
             case LocalGetUuids:
                _handle_get_uuids (Id, JsonData);
                break;
+               
+            // case LocalUpdateAsset:
+            //    _handle_update_asset (Id, JsonData);
+            //    break;
          
             default:
                String msg ("Unknown request type: ");
@@ -628,8 +716,6 @@ _state.log.info << "ForgePutAssetPreview" << endl;
       //    _handle_error (RequestId, qPrintable (RequestType), msg);
       // }
       
-      _state.obsTable.remove (Id);
-      
       reply->deleteLater ();
    }
 }
@@ -638,11 +724,13 @@ _state.log.info << "ForgePutAssetPreview" << endl;
 void
 dmz::ForgeModuleQt::_upload_progress (qint64 bytesSent, qint64 bytesTotal) {
 
-   QNetworkReply *reply = (QNetworkReply *)sender ();
-   QNetworkRequest request = reply->request ();
-   const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
+   // QNetworkReply *reply = (QNetworkReply *)sender ();
+   if (_state.uploadReply) {
       
-_state.log.warn << "_upload_progress["  << Id << "]: " << bytesSent << " of " << bytesTotal << endl;
+      QNetworkRequest request = _state.uploadReply->request ();
+      const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
+// _state.log.error << "_upload_progress["  << Id  << "]: " << bytesSent << " of " << bytesTotal << endl;
+   }
 }
 
 
@@ -653,8 +741,6 @@ dmz::ForgeModuleQt::_upload_finished () {
       
       QNetworkRequest request = _state.uploadReply->request ();
       const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
-      
-_state.log.warn << "_upload_finsihed["  << Id << "]" << endl;
       
       _state.uploadReply->deleteLater ();
       _state.uploadReply = 0;
@@ -667,7 +753,85 @@ _state.log.warn << "_upload_finsihed["  << Id << "]" << endl;
       _state.uploadFile = 0;
    }
 
+   if (_state.upload) {
+      
+      if (_state.upload->files.get_count () == 0) { _state.upload = 0; }
+   }
+   
    _start_next_upload ();
+}
+
+
+void
+dmz::ForgeModuleQt::_start_next_upload () {
+
+   // only upload next file if not currently uploading
+   if (!_state.uploadFile && !_state.uploadReply) {
+
+      // get next set of file to upload from queue
+      if (!_state.upload && !_state.uploadQueue.isEmpty ()) {
+         
+         _state.upload = _state.uploadQueue.dequeue ();
+      }
+      
+      if (_state.upload && _state.networkAccessManager) {
+
+         String revision;
+         if (_lookup_revision (_state.upload->assetId, revision)) {
+
+            String file;
+            _state.upload->files.get_first (file);
+            _state.upload->files.remove (file);
+                        
+            QFileInfo fi (file.get_buffer ());
+
+            QUrl url (_state.baseUrl);
+            QString path ("/%1/%2/%3");
+            
+            url.setPath (
+               path.arg (_state.db)
+                   .arg (_state.upload->assetId.get_buffer ())
+                   .arg (fi.fileName ()));
+
+            url.addQueryItem ("rev", revision.get_buffer ());
+
+            const QString Ext (fi.suffix ().toLower ());
+            QByteArray mimeType (LocalDefaultMimeType);
+            if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
+
+            QNetworkRequest request (url);
+            request.setRawHeader ("User-Agent", ForgeUserAgentName);
+            request.setRawHeader ("Accept", "application/json");
+            request.setHeader (QNetworkRequest::ContentTypeHeader, mimeType);
+            request.setAttribute (LocalAttrId, _state.upload->requestId);
+            request.setAttribute (LocalAttrType, _state.upload->type);
+
+            _state.uploadFile = new QFile (fi.absoluteFilePath ());
+
+            if (_state.uploadFile->open (QIODevice::ReadOnly)) {
+
+               _state.uploadReply =
+                  _state.networkAccessManager->put (request, _state.uploadFile);
+            
+               connect (
+                  _state.uploadReply, SIGNAL (uploadProgress (qint64, qint64)),
+                  this, SLOT (_upload_progress (qint64, qint64)));
+               
+               connect (
+                  _state.uploadReply, SIGNAL (finished ()),
+                  this, SLOT (_upload_finished ()));
+            }
+            else {
+
+               _state.log.warn << "Fialed to open file: "
+                               << qPrintable (fi.absoluteFilePath ()) << endl;
+                               
+               delete _state.uploadFile;
+               _state.uploadFile = 0;
+            }
+         } 
+      }
+   }
 }
 
 
@@ -794,9 +958,15 @@ dmz::ForgeModuleQt::_handle_delete_asset (const UInt64 RequestId, const String &
 
 
 void
-dmz::ForgeModuleQt::_handle_put_asset_preview (
+dmz::ForgeModuleQt::_handle_put_asset_media (
       const UInt64 RequestId,
       const String &JsonData) {
+
+   Boolean finished (False);
+   if (_state.upload && (_state.upload->requestId == RequestId)) {
+      
+      if (_state.upload->files.get_count () == 0) { finished = True; }
+   }
 
    Config global ("global");
    
@@ -811,19 +981,76 @@ dmz::ForgeModuleQt::_handle_put_asset_preview (
          StringContainer container;
          container.append (JsonData);
 
-         _handle_reply (RequestId, ForgePutAssetPreview, container);
+         if (finished) {
+            
+            _handle_reply (RequestId, _state.upload->type, container);
+         }
       }
       else {
          
+         if (_state.upload && (_state.upload->requestId == RequestId)) {
+
+            _state.upload->files.clear ();
+         }
+         
          _handle_error (
             RequestId,
-            ForgePutAssetPreview,
+            _state.upload->type,
             config_to_string ("reason", global));
       }
    }
    else {
       
-      _handle_error (RequestId, ForgePutAssetPreview, LocalJsonParseErrorMessage);
+      _handle_error (RequestId, _state.upload->type, LocalJsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_add_asset_preview (
+      const UInt64 RequestId,
+      const String &JsonData) {
+
+   Boolean finished (False);
+   if (_state.upload && (_state.upload->requestId == RequestId)) {
+      
+      if (_state.upload->files.get_count () == 0) { finished = True; }
+   }
+
+   Config global ("global");
+   
+   if (json_string_to_config (JsonData, global)) { 
+
+      if (config_to_boolean ("ok", global)) {
+         
+         const String AssetId (config_to_string ("id", global));
+         const String Revision (config_to_string ("rev", global));
+         _store_revision (AssetId, Revision);
+
+         StringContainer container;
+         container.append (JsonData);
+
+         if (finished) {
+            
+            _handle_reply (RequestId, ForgeAddAssetPreview, container);
+         }
+      }
+      else {
+         
+         if (_state.upload && (_state.upload->requestId == RequestId)) {
+
+            _state.upload->files.clear ();
+         }
+         
+         _handle_error (
+            RequestId,
+            ForgeAddAssetPreview,
+            config_to_string ("reason", global));
+      }
+   }
+   else {
+      
+      _handle_error (RequestId, ForgeAddAssetPreview, LocalJsonParseErrorMessage);
    }
 }
 
@@ -881,7 +1108,7 @@ dmz::ForgeModuleQt::_handle_reply (
       const ForgeTypeEnum &RequestType,
       StringContainer &Container) {
 
-   ForgeObserver *observer = _state.obsTable.lookup (RequestId);
+   ForgeObserver *observer = _state.obsTable.remove (RequestId);
    if (observer) {
       
       observer->handle_reply (RequestId, RequestType, False, Container);
@@ -895,7 +1122,7 @@ dmz::ForgeModuleQt::_handle_error (
       const ForgeTypeEnum &RequestType,
       const String &Message) {
 
-   ForgeObserver *observer = _state.obsTable.lookup (RequestId);
+   ForgeObserver *observer = _state.obsTable.remove (RequestId);
    if (observer) {
       
       StringContainer container;
@@ -923,69 +1150,6 @@ dmz::ForgeModuleQt::_lookup_revision (const String &AssetId, String &value) {
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) { value = asset->revision; retVal = True; }
    return retVal;
-}
-
-
-void
-dmz::ForgeModuleQt::_start_next_upload () {
-
-   if (!_state.uploadFile && !_state.uploadReply && !_state.uploadQueue.isEmpty ()) {
-   
-      UploadStruct *us = _state.uploadQueue.dequeue ();
-
-      if (us && _state.networkAccessManager) {
-
-         String revision;
-         if (_lookup_revision (us->assetId, revision)) {
-
-            QFileInfo fi (us->file.get_buffer ());
-
-            QUrl url (_state.baseUrl);
-            QString path ("/%1/%2/%3");
-            
-            url.setPath (
-               path.arg (_state.db)
-                   .arg (us->assetId.get_buffer ())
-                   .arg (fi.fileName ()));
-
-            url.addQueryItem ("rev", revision.get_buffer ());
-
-            const QString Ext (fi.suffix ().toLower ());
-            QByteArray mimeType ("image/jpeg");
-            if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
-
-            QNetworkRequest request (url);
-            request.setRawHeader ("User-Agent", ForgeUserAgentName);
-            request.setRawHeader ("Content-Type", mimeType);
-            request.setAttribute (LocalAttrId, us->requestId);
-            request.setAttribute (LocalAttrType, ForgePutAssetPreview);
-
-            _state.uploadFile = new QFile (fi.absoluteFilePath ());
-
-            if (_state.uploadFile->open (QIODevice::ReadOnly)) {
-
-               _state.uploadReply =
-                  _state.networkAccessManager->put (request, _state.uploadFile);
-            
-               connect (
-                  _state.uploadReply, SIGNAL (uploadProgress (qint64, qint64)),
-                  this, SLOT (_upload_progress (qint64, qint64)));
-               
-               connect (
-                  _state.uploadReply, SIGNAL (finished ()),
-                  this, SLOT (_upload_finished ()));
-            }
-            else {
-
-               _state.log.warn << "Fialed to open file: "
-                               << qPrintable (fi.absoluteFilePath ()) << endl;
-                               
-               delete _state.uploadFile;
-               _state.uploadFile = 0;
-            }
-         } 
-      }
-   }
 }
 
 
@@ -1105,6 +1269,8 @@ dmz::ForgeModuleQt::_get_uuid () {
          url.addQueryItem ("count", QString::number (10));
 
          QNetworkRequest request (url);
+         request.setRawHeader ("User-Agent", ForgeUserAgentName);
+         request.setRawHeader ("Accept", "application/json");
          request.setAttribute (LocalAttrId, requestId);
          request.setAttribute (LocalAttrType, LocalGetUuids);
 

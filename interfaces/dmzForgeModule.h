@@ -81,9 +81,14 @@ namespace dmz {
             const String &File,
             ForgeObserver *observer) = 0;
          
-         virtual UInt64 put_asset_preview (
+         virtual UInt64 add_asset_preview (
             const String &AssetId,
-            const String &File,
+            const StringContainer &Files,
+            ForgeObserver *observer) = 0;
+
+         virtual UInt64 remove_asset_preview (
+            const String &AssetId,
+            const StringContainer &Files,
             ForgeObserver *observer) = 0;
          
       protected:

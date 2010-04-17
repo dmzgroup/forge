@@ -18,14 +18,16 @@ namespace dmz {
 //! @{
 
    enum ForgeTypeEnum {
-      ForgeSearch = 101,
+      ForgeTypeUnknown = 100,
+      ForgeSearch,
       ForgeGetAsset,
       ForgePutAsset,
       ForgeDeleteAsset,
       ForgeGetAssetMedia,
       ForgePutAssetMedia,
       ForgeGetAssetPreview,
-      ForgePutAssetPreview
+      ForgeAddAssetPreview,
+      ForgeRemoveAssetPreview
    };
          
    //! Forge media asset type. Defined in dmzForgeConsts.h.

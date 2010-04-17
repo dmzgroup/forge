@@ -91,15 +91,24 @@ dmz::ForgeQtPluginClient::discover_plugin (
 void
 dmz::ForgeQtPluginClient::update_time_slice (const Float64 TimeDelta) {
 
-   static Int32 updateCounter (4);
+   static Int32 updateCounter (-1);
    
    if (_state.forgeModule) {
       
       updateCounter++;
    }
 
+   if (updateCounter == 0) {
+      
+      _state.assetId = "me";
+      _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
+_state.log.debug << " --> get_asset: " << _state.requestId << endl;
+   }
    if (updateCounter == 1) {
       
+      _state.assetId = "me";
+      _state.requestId = _state.forgeModule->delete_asset (_state.assetId, this);
+_state.log.debug << " --> delete_asset: " << _state.requestId << endl;
    }
    else if (updateCounter == 2) {
       
@@ -117,39 +126,36 @@ dmz::ForgeQtPluginClient::update_time_slice (const Float64 TimeDelta) {
       _state.forgeModule->store_keywords (_state.assetId, keywords);
       
       _state.requestId = _state.forgeModule->put_asset (_state.assetId, this);
-      _state.log.warn << "put_asset: " << _state.requestId << endl;
+_state.log.debug << "--> put_asset: " << _state.requestId << endl;
    }
    else if (updateCounter == 3) {
       
-      _state.assetId = "me2";
-      _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
-      _state.log.warn << "get_asset: " << _state.requestId << endl;
+      // _state.assetId = "me";
+      // _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
+      // _state.log.warn << updateCounter << ":get_asset: " << _state.requestId << endl;
+      start_time_slice ();
    }
    else if (updateCounter == 4) {
       
-      String file ("preview1.jpg");
-      _state.requestId = _state.forgeModule->put_asset_preview (_state.assetId, file, this);
-      _state.log.warn << "put_preview: " << _state.requestId << endl;
+      StringContainer previews;
+      previews.append ("preview1.jpg");
+      previews.append ("preview2.jpg");
+      previews.append ("preview3.png");
       
-      file = "preview2.jpg";
-      _state.requestId = _state.forgeModule->put_asset_preview (_state.assetId, file, this);
-      _state.log.warn << "put_preview: " << _state.requestId << endl;      
-
-      file = "preview3.png";
-      _state.requestId = _state.forgeModule->put_asset_preview (_state.assetId, file, this);
-      _state.log.warn << "put_preview: " << _state.requestId << endl;      
+      _state.assetId = "me";
+      _state.requestId = _state.forgeModule->add_asset_preview (_state.assetId, previews, this);
+_state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;
    }
    else if (updateCounter == 5) {
       
-      _state.assetId = "me5";
-      _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
-      _state.log.warn << "get_asset: " << _state.requestId << endl;
+      String file ("preview0.jpg");
+      
+      _state.assetId = "me";
+      _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
+_state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
    }
    else if (updateCounter == 6) {
       
-      _state.assetId = "me123";
-      _state.requestId = _state.forgeModule->delete_asset (_state.assetId, this);
-      _state.log.warn << "delete_asset: " << _state.requestId << endl;
    }
 }
 
@@ -161,7 +167,7 @@ dmz::ForgeQtPluginClient::handle_reply (
       const Boolean Error,
       const StringContainer &Results) {
 
-_state.log.warn << "handle_reply:" << RequestId << endl;
+// _state.log.warn << "handle_reply:" << RequestId << endl;
 
    switch (ReqeustType) {
    
@@ -169,38 +175,40 @@ _state.log.warn << "handle_reply:" << RequestId << endl;
          String assetId;
          while (Results.get_next (assetId)) {
 
-            _state.log.info << "getting asset: " << assetId << endl;
+            // _state.log.info << "getting asset: " << assetId << endl;
             // _state.forgeModule->get_asset (assetId, this);
          }
          break;
       }
       
       case ForgeGetAsset:
-_state.log.debug << "ForgeGetAsset" << endl;
+_state.log.error << "<-- ForgeGetAsset" << endl;
 
          start_time_slice ();
          break;
          
       case ForgePutAsset:
-_state.log.debug << "ForgePutAsset" << endl;
+_state.log.error << "<-- ForgePutAsset" << endl;
 
          start_time_slice ();
          break;
       
       case ForgeDeleteAsset:
-_state.log.error << "ForgeDeleteAsset" << endl;
+_state.log.error << "<-- ForgeDeleteAsset" << endl;
 
-         // start_time_slice ();
+         start_time_slice ();
          break;
 
-      case ForgePutAssetPreview:
-_state.log.warn << "ForgePutAssetPreview" << endl;
+      case ForgePutAssetMedia:
+_state.log.error << "<-- ForgePutAssetMedia" << endl;
 
-         if (_state.requestId == RequestId) {
-            
-            start_time_slice ();
-         }
-         
+         start_time_slice ();
+         break;
+
+      case ForgeAddAssetPreview:
+_state.log.error << "<-- ForgeAddAssetPreview" << endl;
+
+         start_time_slice ();
          break;
 
       default:
@@ -209,11 +217,11 @@ _state.log.error << "handle_reply: Unknown[" << RequestId << "]" << endl;
 
    if (Error) {
       
-_state.log.error << "Results: " << Results << endl;
+// _state.log.error << "Results: " << Results << endl;
    }
    else {
       
-_state.log.warn << "Results: " << Results << endl;
+// _state.log.warn << "Results: " << Results << endl;
    }
 }
 
