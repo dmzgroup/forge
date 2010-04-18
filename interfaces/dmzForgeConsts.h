@@ -17,18 +17,16 @@ namespace dmz {
 //! \addtogroup Forge
 //! @{
 
-   enum ForgeTypeEnum {
-      ForgeTypeUnknown = 100,
-      ForgeSearch,
-      ForgeGetAsset,
-      ForgePutAsset,
-      ForgeDeleteAsset,
-      ForgeGetAssetMedia,
-      ForgePutAssetMedia,
-      ForgeGetAssetPreview,
-      ForgeAddAssetPreview,
-      ForgeRemoveAssetPreview
-   };
+   const Int32 ForgeTypeSearch             = 100;
+   const Int32 ForgeTypeGetAsset           = 101;
+   const Int32 ForgeTypePutAsset           = 102;
+   const Int32 ForgeTypeDeleteAsset        = 103;
+   const Int32 ForgeTypeGetAssetMedia      = 104;
+   const Int32 ForgeTypePutAssetMedia      = 105;
+   const Int32 ForgeTypeGetAssetPreview    = 106;
+   const Int32 ForgeTypeAddAssetPreview    = 107;
+   const Int32 ForgeTypeRemoveAssetPreview = 108;
+   const Int32 ForgeTypeUser               = 1000;
          
    //! Forge media asset type. Defined in dmzForgeConsts.h.
    enum ForgeAssetTypeEnum {

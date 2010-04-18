@@ -1,8 +1,6 @@
 require "lmkQt"
 lmkQt.set_name "dmzForgeModuleQt"
 lmk.set_type "plugin"
--- lmk.add_files ({"dmzForgeModuleQt.h","dmzForgeWebServiceQt.h",}, {src = "moc"})
--- lmk.add_files {"dmzForgeModuleQt.cpp","dmzForgeWebServiceQt.cpp",}
 lmk.add_files ({"dmzForgeModuleQt.h",}, {src = "moc"})
 lmk.add_files {"dmzForgeModuleQt.cpp",}
 lmk.add_preqs {"dmzForgeFramework",}

@@ -1,7 +1,6 @@
 #ifndef DMZ_FORGE_OBSERVER_DOT_H
 #define DMZ_FORGE_OBSERVER_DOT_H
 
-#include <dmzForgeConsts.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzRuntimeRTTI.h>
@@ -28,7 +27,7 @@ namespace dmz {
          
          virtual void handle_reply (
             const UInt64 RequestId,
-            const ForgeTypeEnum &RequestType,
+            const Int32 RequestType,
             const Boolean Error,
             const StringContainer &Results) = 0;
 

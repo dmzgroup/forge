@@ -114,34 +114,47 @@ namespace dmz {
          void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_media (const UInt64 RequestId, const String &JsonData);
-         void _handle_put_asset_media (const UInt64 RequestId, const String &JsonData);
+         void _handle_put_asset_media_phase1 (const UInt64 RequestId, const String &JsonData);
+         void _handle_put_asset_media_phase2 (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_preview (const UInt64 RequestId, const String &JsonData);
-         void _handle_add_asset_preview (const UInt64 RequestId, const String &JsonData);
+         void _handle_add_asset_preview_phase1 (const UInt64 RequestId, const String &JsonData);
+         void _handle_add_asset_preview_phase2 (const UInt64 RequestId, const String &JsonData);
+         void _handle_add_asset_preview_phase3 (const UInt64 RequestId, const String &JsonData);
          
          void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
          
          void _handle_not_found (
             const String &AssetId,
             const UInt64 RequestId,
-            const ForgeTypeEnum &RequestType,
+            const Int32 RequestType,
             ForgeObserver *observer);
             
          void _handle_reply (
             const UInt64 RequestId,
-            const ForgeTypeEnum &RequestType,
+            const Int32 RequestType,
             StringContainer &Container);
          
          void _handle_error (
             const UInt64 RequestId,
-            const ForgeTypeEnum &RequestType,
+            const Int32 RequestType,
             const String &Message);
          
          Boolean _store_revision (const String &AssetId, const String &Value);
          Boolean _lookup_revision (const String &AssetId, String &value);
+
+         QNetworkReply *_get_asset (
+            const String &AssetId,
+            const UInt64 RequestId,
+            const Int32 RequestType);
+         
+         QNetworkReply *_put_asset (
+            const String &AssetId,
+            const UInt64 RequestId,
+            const Int32 RequestType);
          
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
-         Boolean _config_to_asset (const String &AssetId, const Config &AssetConfig);
+         Boolean _config_to_asset (const Config &AssetConfig);
          
          String _get_uuid ();
          

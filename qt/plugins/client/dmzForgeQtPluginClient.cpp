@@ -1,3 +1,4 @@
+#include <dmzForgeConsts.h>
 #include <dmzForgeModule.h>
 #include "dmzForgeQtPluginClient.h"
 #include <dmzRuntimeConfig.h>
@@ -107,8 +108,11 @@ _state.log.debug << " --> get_asset: " << _state.requestId << endl;
    if (updateCounter == 1) {
       
       _state.assetId = "me";
-      _state.requestId = _state.forgeModule->delete_asset (_state.assetId, this);
-_state.log.debug << " --> delete_asset: " << _state.requestId << endl;
+      // _state.requestId = _state.forgeModule->delete_asset (_state.assetId, this);
+// _state.log.debug << " --> delete_asset: " << _state.requestId << endl;
+      _state.requestId = _state.forgeModule->put_asset (_state.assetId, this);
+_state.log.debug << " --> put_asset: " << _state.requestId << endl;
+updateCounter = 100;
    }
    else if (updateCounter == 2) {
       
@@ -151,8 +155,8 @@ _state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;
       String file ("preview0.jpg");
       
       _state.assetId = "me";
-      _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
-_state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
+//      _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
+//_state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
    }
    else if (updateCounter == 6) {
       
@@ -163,7 +167,7 @@ _state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
 void
 dmz::ForgeQtPluginClient::handle_reply (
       const UInt64 RequestId,
-      const ForgeTypeEnum &ReqeustType,
+      const Int32 ReqeustType,
       const Boolean Error,
       const StringContainer &Results) {
 
@@ -171,7 +175,7 @@ dmz::ForgeQtPluginClient::handle_reply (
 
    switch (ReqeustType) {
    
-      case ForgeSearch: {
+      case ForgeTypeSearch: {
          String assetId;
          while (Results.get_next (assetId)) {
 
@@ -181,31 +185,31 @@ dmz::ForgeQtPluginClient::handle_reply (
          break;
       }
       
-      case ForgeGetAsset:
+      case ForgeTypeGetAsset:
 _state.log.error << "<-- ForgeGetAsset" << endl;
 
          start_time_slice ();
          break;
          
-      case ForgePutAsset:
+      case ForgeTypePutAsset:
 _state.log.error << "<-- ForgePutAsset" << endl;
 
          start_time_slice ();
          break;
       
-      case ForgeDeleteAsset:
+      case ForgeTypeDeleteAsset:
 _state.log.error << "<-- ForgeDeleteAsset" << endl;
 
          start_time_slice ();
          break;
 
-      case ForgePutAssetMedia:
+      case ForgeTypePutAssetMedia:
 _state.log.error << "<-- ForgePutAssetMedia" << endl;
 
          start_time_slice ();
          break;
 
-      case ForgeAddAssetPreview:
+      case ForgeTypeAddAssetPreview:
 _state.log.error << "<-- ForgeAddAssetPreview" << endl;
 
          start_time_slice ();
@@ -217,7 +221,7 @@ _state.log.error << "handle_reply: Unknown[" << RequestId << "]" << endl;
 
    if (Error) {
       
-// _state.log.error << "Results: " << Results << endl;
+_state.log.error << "Results: " << Results << endl;
    }
    else {
       
