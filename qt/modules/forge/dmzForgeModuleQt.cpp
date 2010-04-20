@@ -26,9 +26,9 @@ namespace {
    
    static const dmz::String LocalJsonParseErrorMessage ("Error parsing json response.");
 
-   static const dmz::String LocalId ("_id");
-   static const dmz::String LocalRev ("_rev");
-   static const dmz::String LocalAttachments ("_attachments");
+   static const dmz::String Local_Id ("_id");
+   static const dmz::String Local_Rev ("_rev");
+   static const dmz::String Local_Attachments ("_attachments");
    static const dmz::String LocalName ("name");
    static const dmz::String LocalBrief ("brief");
    static const dmz::String LocalDetails ("details");
@@ -39,13 +39,17 @@ namespace {
    static const dmz::String LocalType ("type");
    static const dmz::String LocalMedia ("media");
    static const dmz::String LocalCurrent ("current");
-   static const dmz::String LocalMimeIVE ("model/x-ive");
    static const dmz::String LocalOriginalName ("original_name");
    static const dmz::String LocalValue ("value");
-   
-   static char LocalDefaultMimeType[] = "application/octet-stream";
-   static QHash<QString, QByteArray> localMimeTypes;
-   
+
+   static const char LocalId[] = "id";
+   static const char LocalRev[] = "rev";
+   static char LocalAccept[] = "Accept";
+   static char LocalApplicationJson[] = "application/json";
+   static char LocalApplicationOctetStream[] = "application/octet-stream";
+   static char LocalUserAgent[] = "User-Agent";
+   static char LocalMimeIVE[] = "model/x-ive";
+
    static const dmz::Int32 LocalGetUuids              = dmz::ForgeTypeUser + 1;
    static const dmz::Int32 LocalPutAssetMediaPhase1   = dmz::ForgeTypeUser + 2;
    static const dmz::Int32 LocalPutAssetMediaPhase2   = dmz::ForgeTypeUser + 3;
@@ -58,6 +62,8 @@ namespace {
       
    static QNetworkRequest::Attribute LocalAttrId =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
+   
+   static QHash<QString, QByteArray> localMimeTypes;
    
    struct UploadStruct {
       
@@ -82,6 +88,8 @@ struct dmz::ForgeModuleQt::AssetStruct {
    StringContainer keywords;
    StringContainer media;
    StringContainer previews;
+   QMap<QString, String> current;
+   QMap<QString, String> originalName;
    Config attachments;
    
    AssetStruct (const String &AssetId) : Id (AssetId) {;}
@@ -117,8 +125,8 @@ local_init_mime_types () {
    localMimeTypes["jpg"]      = "image/jpeg";
    localMimeTypes["tiff"]     = "image/tiff";
    localMimeTypes["svg"]      = "image/svg+xml";
-   localMimeTypes["collads"]  = "model/x-collada+xml";
-   localMimeTypes["ive"]      = "model/x-ive";
+   localMimeTypes["collada"]  = "model/x-collada+xml";
+   localMimeTypes["ive"]      = LocalMimeIVE;
    localMimeTypes["wav"]      = "audio/x-wav";
    localMimeTypes["xml"]      = "application/x-dmz+xml";
    localMimeTypes["json"]     = "application/x-dmz+json";
@@ -373,8 +381,8 @@ dmz::ForgeModuleQt::search (
       if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
 
       QNetworkRequest request (url);
-      request.setRawHeader ("User-Agent", ForgeUserAgentName);
-      request.setRawHeader ("Accept", "application/json");
+      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+      request.setRawHeader (LocalAccept, LocalApplicationJson);
       request.setAttribute (LocalAttrId, requestId);
       request.setAttribute (LocalAttrType, (int)ForgeTypeSearch);
 
@@ -443,11 +451,11 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
          QString path ("/%1/%2");
          url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
-         url.addQueryItem ("rev", as->revision.get_buffer ());
+         url.addQueryItem (LocalRev, as->revision.get_buffer ());
 
          QNetworkRequest request (url);
-         request.setRawHeader("User-Agent", ForgeUserAgentName);
-         request.setRawHeader ("Accept", "application/json");
+         request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+         request.setRawHeader (LocalAccept, LocalApplicationJson);
          request.setAttribute (LocalAttrId, requestId);
          request.setAttribute (LocalAttrType, (int)ForgeTypeDeleteAsset);
 
@@ -538,9 +546,6 @@ dmz::ForgeModuleQt::add_asset_preview (
       AssetStruct *as = _state.assetTable.lookup (AssetId);
       if (as) {
 
-         String preview;
-         while (Files.get_next  (preview)) { as->previews.append (preview); }
-         
          _state.obsTable.store (requestId, observer);
 
          UploadStruct *us = new UploadStruct;
@@ -622,7 +627,7 @@ dmz::ForgeModuleQt::_reply_finished (QNetworkReply *reply) {
       }
       else {
          
-_state.log.warn << "json: " << JsonData << endl;
+// _state.log.warn << "json: " << JsonData << endl;
 
          switch (RequestType) {
 
@@ -774,6 +779,25 @@ dmz::ForgeModuleQt::_start_next_upload () {
             _state.upload->files.remove (file);
                         
             QFileInfo fi (file.get_buffer ());
+            
+            const QString Ext (fi.suffix ().toLower ());
+
+            QString attachmentName = fi.fileName ();
+            
+            if (_state.upload->requestType == LocalPutAssetMediaPhase1) {
+            
+               attachmentName = _add_asset_media_file (_state.upload->assetId, file);
+            }
+            else if (_state.upload->requestType == LocalAddAssetPreviewPhase1) {
+               
+               attachmentName = _add_asset_preview_file (_state.upload->assetId, file);
+            }
+
+qDebug () << "attachmentName: " << attachmentName;
+            
+            QByteArray mimeType (LocalApplicationOctetStream);
+            if (_state.upload->mimeType) { mimeType = _state.upload->mimeType.get_buffer (); }
+            else if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
 
             QUrl url (_state.baseUrl);
             QString path ("/%1/%2/%3");
@@ -781,18 +805,13 @@ dmz::ForgeModuleQt::_start_next_upload () {
             url.setPath (
                path.arg (_state.db)
                    .arg (_state.upload->assetId.get_buffer ())
-                   .arg (fi.fileName ()));
+                   .arg (attachmentName));
 
-            url.addQueryItem ("rev", revision.get_buffer ());
-
-            const QString Ext (fi.suffix ().toLower ());
-            QByteArray mimeType (LocalDefaultMimeType);
-            if (_state.upload->mimeType) { mimeType = _state.upload->mimeType.get_buffer (); }
-            else if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
+            url.addQueryItem (LocalRev, revision.get_buffer ());
 
             QNetworkRequest request (url);
-            request.setRawHeader ("User-Agent", ForgeUserAgentName);
-            request.setRawHeader ("Accept", "application/json");
+            request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+            request.setRawHeader (LocalAccept, LocalApplicationJson);
             request.setHeader (QNetworkRequest::ContentTypeHeader, mimeType);
             request.setAttribute (LocalAttrId, _state.upload->requestId);
             request.setAttribute (LocalAttrType, (int)_state.upload->requestType);
@@ -843,7 +862,7 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
 
          while (list.get_next_config (it, cd)) {
 
-            String assetId = config_to_string ("id", cd);
+            String assetId = config_to_string (LocalId, cd);
             if (assetId) { container.append (assetId); }
          }
       }
@@ -895,8 +914,8 @@ dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &Jso
 
       if (config_to_boolean ("ok", global)) {
          
-         const String AssetId (config_to_string ("id", global));
-         const String Revision (config_to_string ("rev", global));
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
          _store_revision (AssetId, Revision);
 
          StringContainer container;
@@ -925,8 +944,8 @@ dmz::ForgeModuleQt::_handle_delete_asset (const UInt64 RequestId, const String &
 
       if (config_to_boolean ("ok", global)) {
          
-         const String AssetId (config_to_string ("id", global));
-         const String Revision (config_to_string ("rev", global));
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
          _store_revision (AssetId, Revision);
 
          StringContainer container;
@@ -963,8 +982,8 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase1 (
 
       if (config_to_boolean ("ok", global)) {
          
-         const String AssetId (config_to_string ("id", global));
-         const String Revision (config_to_string ("rev", global));
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
          _store_revision (AssetId, Revision);
 
          if (finished) { _get_asset (AssetId, RequestId, LocalPutAssetMediaPhase2); }
@@ -1009,7 +1028,7 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase2 (
          StringContainer container;
          container.append (JsonData);
 
-         _handle_reply (RequestId, ForgeTypePutAssetMedia, container);
+         _handle_reply (RequestId, ForgeTypePutAsset, container);
       }
    }
    else {
@@ -1036,8 +1055,8 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase1 (
 
       if (config_to_boolean ("ok", global)) {
 
-         const String AssetId (config_to_string ("id", global));
-         const String Revision (config_to_string ("rev", global));
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
          _store_revision (AssetId, Revision);
 
          if (finished) { _get_asset (AssetId, RequestId, LocalAddAssetPreviewPhase2); }
@@ -1071,14 +1090,13 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase2 (
    
    if (json_string_to_config (JsonData, global)) { 
 
-      const String AssetId (config_to_string (LocalId, global));
+      const String AssetId (config_to_string (Local_Id, global));
 
       AssetStruct *as = _state.assetTable.lookup (AssetId);
       if (as){
 
          // _config_to_asset will overwrite previews so lets save it here so we don't loose it
          StringContainer previews = as->previews;
-         
          _config_to_asset (global);
 
          // now lets restore previews and push to server
@@ -1104,8 +1122,8 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase3 (
 
       if (config_to_boolean ("ok", global)) {
 
-         const String AssetId (config_to_string ("id", global));
-         const String Revision (config_to_string ("rev", global));
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
          _store_revision (AssetId, Revision);
 
          StringContainer container;
@@ -1241,8 +1259,8 @@ dmz::ForgeModuleQt::_get_asset (
       url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
       QNetworkRequest request (url);
-      request.setRawHeader ("User-Agent", ForgeUserAgentName);
-      request.setRawHeader ("Accept", "application/json");
+      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+      request.setRawHeader (LocalAccept, LocalApplicationJson);
       request.setAttribute (LocalAttrId, RequestId);
       request.setAttribute (LocalAttrType, (int)RequestType);
 
@@ -1272,16 +1290,78 @@ dmz::ForgeModuleQt::_put_asset (
       QByteArray byteArray (assetJson.get_buffer ());
       
       QNetworkRequest request (url);
-      request.setRawHeader ("User-Agent", ForgeUserAgentName);
-      request.setRawHeader ("Accept", "application/json");
+      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+      request.setRawHeader (LocalAccept, LocalApplicationJson);
       request.setAttribute (LocalAttrId, RequestId);
       request.setAttribute (LocalAttrType, (int)RequestType);
 
-qDebug () << "PUT: " << byteArray << endl;
+// qDebug () << "PUT: " << byteArray << endl;
       reply = _state.networkAccessManager->put (request, byteArray);
    }
    
    return reply;
+}
+
+
+QString
+dmz::ForgeModuleQt::_add_asset_media_file (const String &AssetId, const String &File) {
+
+   QFileInfo fi (File.get_buffer ());
+
+   const String FileSHA = sha_from_file (File);
+   QString current = FileSHA.get_buffer ();
+   
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   if (as) {
+      
+      const QString Ext (fi.suffix ().toLower ());
+
+      QByteArray mimeType (LocalMimeIVE);
+      if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
+      
+      Int32 rev = 1;
+      
+      current = QString ("%1-%2.%3").arg (rev).arg (current).arg (Ext);
+      
+      as->current[mimeType] = qPrintable (current);
+      as->originalName[current] = qPrintable (fi.fileName ());
+
+      as->type = ForgeAssetUnknown;
+      
+      if (Ext == QLatin1String ("ive")) {
+         
+         as->type = ForgeAsset3d;
+      }
+      else if (Ext == QLatin1String ("wav")) {
+         
+         as->type = ForgeAssetAudio;
+      }
+      else if (Ext == QLatin1String ("jpg") || Ext == QLatin1String ("png")) {
+         
+         as->type = ForgeAssetImage;
+      }
+      else if (Ext == QLatin1String ("xml") || Ext == QLatin1String ("json")) {
+         
+         as->type = ForgeAssetConfig;
+      }
+   }
+   
+   return current;
+}
+
+
+QString
+dmz::ForgeModuleQt::_add_asset_preview_file (const String &AssetId, const String &File) {
+
+   String path, name, ext;
+   split_path_file_ext (File, path, name, ext);
+
+   const String Preview (name + ext);
+   
+   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   if (as) { as->previews.append (Preview); }
+   
+   return Preview.get_buffer ();
 }
 
 
@@ -1314,9 +1394,9 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
    AssetStruct *as = _state.assetTable.lookup (AssetId);
    if (as) {
       
-      assetConfig.store_attribute (LocalId, as->Id);
+      assetConfig.store_attribute (Local_Id, as->Id);
 
-      if (as->revision) { assetConfig.store_attribute (LocalRev, as->revision); }
+      if (as->revision) { assetConfig.store_attribute (Local_Rev, as->revision); }
 
       assetConfig.store_attribute (LocalType, "asset");
       assetConfig.store_attribute (LocalName, as->name);
@@ -1364,7 +1444,7 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
    Boolean retVal (False);
    
-   const String AssetId (config_to_string (LocalId, AssetConfig));
+   const String AssetId (config_to_string (Local_Id, AssetConfig));
    
    AssetStruct *as = _state.assetTable.lookup (AssetId);
    if (!as && AssetId) {
@@ -1375,7 +1455,7 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
    
    if (as) {
       
-      _store_revision (AssetId, config_to_string (LocalRev, AssetConfig));
+      _store_revision (AssetId, config_to_string (Local_Rev, AssetConfig));
       
       store_name (AssetId, config_to_string (LocalName, AssetConfig));
       store_brief (AssetId, config_to_string (LocalBrief, AssetConfig));
@@ -1416,9 +1496,7 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
          }
       }
       
-      AssetConfig.lookup_config (LocalAttachments, as->attachments);
-      
-_state.log.warn << "attachments: " << as->attachments << endl;
+      AssetConfig.lookup_config (Local_Attachments, as->attachments);
       
       retVal = True;
    }
@@ -1443,8 +1521,8 @@ dmz::ForgeModuleQt::_get_uuid () {
          url.addQueryItem ("count", QString::number (10));
 
          QNetworkRequest request (url);
-         request.setRawHeader ("User-Agent", ForgeUserAgentName);
-         request.setRawHeader ("Accept", "application/json");
+         request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+         request.setRawHeader (LocalAccept, LocalApplicationJson);
          request.setAttribute (LocalAttrId, requestId);
          request.setAttribute (LocalAttrType, (int)LocalGetUuids);
 

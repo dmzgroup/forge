@@ -152,6 +152,9 @@ namespace dmz {
             const UInt64 RequestId,
             const Int32 RequestType);
          
+         QString _add_asset_media_file (const String &AssetId, const String &File);
+         QString _add_asset_preview_file (const String &AssetId, const String &File);
+            
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
          Boolean _config_to_asset (const Config &AssetConfig);
