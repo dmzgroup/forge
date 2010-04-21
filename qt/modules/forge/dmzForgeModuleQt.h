@@ -116,6 +116,7 @@ namespace dmz {
          // void _handle_get_asset_media (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset_media_phase1 (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset_media_phase2 (const UInt64 RequestId, const String &JsonData);
+         void _handle_put_asset_media_phase3 (const UInt64 RequestId, const String &JsonData);
          // void _handle_get_asset_preview (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase1 (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase2 (const UInt64 RequestId, const String &JsonData);
@@ -158,6 +159,8 @@ namespace dmz {
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
          Boolean _config_to_asset (const Config &AssetConfig);
+         
+         QString _get_current_rev (const String &Value);
          
          String _get_uuid ();
          

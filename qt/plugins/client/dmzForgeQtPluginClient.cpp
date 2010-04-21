@@ -99,31 +99,33 @@ dmz::ForgeQtPluginClient::update_time_slice (const Float64 TimeDelta) {
       updateCounter++;
    }
 
+   _state.assetId = "aaaaaa";
+   
    if (updateCounter == 0) {
       
-      _state.assetId = "me";
       _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
 _state.log.debug << " --> get_asset: " << _state.requestId << endl;
    }
    if (updateCounter == 1) {
       
-      _state.assetId = "me";
       _state.requestId = _state.forgeModule->delete_asset (_state.assetId, this);
 _state.log.debug << " --> delete_asset: " << _state.requestId << endl;
    }
    else if (updateCounter == 2) {
       
-      _state.assetId = _state.forgeModule->create_asset ("me");
+      _state.assetId = _state.forgeModule->create_asset (_state.assetId);
       
-      _state.forgeModule->store_name (_state.assetId, "scott");
-      _state.forgeModule->store_brief (_state.assetId, "shillcock");
-      _state.forgeModule->store_details (_state.assetId,"scott shillcock");
+      _state.forgeModule->store_name (_state.assetId, "the name");
+      _state.forgeModule->store_brief (_state.assetId, "the brief");
+      _state.forgeModule->store_details (_state.assetId,"details details details");
       
       StringContainer keywords;
-      keywords.append ("male");
-      keywords.append ("father");
-      keywords.append ("programmer");
-      keywords.append ("photographer");
+      keywords.append ("key1");
+      keywords.append ("key2");
+      keywords.append ("key3");
+      keywords.append ("key4");
+      keywords.append ("key5");
+      keywords.append ("key6");
       _state.forgeModule->store_keywords (_state.assetId, keywords);
       
       _state.requestId = _state.forgeModule->put_asset (_state.assetId, this);
@@ -131,7 +133,6 @@ _state.log.debug << "--> put_asset: " << _state.requestId << endl;
    }
    else if (updateCounter == 3) {
       
-      // _state.assetId = "me";
       // _state.requestId = _state.forgeModule->get_asset (_state.assetId, this);
       // _state.log.warn << updateCounter << ":get_asset: " << _state.requestId << endl;
       start_time_slice ();
@@ -141,9 +142,8 @@ _state.log.debug << "--> put_asset: " << _state.requestId << endl;
       StringContainer previews;
       previews.append ("preview1.jpg");
       previews.append ("preview2.jpg");
-      previews.append ("preview3.png");
+      previews.append ("preview3.jpg");
       
-      _state.assetId = "me";
       _state.requestId = _state.forgeModule->add_asset_preview (_state.assetId, previews, this);
 _state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;
    }
@@ -151,12 +151,15 @@ _state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;
       
       String file ("preview0.jpg");
       
-      _state.assetId = "me";
      _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
 _state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
    }
    else if (updateCounter == 6) {
-      
+
+      String file ("preview0.jpg");
+
+     _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
+_state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
    }
 }
 

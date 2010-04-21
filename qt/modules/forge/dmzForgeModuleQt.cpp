@@ -38,9 +38,14 @@ namespace {
    static const dmz::String LocalImages ("images");
    static const dmz::String LocalType ("type");
    static const dmz::String LocalMedia ("media");
+   static const dmz::String LocalMedia3d ("3d");
+   static const dmz::String LocalMediaAudio ("audio");
+   static const dmz::String LocalMediaImage ("image");
+   static const dmz::String LocalMediaConfig ("config");
    static const dmz::String LocalCurrent ("current");
    static const dmz::String LocalOriginalName ("original_name");
    static const dmz::String LocalValue ("value");
+   
 
    static const char LocalId[] = "id";
    static const char LocalRev[] = "rev";
@@ -53,9 +58,10 @@ namespace {
    static const dmz::Int32 LocalGetUuids              = dmz::ForgeTypeUser + 1;
    static const dmz::Int32 LocalPutAssetMediaPhase1   = dmz::ForgeTypeUser + 2;
    static const dmz::Int32 LocalPutAssetMediaPhase2   = dmz::ForgeTypeUser + 3;
-   static const dmz::Int32 LocalAddAssetPreviewPhase1 = dmz::ForgeTypeUser + 4;
-   static const dmz::Int32 LocalAddAssetPreviewPhase2 = dmz::ForgeTypeUser + 5;
-   static const dmz::Int32 LocalAddAssetPreviewPhase3 = dmz::ForgeTypeUser + 6;
+   static const dmz::Int32 LocalPutAssetMediaPhase3   = dmz::ForgeTypeUser + 4;
+   static const dmz::Int32 LocalAddAssetPreviewPhase1 = dmz::ForgeTypeUser + 5;
+   static const dmz::Int32 LocalAddAssetPreviewPhase2 = dmz::ForgeTypeUser + 6;
+   static const dmz::Int32 LocalAddAssetPreviewPhase3 = dmz::ForgeTypeUser + 7;
    
    static QNetworkRequest::Attribute LocalAttrType =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 1);
@@ -81,7 +87,7 @@ struct dmz::ForgeModuleQt::AssetStruct {
 
    const String Id;
    String revision;
-   ForgeAssetTypeEnum type;
+   String type;
    String name;
    String brief;
    String details;
@@ -92,7 +98,7 @@ struct dmz::ForgeModuleQt::AssetStruct {
    QMap<QString, String> originalName;
    Config attachments;
    
-   AssetStruct (const String &AssetId) : Id (AssetId) {;}
+   AssetStruct (const String &AssetId) : Id (AssetId), type ("unknown") {;}
 };
 
 
@@ -229,20 +235,20 @@ dmz::ForgeModuleQt::create_asset (const String &AssetId) {
 
    String retVal;
    
-   AssetStruct *as = _state.assetTable.lookup (AssetId);
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
    
-   if (!as) {
+   if (!asset) {
    
-      as = new AssetStruct (AssetId ? AssetId : _get_uuid ());
+      asset = new AssetStruct (AssetId ? AssetId : _get_uuid ());
       
-      if (!_state.assetTable.store (as->Id, as)) {
+      if (!_state.assetTable.store (asset->Id, asset)) {
          
-         delete as;
-         as = 0;
+         delete asset;
+         asset = 0;
       }
    }
    
-   if (as) { retVal = as->Id; }
+   if (asset) { retVal = asset->Id; }
    
    return retVal;
 }
@@ -252,8 +258,16 @@ dmz::ForgeAssetTypeEnum
 dmz::ForgeModuleQt::lookup_asset_type (const String &AssetId) {
 
    ForgeAssetTypeEnum retVal (ForgeAssetUnknown);
+
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) { retVal = asset->type; }
+   if (asset) {
+   
+      if (asset->type == LocalMedia3d) { retVal = ForgeAsset3d; }
+      else if (asset->type == LocalMediaAudio) { retVal = ForgeAssetAudio; }
+      else if (asset->type == LocalMediaConfig) { retVal = ForgeAssetConfig; }
+      else if (asset->type == LocalMediaImage) { retVal = ForgeAssetImage; }
+   }
+   
    return retVal;
 }
 
@@ -419,8 +433,8 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
       
       requestId = _state.requestCounter++;
 
-      AssetStruct *as = _state.assetTable.lookup (AssetId);
-      if (as) {
+      AssetStruct *asset = _state.assetTable.lookup (AssetId);
+      if (asset) {
 
          _state.obsTable.store (requestId, observer);
          
@@ -442,8 +456,8 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
       
       requestId = _state.requestCounter++;
 
-      AssetStruct *as = _state.assetTable.remove (AssetId);
-      if (as) {
+      AssetStruct *asset = _state.assetTable.remove (AssetId);
+      if (asset) {
 
          _state.obsTable.store (requestId, observer);
          
@@ -451,7 +465,7 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
          QString path ("/%1/%2");
          url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
-         url.addQueryItem (LocalRev, as->revision.get_buffer ());
+         url.addQueryItem (LocalRev, asset->revision.get_buffer ());
 
          QNetworkRequest request (url);
          request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
@@ -460,7 +474,7 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
          request.setAttribute (LocalAttrType, (int)ForgeTypeDeleteAsset);
 
          QNetworkReply *reply = _state.networkAccessManager->deleteResource (request);
-         delete as; as = 0;
+         delete asset; asset = 0;
       }
       else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset, observer); }
    }
@@ -494,11 +508,9 @@ dmz::ForgeModuleQt::put_asset_media (
       
       requestId = _state.requestCounter++;
       
-      AssetStruct *as = _state.assetTable.lookup (AssetId);
-      if (as) {
+      AssetStruct *asset = _state.assetTable.lookup (AssetId);
+      if (asset) {
 
-         //as->current.store (File);
-         
          _state.obsTable.store (requestId, observer);
          
          UploadStruct *us = new UploadStruct;
@@ -543,8 +555,8 @@ dmz::ForgeModuleQt::add_asset_preview (
       
       requestId = _state.requestCounter++;
       
-      AssetStruct *as = _state.assetTable.lookup (AssetId);
-      if (as) {
+      AssetStruct *asset = _state.assetTable.lookup (AssetId);
+      if (asset) {
 
          _state.obsTable.store (requestId, observer);
 
@@ -577,10 +589,10 @@ dmz::ForgeModuleQt::remove_asset_preview (
    //    
    //    requestId = _state.requestCounter++;
    //    
-   //    AssetStruct *as = _state.assetTable.lookup (AssetId);
-   //    if (as) {
+   //    AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   //    if (asset) {
    // 
-   //       as->preview.append (Preview);
+   //       asset->preview.append (Preview);
    //       
    //       _state.obsTable.store (requestId, observer);
    // 
@@ -663,6 +675,11 @@ _state.log.warn << "<-- LocalPutAssetMediaPhase1" << endl;
 _state.log.warn << "<-- LocalPutAssetMediaPhase2" << endl;
                _handle_put_asset_media_phase2 (RequestId, JsonData);
                break;
+
+            case LocalPutAssetMediaPhase3:
+_state.log.warn << "<-- LocalPutAssetMediaPhase3" << endl;
+               _handle_put_asset_media_phase3 (RequestId, JsonData);
+               break;
          
             case ForgeTypeGetAssetPreview:
             break;
@@ -685,10 +702,6 @@ _state.log.warn << "<-- LocalAddAssetPreviewPhase3" << endl;
             case LocalGetUuids:
                _handle_get_uuids (RequestId, JsonData);
                break;
-               
-            // case LocalUpdateAsset:
-            //    _handle_update_asset (RequestId, JsonData);
-            //    break;
          
             default:
                String msg ("Unknown request type: ");
@@ -793,8 +806,6 @@ dmz::ForgeModuleQt::_start_next_upload () {
                attachmentName = _add_asset_preview_file (_state.upload->assetId, file);
             }
 
-qDebug () << "attachmentName: " << attachmentName;
-            
             QByteArray mimeType (LocalApplicationOctetStream);
             if (_state.upload->mimeType) { mimeType = _state.upload->mimeType.get_buffer (); }
             else if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
@@ -1007,8 +1018,45 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase1 (
    }
 }
 
+
 void
 dmz::ForgeModuleQt::_handle_put_asset_media_phase2 (
+      const UInt64 RequestId,
+      const String &JsonData) {
+
+   Config global ("global");
+   
+   if (json_string_to_config (JsonData, global)) { 
+
+      const String AssetId (config_to_string (Local_Id, global));
+
+      AssetStruct *asset = _state.assetTable.lookup (AssetId);
+      if (asset){
+
+         // _config_to_asset will overwrite type, save it so we don't loose it
+         String type = asset->type;
+         QMap<QString, String>current = asset->current;
+         QMap<QString, String>originalName = asset->originalName;
+         
+         _config_to_asset (global);
+
+         // now lets restore type and push to server
+         asset->type = type;
+         asset->current = current;
+         asset->originalName = originalName;
+         
+         _put_asset (AssetId, RequestId, LocalPutAssetMediaPhase3);
+      }
+   }
+   else {
+      
+      _handle_error (RequestId, ForgeTypePutAssetMedia, LocalJsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_put_asset_media_phase3 (
       const UInt64 RequestId,
       const String &JsonData) {
 
@@ -1016,19 +1064,23 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase2 (
 
    if (json_string_to_config (JsonData, global)) { 
 
-      String error = config_to_string ("error", global);
-      if (error) {
+      if (config_to_boolean ("ok", global)) {
 
-         _handle_error (RequestId, ForgeTypePutAssetMedia, config_to_string ("reason", global));
-      }
-      else {
-
-         _config_to_asset (global);
+         const String AssetId (config_to_string (LocalId, global));
+         const String Revision (config_to_string (LocalRev, global));
+         _store_revision (AssetId, Revision);
 
          StringContainer container;
          container.append (JsonData);
 
-         _handle_reply (RequestId, ForgeTypePutAsset, container);
+         _handle_reply (RequestId, ForgeTypePutAssetMedia, container);
+      }
+      else {
+
+         _handle_error (
+            RequestId,
+            ForgeTypePutAssetMedia,
+            config_to_string ("reason", global));
       }
    }
    else {
@@ -1092,15 +1144,15 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase2 (
 
       const String AssetId (config_to_string (Local_Id, global));
 
-      AssetStruct *as = _state.assetTable.lookup (AssetId);
-      if (as){
+      AssetStruct *asset = _state.assetTable.lookup (AssetId);
+      if (asset){
 
-         // _config_to_asset will overwrite previews so lets save it here so we don't loose it
-         StringContainer previews = as->previews;
+         // _config_to_asset will overwrite previews, save it so we don't loose it
+         StringContainer previews = asset->previews;
          _config_to_asset (global);
 
          // now lets restore previews and push to server
-         as->previews = previews;
+         asset->previews = previews;
          _put_asset (AssetId, RequestId, LocalAddAssetPreviewPhase3);
       }
    }
@@ -1308,46 +1360,48 @@ dmz::ForgeModuleQt::_add_asset_media_file (const String &AssetId, const String &
 
    QFileInfo fi (File.get_buffer ());
 
-   const String FileSHA = sha_from_file (File);
-   QString current = FileSHA.get_buffer ();
+   const QString FileSHA = sha_from_file (File).get_buffer ();
    
-   AssetStruct *as = _state.assetTable.lookup (AssetId);
-   if (as) {
+   QString name (FileSHA);
+   
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset) {
       
       const QString Ext (fi.suffix ().toLower ());
 
       QByteArray mimeType (LocalMimeIVE);
       if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
       
-      Int32 rev = 1;
+      const QString Rev (_get_current_rev (asset->current.value (mimeType)));
       
-      current = QString ("%1-%2.%3").arg (rev).arg (current).arg (Ext);
-      
-      as->current[mimeType] = qPrintable (current);
-      as->originalName[current] = qPrintable (fi.fileName ());
+      name = Rev + "-" + FileSHA;
+      asset->originalName[name] = qPrintable (fi.fileName ());
 
-      as->type = ForgeAssetUnknown;
-      
+      name = name + "." + Ext;
+      asset->current[mimeType] = qPrintable (name);
+
       if (Ext == QLatin1String ("ive")) {
          
-         as->type = ForgeAsset3d;
+         asset->type = LocalMedia3d;
       }
       else if (Ext == QLatin1String ("wav")) {
          
-         as->type = ForgeAssetAudio;
-      }
-      else if (Ext == QLatin1String ("jpg") || Ext == QLatin1String ("png")) {
-         
-         as->type = ForgeAssetImage;
+         asset->type = LocalMediaAudio;
       }
       else if (Ext == QLatin1String ("xml") || Ext == QLatin1String ("json")) {
          
-         as->type = ForgeAssetConfig;
+         asset->type = LocalMediaConfig;
       }
+      else if (Ext == QLatin1String ("jpg") || Ext == QLatin1String ("png")) {
+         
+         asset->type = LocalMediaImage;
+      }
+      else { asset->type = "unknown"; }
    }
    
-   return current;
+   return name;
 }
+
 
 
 QString
@@ -1358,8 +1412,8 @@ dmz::ForgeModuleQt::_add_asset_preview_file (const String &AssetId, const String
 
    const String Preview (name + ext);
    
-   AssetStruct *as = _state.assetTable.lookup (AssetId);
-   if (as) { as->previews.append (Preview); }
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset) { asset->previews.append (Preview); }
    
    return Preview.get_buffer ();
 }
@@ -1391,22 +1445,25 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
 
    Boolean retVal (False);
    
-   AssetStruct *as = _state.assetTable.lookup (AssetId);
-   if (as) {
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset) {
       
-      assetConfig.store_attribute (Local_Id, as->Id);
+      assetConfig.store_attribute (Local_Id, asset->Id);
 
-      if (as->revision) { assetConfig.store_attribute (Local_Rev, as->revision); }
+      if (asset->revision) { assetConfig.store_attribute (Local_Rev, asset->revision); }
 
       assetConfig.store_attribute (LocalType, "asset");
-      assetConfig.store_attribute (LocalName, as->name);
-      assetConfig.store_attribute (LocalBrief, as->brief);
-      assetConfig.store_attribute (LocalDetails, as->details);
+      assetConfig.store_attribute (LocalName, asset->name);
+      assetConfig.store_attribute (LocalBrief, asset->brief);
+      assetConfig.store_attribute (LocalDetails, asset->details);
+      assetConfig.store_attribute (LocalMedia, asset->type);
       
+      // keywords
       String keyword;
       Boolean first = True;
+      StringContainerIterator keywordIt;
       
-      while (as->keywords.get_next (keyword)) {
+      while (asset->keywords.get_next (keywordIt, keyword)) {
       
          Config data (LocalKeywords);
          data.store_attribute (LocalValue, keyword);
@@ -1414,13 +1471,35 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
          if (first) { assetConfig.overwrite_config (data); first = False; }
          else { assetConfig.add_config (data); }
       }
+
+      // current
+      Config currentConfig (LocalCurrent);
+      QMapIterator<QString, String> currentIt (asset->current);
+      while (currentIt.hasNext()) {
       
+         currentIt.next();
+         currentConfig.store_attribute (qPrintable (currentIt.key ()), currentIt.value ());
+      }
+      
+      assetConfig.overwrite_config (currentConfig);
+      
+      // originalName
+      Config nameConfig (LocalOriginalName);
+      QMapIterator<QString, String> nameIt (asset->originalName);
+      while (nameIt.hasNext()) {
+      
+         nameIt.next();
+         nameConfig.store_attribute (qPrintable (nameIt.key ()), nameIt.value ());
+      }
+      
+      assetConfig.overwrite_config (nameConfig);
+      
+      // previews
       Config previewsConfig (LocalPreviews);
+      StringContainerIterator previewIt;
       String image;
       
-      StringContainerIterator it;
-      
-      while (as->previews.get_next (it, image)) {
+      while (asset->previews.get_next (previewIt, image)) {
       
          Config data (LocalImages);
          data.store_attribute (LocalValue, image);
@@ -1430,7 +1509,8 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
       
       assetConfig.overwrite_config (previewsConfig);
       
-      assetConfig.overwrite_config (as->attachments);
+      // _attachments
+      assetConfig.overwrite_config (asset->attachments);
       
       retVal = True;
    }
@@ -1446,14 +1526,14 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
    
    const String AssetId (config_to_string (Local_Id, AssetConfig));
    
-   AssetStruct *as = _state.assetTable.lookup (AssetId);
-   if (!as && AssetId) {
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (!asset && AssetId) {
       
       create_asset (AssetId);
-      as = _state.assetTable.lookup (AssetId);
+      asset = _state.assetTable.lookup (AssetId);
    }
    
-   if (as) {
+   if (asset) {
       
       _store_revision (AssetId, config_to_string (Local_Rev, AssetConfig));
       
@@ -1461,6 +1541,9 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
       store_brief (AssetId, config_to_string (LocalBrief, AssetConfig));
       store_details (AssetId, config_to_string (LocalDetails, AssetConfig));
       
+      asset->type = config_to_string (LocalMedia, AssetConfig);
+      
+      // keywords
       StringContainer keywords;
       Config keywordList;
       
@@ -1477,7 +1560,42 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
       
       store_keywords (AssetId, keywords);
 
-      as->previews.clear ();
+      // current
+      asset->current.clear ();
+      Config currentConfig;
+      
+      if (AssetConfig.lookup_config (LocalCurrent, currentConfig)) {
+         
+         ConfigIterator it;
+         Config data;
+         
+         while (currentConfig.get_next_config (it, data)) {
+            
+            QString mimeType (data.get_name ().get_buffer ());
+            
+            asset->current.insert (mimeType, config_to_string (LocalValue, data));
+         }
+      }
+
+      // originalName
+      asset->originalName.clear ();
+      Config nameConfig;
+      
+      if (AssetConfig.lookup_config (LocalCurrent, nameConfig)) {
+         
+         ConfigIterator it;
+         Config data;
+         
+         while (nameConfig.get_next_config (it, data)) {
+            
+            QString name (data.get_name ().get_buffer ());
+            
+            asset->originalName.insert (name, config_to_string (LocalValue, data));
+         }
+      }
+      
+      // previews
+      asset->previews.clear ();
       Config previewsConfig;
       
       if (AssetConfig.lookup_config (LocalPreviews, previewsConfig)) {
@@ -1491,17 +1609,35 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
             while (imageList.get_next_config (it, image)) {
 
-               as->previews.append (config_to_string (LocalValue, image));
+               asset->previews.append (config_to_string (LocalValue, image));
             }
          }
       }
       
-      AssetConfig.lookup_config (Local_Attachments, as->attachments);
+      // _attachments
+      AssetConfig.lookup_config (Local_Attachments, asset->attachments);
       
       retVal = True;
    }
    
    return retVal;
+}
+
+
+QString
+dmz::ForgeModuleQt::_get_current_rev (const String &Value) {
+
+   Int32 rev (0);
+
+   if (Value) {
+      
+      QString data (Value.get_buffer ());
+      rev = data.section ('-', 0, 0).toInt ();
+   }
+
+   rev++;
+   
+   return QString::number (rev);
 }
 
 
