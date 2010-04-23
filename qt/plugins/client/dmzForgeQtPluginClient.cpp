@@ -130,6 +130,7 @@ _state.log.debug << " --> delete_asset: " << _state.requestId << endl;
       
       _state.requestId = _state.forgeModule->put_asset (_state.assetId, this);
 _state.log.debug << "--> put_asset: " << _state.requestId << endl;
+updateCounter++;
    }
    else if (updateCounter == 3) {
       
@@ -142,7 +143,7 @@ _state.log.debug << "--> put_asset: " << _state.requestId << endl;
       StringContainer previews;
       previews.append ("preview1.jpg");
       previews.append ("preview2.jpg");
-      previews.append ("preview3.jpg");
+      previews.append ("preview3.png");
       
       _state.requestId = _state.forgeModule->add_asset_preview (_state.assetId, previews, this);
 _state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;
@@ -156,10 +157,26 @@ _state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
    }
    else if (updateCounter == 6) {
 
-      String file ("preview0.jpg");
+      String file ("1-1d7046f4b0414d1da2bdc624f3d85a86cb114265.jpg");
+      
+      _state.requestId = _state.forgeModule->get_asset_media (_state.assetId, file, this);
+_state.log.debug << "--> get_asset_media: " << _state.requestId << endl;
+   }
+   else if (updateCounter == 7) {
+      
+      String file ("preview1.jpg");
 
-     _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
-_state.log.debug << "--> put_asset_media: " << _state.requestId << endl;
+      _state.requestId = _state.forgeModule->get_asset_media (_state.assetId, file, this);
+_state.log.debug << "--> get_asset_media: " << _state.requestId << endl;
+   }
+   else if (updateCounter == 8) {
+      
+   }
+   else if (updateCounter == 9) {
+      
+   }
+   else if (updateCounter == 10) {
+      
    }
 }
 
@@ -199,6 +216,13 @@ _state.log.error << "<-- ForgePutAsset" << endl;
       
       case ForgeTypeDeleteAsset:
 _state.log.error << "<-- ForgeDeleteAsset" << endl;
+
+         start_time_slice ();
+         break;
+
+      case ForgeTypeGetAssetMedia:
+_state.log.error << "<-- ForgeTypeGetAssetMedia" << endl;
+_state.log.error << "Results: " << Results << endl;
 
          start_time_slice ();
          break;

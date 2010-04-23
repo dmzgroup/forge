@@ -6,9 +6,11 @@
 #include <dmzRuntimePlugin.h>
 #include <QtCore/QObject>
 
-
+class QByteArray;
 class QNetworkReply;
 class QNetworkRequest;
+class QString;
+class QUrl;
 
 
 namespace dmz {
@@ -103,7 +105,8 @@ namespace dmz {
             ForgeObserver *observer);
 
       protected Q_SLOTS:
-         void _reply_finished (QNetworkReply *reply);
+         // void _reply_finished (QNetworkReply *reply);
+         void _reply_finished ();
          void _download_progress (qint64 bytesReceived, qint64 bytesTotal);
          void _download_ready_read ();
          void _download_finished ();
@@ -147,6 +150,13 @@ namespace dmz {
          Boolean _store_revision (const String &AssetId, const String &Value);
          Boolean _lookup_revision (const String &AssetId, String &value);
 
+         QNetworkReply *_request (
+               const QString &Method,
+               const QUrl &Url,
+               const UInt64 RequestId,
+               const Int32 RequestType,
+               const QByteArray &Data = "");
+               
          QNetworkReply *_get_asset (
             const String &AssetId,
             const UInt64 RequestId,
@@ -163,8 +173,6 @@ namespace dmz {
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
          Boolean _config_to_asset (const Config &AssetConfig);
-         
-         QString _get_current_rev (const String &Value);
          
          String _get_uuid ();
          

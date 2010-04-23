@@ -19,34 +19,70 @@
 #include <QtCore/QtCore>
 #include <QtNetwork/QtNetwork>
 
+using namespace dmz;
 
 namespace {
-
-   static const char ForgeApiEndpoint[] = "http://api.dmzforge.org:80";
-   static const char ForgeUserAgentName[] = "dmzForgeModuleQt";
    
-   static const dmz::String LocalJsonParseErrorMessage ("Error parsing json response.");
+   QString
+   local_get_current_rev (const String &Value) {
 
-   static const dmz::String Local_Id ("_id");
-   static const dmz::String Local_Rev ("_rev");
-   static const dmz::String Local_Attachments ("_attachments");
-   static const dmz::String LocalName ("name");
-   static const dmz::String LocalBrief ("brief");
-   static const dmz::String LocalDetails ("details");
-   static const dmz::String LocalKeywords ("keywords");
-   static const dmz::String LocalThumbnails ("thumbnails");
-   static const dmz::String LocalPreviews ("previews");
-   static const dmz::String LocalImages ("images");
-   static const dmz::String LocalType ("type");
-   static const dmz::String LocalMedia ("media");
-   static const dmz::String LocalMedia3d ("3d");
-   static const dmz::String LocalMediaAudio ("audio");
-   static const dmz::String LocalMediaImage ("image");
-   static const dmz::String LocalMediaConfig ("config");
-   static const dmz::String LocalCurrent ("current");
-   static const dmz::String LocalOriginalName ("original_name");
-   static const dmz::String LocalValue ("value");
+      Int32 rev (0);
+
+      if (Value) {
+
+         QString data (Value.get_buffer ());
+         rev = data.section ('-', 0, 0).toInt ();
+      }
+
+      rev++;
+
+      return QString::number (rev);
+   }
+
+
+   String
+   local_get_hash (const String &Value) {
+
+      QString hash;
+
+      if (Value) {
+
+         QFileInfo fi (Value.get_buffer ());
+         QString data (fi.baseName ());
+         hash = data.section ('-', 1, 1);
+      }
+
+      return qPrintable (hash);
+   }
+
+   static const char LocalApiEndpoint[] = "http://api.dmzforge.org:80";
+   static const char LocalUserAgentName[] = "dmzForgeModuleQt";
    
+   static const String LocalJsonParseErrorMessage ("Error parsing json response.");
+
+   static const String Local_Id ("_id");
+   static const String Local_Rev ("_rev");
+   static const String Local_Attachments ("_attachments");
+   static const String LocalName ("name");
+   static const String LocalBrief ("brief");
+   static const String LocalDetails ("details");
+   static const String LocalKeywords ("keywords");
+   static const String LocalThumbnails ("thumbnails");
+   static const String LocalPreviews ("previews");
+   static const String LocalImages ("images");
+   static const String LocalType ("type");
+   static const String LocalMedia ("media");
+   static const String LocalMedia3d ("3d");
+   static const String LocalMediaAudio ("audio");
+   static const String LocalMediaImage ("image");
+   static const String LocalMediaConfig ("config");
+   static const String LocalCurrent ("current");
+   static const String LocalOriginalName ("original_name");
+   static const String LocalValue ("value");
+   
+   static const QString LocalGet ("get");
+   static const QString LocalPut ("put");
+   static const QString LocalDelete ("delete");
 
    static const char LocalId[] = "id";
    static const char LocalRev[] = "rev";
@@ -56,13 +92,13 @@ namespace {
    static char LocalUserAgent[] = "User-Agent";
    static char LocalMimeIVE[] = "model/x-ive";
 
-   static const dmz::Int32 LocalGetUuids              = dmz::ForgeTypeUser + 1;
-   static const dmz::Int32 LocalPutAssetMediaPhase1   = dmz::ForgeTypeUser + 2;
-   static const dmz::Int32 LocalPutAssetMediaPhase2   = dmz::ForgeTypeUser + 3;
-   static const dmz::Int32 LocalPutAssetMediaPhase3   = dmz::ForgeTypeUser + 4;
-   static const dmz::Int32 LocalAddAssetPreviewPhase1 = dmz::ForgeTypeUser + 5;
-   static const dmz::Int32 LocalAddAssetPreviewPhase2 = dmz::ForgeTypeUser + 6;
-   static const dmz::Int32 LocalAddAssetPreviewPhase3 = dmz::ForgeTypeUser + 7;
+   static const Int32 LocalGetUuids              = ForgeTypeUser + 1;
+   static const Int32 LocalPutAssetMediaPhase1   = ForgeTypeUser + 2;
+   static const Int32 LocalPutAssetMediaPhase2   = ForgeTypeUser + 3;
+   static const Int32 LocalPutAssetMediaPhase3   = ForgeTypeUser + 4;
+   static const Int32 LocalAddAssetPreviewPhase1 = ForgeTypeUser + 5;
+   static const Int32 LocalAddAssetPreviewPhase2 = ForgeTypeUser + 6;
+   static const Int32 LocalAddAssetPreviewPhase3 = ForgeTypeUser + 7;
    
    static QNetworkRequest::Attribute LocalAttrType =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 1);
@@ -74,21 +110,24 @@ namespace {
    
    struct UploadStruct {
       
-      dmz::UInt64 requestId;
-      dmz::Int32 requestType;
-      dmz::String assetId;
-      dmz::StringContainer files;
-      dmz::String mimeType;
+      UInt64 requestId;
+      Int32 requestType;
+      String assetId;
+      StringContainer files;
+      String mimeType;
       
       UploadStruct () : requestId (0), requestType (0) {;}
    };
    
    struct DownloadStruct {
    
-      dmz::UInt64 requestId;
-      dmz::Int32 requestType;
-      dmz::String assetId;
-      dmz::String ;
+      UInt64 requestId;
+      Int32 requestType;
+      String assetId;
+      String file;
+      String targetFile;
+      
+      DownloadStruct () : requestId (0), requestType (0) {;}
    };
 };
 
@@ -121,12 +160,15 @@ struct dmz::ForgeModuleQt::State {
    HashTableUInt64Template<ForgeObserver> obsTable;
    HashTableStringTemplate<AssetStruct> assetTable;
    QQueue<UploadStruct *> uploadQueue;
+   QQueue<DownloadStruct *> downloadQueue;
    Boolean uploading;
+   Boolean downloading;
    QUrl baseUrl;
    QString db;
    UploadStruct *upload;
    QNetworkReply *uploadReply;
    QFile *uploadFile;
+   DownloadStruct *download;
    QNetworkReply *downloadReply;
    QTemporaryFile *downloadFile;
    String cacheDir;
@@ -160,17 +202,21 @@ dmz::ForgeModuleQt::State::State (const PluginInfo &Info) :
       networkAccessManager (0),
       requestCounter (1000),
       uploading (False),
-      baseUrl (ForgeApiEndpoint),
+      baseUrl (LocalApiEndpoint),
       upload (0),
       uploadReply (0),
       uploadFile (0),
+      download (0),
       downloadReply (0),
       downloadFile (0) {;}
 
 
 dmz::ForgeModuleQt::State::~State () {
 
-   if (networkAccessManager) { networkAccessManager->deleteLater (); }
+   if (networkAccessManager) { networkAccessManager->deleteLater (); networkAccessManager = 0; }
+   
+   while (!uploadQueue.isEmpty ()) { delete uploadQueue.takeFirst (); }
+   while (!downloadQueue.isEmpty ()) { delete downloadQueue.takeFirst (); }
    
    obsTable.clear ();
    assetTable.empty ();
@@ -217,15 +263,11 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
 
    local_init_mime_types ();
 
-   _state.init_cache_dir ();
-
    _state.networkAccessManager = new QNetworkAccessManager (this);
 
-   connect (
-      _state.networkAccessManager, SIGNAL (finished (QNetworkReply *)),
-      this, SLOT (_reply_finished (QNetworkReply *)));
-
    _init (local);
+   
+   _state.init_cache_dir ();
 }
 
 
@@ -446,13 +488,7 @@ dmz::ForgeModuleQt::search (
 
       if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
 
-      QNetworkRequest request (url);
-      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
-      request.setRawHeader (LocalAccept, LocalApplicationJson);
-      request.setAttribute (LocalAttrId, requestId);
-      request.setAttribute (LocalAttrType, (int)ForgeTypeSearch);
-
-      QNetworkReply *reply = _state.networkAccessManager->get (request);
+      QNetworkReply *reply = _request (LocalGet, url, requestId, ForgeTypeSearch);
    }
    
    return requestId;
@@ -519,13 +555,8 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
 
          url.addQueryItem (LocalRev, asset->revision.get_buffer ());
 
-         QNetworkRequest request (url);
-         request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
-         request.setRawHeader (LocalAccept, LocalApplicationJson);
-         request.setAttribute (LocalAttrId, requestId);
-         request.setAttribute (LocalAttrType, (int)ForgeTypeDeleteAsset);
+         QNetworkReply *reply = _request (LocalDelete, url, requestId, ForgeTypeDeleteAsset);
 
-         QNetworkReply *reply = _state.networkAccessManager->deleteResource (request);
          delete asset; asset = 0;
       }
       else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset, observer); }
@@ -547,7 +578,36 @@ dmz::ForgeModuleQt::get_asset_media (
       
       requestId = _state.requestCounter++;
       
-      AssetStruct  *asset
+      AssetStruct  *asset = _state.assetTable.lookup (AssetId);
+      if (asset) {
+         
+         _state.obsTable.store (requestId, observer);
+         
+         String targetFile = AssetId + "-" + File;
+         targetFile = format_path (_state.cacheDir + targetFile);
+
+         if (is_valid_path (targetFile)) {
+         
+            StringContainer container;
+            container.append (targetFile);
+
+            _handle_reply (requestId, ForgeTypeGetAssetMedia, container);
+         }
+         else {
+            
+            DownloadStruct *ds = new DownloadStruct;
+            ds->requestId = requestId;
+            ds->requestType = ForgeTypeGetAssetMedia;
+            ds->assetId = AssetId;
+            ds->file = File;
+            ds->targetFile = targetFile;
+
+            _state.downloadQueue.enqueue (ds);
+
+            QTimer::singleShot (0, this, SLOT (_start_next_download ()));
+         }
+      }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetMedia, observer); }
    }
 
    return requestId;
@@ -672,8 +732,9 @@ dmz::ForgeModuleQt::remove_asset_preview (
 
 
 void
-dmz::ForgeModuleQt::_reply_finished (QNetworkReply *reply) {
+dmz::ForgeModuleQt::_reply_finished () {
    
+   QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
    if (reply) {
 
       const Int32 StatusCode =
@@ -759,6 +820,7 @@ _state.log.warn << "<-- LocalAddAssetPreviewPhase3" << endl;
                break;
 
             case LocalGetUuids:
+_state.log.warn << "<-- LocalGetUuids" << endl;
                _handle_get_uuids (RequestId, JsonData);
                break;
          
@@ -796,13 +858,79 @@ dmz::ForgeModuleQt::_download_progress (qint64 bytesReceived, qint64 bytesTotal)
 
 void
 dmz::ForgeModuleQt::_download_ready_read () {
-   
+
+   if (_state.downloadReply && _state.downloadFile) {
+      
+      _state.downloadFile->write (_state.downloadReply->readAll ());
+   }   
 }
 
 
 void
 dmz::ForgeModuleQt::_download_finished () {
+
+   if (_state.download && _state.downloadReply && _state.downloadFile) {
    
+      const Int32 StatusCode =
+         _state.downloadReply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+      QNetworkRequest request = _state.downloadReply->request ();
+      
+      const Int32 RequestType = request.attribute (LocalAttrType).toInt ();
+      const UInt64 RequestId = request.attribute (LocalAttrId).toULongLong ();
+   
+      if (_state.downloadReply->error () == QNetworkReply::NoError) {
+
+         _state.downloadFile->close ();
+         
+         const QString FileName (_state.downloadFile->fileName ());
+         const String Hash (sha_from_file (qPrintable (FileName)));
+         
+         if (Hash == local_get_hash (_state.download->file)) {
+            
+_state.log.warn << "Downloaded file verified: "
+                << _state.download->assetId << "/"
+                << _state.download->file << endl;
+                            
+             _state.downloadFile->setAutoRemove (False);
+
+             if (_state.downloadFile->rename (_state.download->targetFile.get_buffer ())) {
+
+                StringContainer container;
+                container.append (_state.download->targetFile);
+                
+                _handle_reply (RequestId, RequestType, container);
+             }
+             else {
+                
+                _state.downloadFile->setAutoRemove (True);
+
+                String msg ("Failed to rename downloaded file for: ");
+                msg << _state.download->assetId << "/" << _state.download->file;
+
+                _handle_error (RequestId, RequestType, msg);
+             }
+         }
+      }
+      else {
+         
+         String msg ("Network Error: ");
+         msg << qPrintable (_state.downloadReply->errorString ());
+         
+         _handle_error (RequestId, RequestType, msg);
+      }
+      
+      delete _state.downloadFile;
+      _state.downloadFile = 0;
+      
+      delete _state.download;
+      _state.download = 0;
+      
+      _state.downloadReply->deleteLater ();
+      _state.downloadReply = 0;
+      
+      _start_next_download ();
+   }
 }
 
 
@@ -898,7 +1026,7 @@ dmz::ForgeModuleQt::_start_next_upload () {
             url.addQueryItem (LocalRev, revision.get_buffer ());
 
             QNetworkRequest request (url);
-            request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
+            request.setRawHeader (LocalUserAgent, LocalUserAgentName);
             request.setRawHeader (LocalAccept, LocalApplicationJson);
             request.setHeader (QNetworkRequest::ContentTypeHeader, mimeType);
             request.setAttribute (LocalAttrId, _state.upload->requestId);
@@ -912,6 +1040,10 @@ dmz::ForgeModuleQt::_start_next_upload () {
                   _state.networkAccessManager->put (request, _state.uploadFile);
             
                connect (
+                  _state.uploadReply, SIGNAL (finished ()),
+                  this, SLOT (_reply_finished ()));
+            
+               connect (
                   _state.uploadReply, SIGNAL (uploadProgress (qint64, qint64)),
                   this, SLOT (_upload_progress (qint64, qint64)));
                
@@ -921,7 +1053,7 @@ dmz::ForgeModuleQt::_start_next_upload () {
             }
             else {
 
-               _state.log.warn << "Fialed to open file: "
+               _state.log.warn << "Failed to open file: "
                                << qPrintable (fi.absoluteFilePath ()) << endl;
                                
                delete _state.uploadFile;
@@ -935,7 +1067,64 @@ dmz::ForgeModuleQt::_start_next_upload () {
 
 void
 dmz::ForgeModuleQt::_start_next_download () {
-   
+
+   // only download next file if not currently downloading
+   if (!_state.download && !_state.downloadFile && !_state.downloadReply) {
+
+      // get next file  off of the queue
+      if (!_state.downloadQueue.isEmpty ()) { 
+
+         _state.download = _state.downloadQueue.dequeue ();
+      }
+      
+      if (_state.download && _state.networkAccessManager) {
+
+         _state.downloadFile = new QTemporaryFile (QDir::tempPath () + "/dmz_forge_download.XXXXXX");
+         if (_state.downloadFile->open ()) {
+      
+            QUrl url (_state.baseUrl);
+            QString path ("/%1/%2/%3");
+         
+            url.setPath (
+               path.arg (_state.db)
+                   .arg (_state.download->assetId.get_buffer ())
+                   .arg (_state.download->file.get_buffer ()));
+
+            QNetworkRequest request (url);
+            request.setRawHeader (LocalUserAgent, LocalUserAgent);
+            // request.setRawHeader (LocalAccept, LocalApplicationJson);
+            // request.setHeader (QNetworkRequest::ContentTypeHeader, mimeType);
+            request.setAttribute (LocalAttrId, _state.download->requestId);
+            request.setAttribute (LocalAttrType, (int)_state.download->requestType);
+
+            _state.downloadReply = _state.networkAccessManager->get (request);
+      
+            connect (
+               _state.downloadReply, SIGNAL (downloadProgress (qint64, qint64)),
+               this, SLOT (_download_progress (qint64, qint64)));
+      
+            connect(
+               _state.downloadReply, SIGNAL (readyRead ()),
+               this, SLOT (_download_ready_read ()));
+            
+            connect (
+               _state.downloadReply, SIGNAL (finished ()),
+               this, SLOT (_download_finished ()));
+         }
+         else {
+
+            _state.log.warn << "Failed to download file: " 
+                            << _state.download->assetId << "/"
+                            << _state.download->file << endl;
+                            
+            delete _state.downloadFile;
+            _state.downloadFile = 0;
+            
+            delete _state.download;
+            _state.download = 0;
+         }
+      }
+   }
 }
 
 
@@ -1380,6 +1569,53 @@ dmz::ForgeModuleQt::_lookup_revision (const String &AssetId, String &value) {
 
 
 QNetworkReply *
+dmz::ForgeModuleQt::_request (
+      const QString &Method,
+      const QUrl &Url,
+      const UInt64 RequestId,
+      const Int32 RequestType,
+      const QByteArray &Data) {
+
+   QNetworkReply *reply (0);
+   
+   if (_state.networkAccessManager) {
+      
+      QNetworkRequest request (Url);
+      
+      request.setRawHeader (LocalUserAgent, LocalUserAgent);
+      request.setRawHeader (LocalAccept, LocalApplicationJson);
+      
+      request.setAttribute (LocalAttrId, RequestId);
+      request.setAttribute (LocalAttrType, (int)RequestType);
+
+      if (LocalGet == Method.toLower ()) {
+         
+         reply = _state.networkAccessManager->get (request);
+      }
+      else if (LocalPut == Method.toLower ()) {
+         
+         reply = _state.networkAccessManager->put (request, Data);
+      }
+      else if (LocalDelete == Method.toLower ()) {
+         
+         reply = _state.networkAccessManager->deleteResource (request);
+      }
+      else {
+         
+         _state.log.warn << "Unknown HTTP method requested: " << qPrintable (Method) << endl;
+      }
+      
+      if (reply) {
+         
+         connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
+      }
+   }
+   
+   return reply;
+}
+
+
+QNetworkReply *
 dmz::ForgeModuleQt::_get_asset (
       const String &AssetId,
       const UInt64 RequestId,
@@ -1393,13 +1629,7 @@ dmz::ForgeModuleQt::_get_asset (
       QString path ("/%1/%2");
       url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
-      QNetworkRequest request (url);
-      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
-      request.setRawHeader (LocalAccept, LocalApplicationJson);
-      request.setAttribute (LocalAttrId, RequestId);
-      request.setAttribute (LocalAttrType, (int)RequestType);
-
-      reply = _state.networkAccessManager->get (request);
+      reply = _request (LocalGet, url, RequestId, RequestType);
    }
    
    return reply;
@@ -1423,15 +1653,9 @@ dmz::ForgeModuleQt::_put_asset (
       url.setPath (path.arg (_state.db).arg (AssetId.get_buffer ()));
 
       QByteArray byteArray (assetJson.get_buffer ());
-      
-      QNetworkRequest request (url);
-      request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
-      request.setRawHeader (LocalAccept, LocalApplicationJson);
-      request.setAttribute (LocalAttrId, RequestId);
-      request.setAttribute (LocalAttrType, (int)RequestType);
 
 // qDebug () << "PUT: " << byteArray << endl;
-      reply = _state.networkAccessManager->put (request, byteArray);
+      reply = _request (LocalPut, url, RequestId, RequestType, byteArray);
    }
    
    return reply;
@@ -1455,7 +1679,7 @@ dmz::ForgeModuleQt::_add_asset_media_file (const String &AssetId, const String &
       QByteArray mimeType (LocalMimeIVE);
       if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
       
-      const QString Rev (_get_current_rev (asset->current.value (mimeType)));
+      const QString Rev (local_get_current_rev (asset->current.value (mimeType)));
       
       name = Rev + "-" + FileSHA;
       asset->originalName[name] = qPrintable (fi.fileName ());
@@ -1707,23 +1931,6 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 }
 
 
-QString
-dmz::ForgeModuleQt::_get_current_rev (const String &Value) {
-
-   Int32 rev (0);
-
-   if (Value) {
-      
-      QString data (Value.get_buffer ());
-      rev = data.section ('-', 0, 0).toInt ();
-   }
-
-   rev++;
-   
-   return QString::number (rev);
-}
-
-
 dmz::String
 dmz::ForgeModuleQt::_get_uuid () {
    
@@ -1739,13 +1946,8 @@ dmz::ForgeModuleQt::_get_uuid () {
          url.setPath ("/_uuids");
          url.addQueryItem ("count", QString::number (10));
 
-         QNetworkRequest request (url);
-         request.setRawHeader (LocalUserAgent, ForgeUserAgentName);
-         request.setRawHeader (LocalAccept, LocalApplicationJson);
-         request.setAttribute (LocalAttrId, requestId);
-         request.setAttribute (LocalAttrType, (int)LocalGetUuids);
-
-         QNetworkReply *reply = _state.networkAccessManager->get (request);
+         QNetworkReply *reply = _request (LocalGet, url, requestId, LocalGetUuids);
+_state.log.debug << " --> _get_uuid: " << requestId << endl;
       }
       
       UUID id;
