@@ -1,3 +1,4 @@
+#include <dmzApplicationState.h>
 #include "dmzForgeModuleQt.h"
 #include <dmzForgeObserver.h>
 #include <dmzFoundationJSONUtil.h>
@@ -81,6 +82,14 @@ namespace {
       
       UploadStruct () : requestId (0), requestType (0) {;}
    };
+   
+   struct DownloadStruct {
+   
+      dmz::UInt64 requestId;
+      dmz::Int32 requestType;
+      dmz::String assetId;
+      dmz::String ;
+   };
 };
 
 struct dmz::ForgeModuleQt::AssetStruct {
@@ -105,6 +114,7 @@ struct dmz::ForgeModuleQt::AssetStruct {
 struct dmz::ForgeModuleQt::State {
 
    Log log;
+   ApplicationState appState;
    QNetworkAccessManager *networkAccessManager;
    StringContainer uuids;
    UInt64 requestCounter;
@@ -117,9 +127,14 @@ struct dmz::ForgeModuleQt::State {
    UploadStruct *upload;
    QNetworkReply *uploadReply;
    QFile *uploadFile;
+   QNetworkReply *downloadReply;
+   QTemporaryFile *downloadFile;
+   String cacheDir;
    
    State (const PluginInfo &Info);
    ~State ();
+   
+   Boolean init_cache_dir ();
 };
 
 
@@ -141,13 +156,16 @@ local_init_mime_types () {
 
 dmz::ForgeModuleQt::State::State (const PluginInfo &Info) :
       log (Info),
+      appState (Info),
       networkAccessManager (0),
       requestCounter (1000),
       uploading (False),
       baseUrl (ForgeApiEndpoint),
       upload (0),
       uploadReply (0),
-      uploadFile (0) {;}
+      uploadFile (0),
+      downloadReply (0),
+      downloadFile (0) {;}
 
 
 dmz::ForgeModuleQt::State::~State () {
@@ -159,6 +177,38 @@ dmz::ForgeModuleQt::State::~State () {
 }
 
 
+dmz::Boolean
+dmz::ForgeModuleQt::State::init_cache_dir () {
+
+   Boolean retVal (False);
+   cacheDir = get_home_directory ();
+   
+   if (is_valid_path (cacheDir)) {
+
+#if defined (_WIN32)
+      cacheDir << "/Local Settings/Application Data/";
+#elif defined (__APPLE__) || defined (MACOSX)
+      cacheDir << "/Library/Caches/";
+#else
+      cacheDir << "/.";
+#endif
+
+      cacheDir = format_path (cacheDir + "dmz/" + appState.get_app_name () + "/forge/");
+      
+      // create cache directory if it doesn't exists already
+      if (!is_valid_path (cacheDir)) {
+         
+         create_directory (cacheDir);
+         log.info << "Created applicatoin cache dir: " << cacheDir << endl;
+      }
+      
+      retVal = True;
+   }
+   
+   return retVal;
+}
+
+
 dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       QObject (0),
       Plugin (Info),
@@ -166,7 +216,9 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       _state (*(new State (Info))) {
 
    local_init_mime_types ();
-         
+
+   _state.init_cache_dir ();
+
    _state.networkAccessManager = new QNetworkAccessManager (this);
 
    connect (
@@ -489,9 +541,16 @@ dmz::ForgeModuleQt::get_asset_media (
       const String &File,
       ForgeObserver *observer) {
 
-   UInt64 retVal (0);
+   UInt64 requestId (0);
 
-   return retVal;
+   if (observer) {
+      
+      requestId = _state.requestCounter++;
+      
+      AssetStruct  *asset
+   }
+
+   return requestId;
 }
 
 
@@ -730,6 +789,24 @@ _state.log.warn << "<-- LocalAddAssetPreviewPhase3" << endl;
 
 
 void
+dmz::ForgeModuleQt::_download_progress (qint64 bytesReceived, qint64 bytesTotal) {
+   
+}
+
+
+void
+dmz::ForgeModuleQt::_download_ready_read () {
+   
+}
+
+
+void
+dmz::ForgeModuleQt::_download_finished () {
+   
+}
+
+
+void
 dmz::ForgeModuleQt::_upload_progress (qint64 bytesSent, qint64 bytesTotal) {
 
    // QNetworkReply *reply = (QNetworkReply *)sender ();
@@ -853,6 +930,12 @@ dmz::ForgeModuleQt::_start_next_upload () {
          } 
       }
    }
+}
+
+
+void
+dmz::ForgeModuleQt::_start_next_download () {
+   
 }
 
 

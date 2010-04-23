@@ -104,9 +104,13 @@ namespace dmz {
 
       protected Q_SLOTS:
          void _reply_finished (QNetworkReply *reply);
+         void _download_progress (qint64 bytesReceived, qint64 bytesTotal);
+         void _download_ready_read ();
+         void _download_finished ();
          void _upload_progress (qint64 bytesSent, qint64 bytesTotal);
          void _upload_finished ();
          void _start_next_upload ();
+         void _start_next_download ();
 
       protected:
          void _handle_search (const UInt64 RequestId, const String &JsonData);
@@ -152,7 +156,7 @@ namespace dmz {
             const String &AssetId,
             const UInt64 RequestId,
             const Int32 RequestType);
-         
+            
          QString _add_asset_media_file (const String &AssetId, const String &File);
          QString _add_asset_preview_file (const String &AssetId, const String &File);
             
