@@ -18,6 +18,7 @@
 #include <dmzTypesUUID.h>
 #include <QtCore/QtCore>
 #include <QtNetwork/QtNetwork>
+#include <QtSql/QtSql>
 
 using namespace dmz;
 
@@ -91,6 +92,8 @@ namespace {
    static char LocalApplicationOctetStream[] = "application/octet-stream";
    static char LocalUserAgent[] = "User-Agent";
    static char LocalMimeIVE[] = "model/x-ive";
+   static char LocalETag[]= "ETag";
+   static char LocalIfNoneMatch[] = "If-None-Match";
 
    static const Int32 LocalGetUuids              = ForgeTypeUser + 1;
    static const Int32 LocalPutAssetMediaPhase1   = ForgeTypeUser + 2;
@@ -125,6 +128,7 @@ namespace {
       Int32 requestType;
       String assetId;
       String file;
+      String hash;
       String targetFile;
       
       DownloadStruct () : requestId (0), requestType (0) {;}
@@ -172,11 +176,17 @@ struct dmz::ForgeModuleQt::State {
    QNetworkReply *downloadReply;
    QTemporaryFile *downloadFile;
    String cacheDir;
+   QSqlDatabase cacheDb;
    
    State (const PluginInfo &Info);
    ~State ();
    
    Boolean init_cache_dir ();
+   Boolean init_cache_database ();
+   Boolean exec (QSqlQuery &query);
+   String get_etag (const String &AssetId, const String &Name);
+   Boolean store_etag (const String &AssetId, const String &Name, const Boolean Value = False);
+   Boolean update_etag (const String &AssetId, const String &Name);
 };
 
 
@@ -212,6 +222,8 @@ dmz::ForgeModuleQt::State::State (const PluginInfo &Info) :
 
 
 dmz::ForgeModuleQt::State::~State () {
+
+   if (cacheDb.isValid () && cacheDb.isOpen ()) { cacheDb.close (); }
 
    if (networkAccessManager) { networkAccessManager->deleteLater (); networkAccessManager = 0; }
    
@@ -255,6 +267,135 @@ dmz::ForgeModuleQt::State::init_cache_dir () {
 }
 
 
+dmz::Boolean
+dmz::ForgeModuleQt::State::init_cache_database () {
+
+   Boolean retVal (False);
+   
+   if (is_valid_path (cacheDir)) {
+      
+      String dbName = format_path (cacheDir + "/cache.db");
+   
+      cacheDb = QSqlDatabase::addDatabase ("QSQLITE");
+      cacheDb.setDatabaseName (dbName.get_buffer ());
+   
+      retVal = cacheDb.open ();
+      
+      if (retVal) {
+         
+         QSqlQuery query (cacheDb);
+         QStringList tables = cacheDb.tables ();
+         
+         cacheDb.transaction ();
+         
+         if (!tables.contains("meta")) {
+         
+            query.prepare ("CREATE TABLE meta (schema_version INTEGER)");
+            exec (query);
+
+            query.prepare ("INSERT INTO meta (schema_version) VALUES (1)");
+            exec (query);
+         }
+         
+         if (!tables.contains ("previews")) {
+            
+            query.prepare (
+               "CREATE TABLE previews ("
+                  "id INTEGER PRIMARY KEY, "
+                  "asset TEXT NOT NULL, "
+                  "name TEXT NOT NULL, "
+                  "etag TEXT NOT NULL"
+               ");"
+            );
+
+            exec (query);
+         }
+         
+         if (!cacheDb.commit ()) {
+            
+            log.warn << "SQL Error: " << qPrintable (cacheDb.lastError ().text ()) << endl;
+         }
+      }
+      else {
+         
+         log.warn << "Database failed to open: " << dbName << endl;
+      }
+   }
+   
+   return retVal;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::State::exec (QSqlQuery &query) {
+
+   Boolean retVal (query.exec ());
+   
+log.warn << "SQL: " << qPrintable  (query.lastQuery ()) << endl;
+
+   if (query.lastError ().isValid ()) {
+   
+      log.debug << "SQL: " << qPrintable  (query.lastQuery ()) << endl;
+      log.warn << "SQL Error: " << qPrintable (query.lastError ().text ()) << endl;
+   }
+   
+   return retVal;
+}
+
+
+dmz::String
+dmz::ForgeModuleQt::State::get_etag (const String &AssetId, const String &Name) {
+
+   String etag;
+   QSqlQuery query (cacheDb);
+   
+   query.prepare ("SELECT etag FROM previews WHERE asset = :asset AND name = :name");
+   query.bindValue (":asset", AssetId.get_buffer ());
+   query.bindValue (":name", Name.get_buffer ());
+   exec (query);
+   
+   if (query.next ()) { etag = qPrintable (query.value (0).toString ()); }
+   
+   return etag;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::State::store_etag (
+      const String &AssetId,
+      const String &Name,
+      const Boolean Update) {
+
+   String revision;
+   AssetStruct *asset = assetTable.lookup (AssetId);
+   if (asset) { revision = asset->revision; }
+   
+   QSqlQuery query (cacheDb);
+
+   if (Update) {
+      
+      query.prepare ("UPDATE previews SET etag = :etag WHERE asset = :asset AND name = :name");
+   }
+   else {
+      
+      query.prepare ("INSERT INTO previews (asset, name, etag) VALUES (:asset, :name, :etag)");
+   }
+   
+   query.bindValue (":asset", AssetId.get_buffer ());
+   query.bindValue (":name", Name.get_buffer ());
+   query.bindValue (":etag", revision.get_buffer ());
+   
+   return exec (query);
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::State::update_etag (const String &AssetId, const String &Name) {
+
+   return store_etag (AssetId, Name, True);
+}
+
+
 dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       QObject (0),
       Plugin (Info),
@@ -268,6 +409,7 @@ dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
    _init (local);
    
    _state.init_cache_dir ();
+   _state.init_cache_database ();
 }
 
 
@@ -600,6 +742,7 @@ dmz::ForgeModuleQt::get_asset_media (
             ds->requestType = ForgeTypeGetAssetMedia;
             ds->assetId = AssetId;
             ds->file = File;
+            ds->hash = local_get_hash (File);
             ds->targetFile = targetFile;
 
             _state.downloadQueue.enqueue (ds);
@@ -656,9 +799,49 @@ dmz::ForgeModuleQt::get_asset_preview (
       const String &File,
       ForgeObserver *observer) {
 
-   UInt64 retVal (0);
+   UInt64 requestId (0);
 
-   return retVal;
+   
+   if (observer) {
+      
+      requestId = _state.requestCounter++;
+      
+      AssetStruct  *asset = _state.assetTable.lookup (AssetId);
+      if (asset) {
+         
+         _state.obsTable.store (requestId, observer);
+         
+         const String ETag (_state.get_etag (AssetId, File));
+
+         String targetFile = AssetId + "-" + File;
+         targetFile = format_path (_state.cacheDir + targetFile);
+         
+         if (is_valid_path (targetFile) && (ETag == asset->revision)) {
+         
+            StringContainer container;
+            container.append (targetFile);
+
+            _handle_reply (requestId, ForgeTypeGetAssetMedia, container);
+         }
+         else {
+            
+            DownloadStruct *ds = new DownloadStruct;
+            ds->requestId = requestId;
+            ds->requestType = ForgeTypeGetAssetMedia;
+            ds->assetId = AssetId;
+            ds->file = File;
+            ds->hash = local_get_hash (File);
+            ds->targetFile = targetFile;
+
+            _state.downloadQueue.enqueue (ds);
+
+            QTimer::singleShot (0, this, SLOT (_start_next_download ()));
+         }
+      }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetMedia, observer); }
+   }
+
+   return requestId;
 }
 
 
@@ -745,8 +928,14 @@ dmz::ForgeModuleQt::_reply_finished () {
       const Int32 RequestType = request.attribute (LocalAttrType).toInt ();
       const UInt64 RequestId = request.attribute (LocalAttrId).toULongLong ();
 
-      QString data (reply->readAll ());
-      const String JsonData (qPrintable (data));
+// _state.log.warn << "Status: " << StatusCode << endl;
+// if (reply->hasRawHeader (LocalETag)) {
+// 
+//    _state.log.warn << "ETag: " << reply->rawHeader (LocalETag).constData () << endl;
+// }  
+
+      QByteArray data (reply->readAll ());
+      const String JsonData (data.constData ());
       
 // _state.log.warn << "_reply_finished[" << StatusCode << "]: " << Id << endl;
 
@@ -783,9 +972,6 @@ _state.log.warn << "<-- ForgeTypePutAsset" << endl;
                _handle_delete_asset (RequestId, JsonData);
                break;
          
-            case ForgeTypeGetAssetMedia:
-            break;
-         
             case LocalPutAssetMediaPhase1:
 _state.log.warn << "<-- LocalPutAssetMediaPhase1" << endl;
                _handle_put_asset_media_phase1 (RequestId, JsonData);
@@ -801,9 +987,6 @@ _state.log.warn << "<-- LocalPutAssetMediaPhase3" << endl;
                _handle_put_asset_media_phase3 (RequestId, JsonData);
                break;
          
-            case ForgeTypeGetAssetPreview:
-            break;
-            
             case LocalAddAssetPreviewPhase1:
 _state.log.warn << "<-- LocalAddAssetPreviewPhase1" << endl;
                _handle_add_asset_preview_phase1 (RequestId, JsonData);
@@ -836,8 +1019,8 @@ _state.log.warn << "<-- LocalGetUuids" << endl;
       
       // else {
       //    
-      //    QString data (reply->readAll ());
-      //    _state.log.warn << "json: " << qPrintable (data) << endl;
+      //    QByteArray data (reply->readAll ());
+      //    _state.log.warn << "json: " << data.constData () << endl;
       // 
       //    String msg ("Network Error: ");
       //    msg << qPrintable (reply->errorString ());
@@ -878,38 +1061,34 @@ dmz::ForgeModuleQt::_download_finished () {
       
       const Int32 RequestType = request.attribute (LocalAttrType).toInt ();
       const UInt64 RequestId = request.attribute (LocalAttrId).toULongLong ();
-   
+
+      Boolean validDownload (False);
+      
       if (_state.downloadReply->error () == QNetworkReply::NoError) {
 
+         validDownload = True;
+         
          _state.downloadFile->close ();
-         
-         const QString FileName (_state.downloadFile->fileName ());
-         const String Hash (sha_from_file (qPrintable (FileName)));
-         
-         if (Hash == local_get_hash (_state.download->file)) {
+
+         if (_state.download->hash) {
             
-_state.log.warn << "Downloaded file verified: "
-                << _state.download->assetId << "/"
-                << _state.download->file << endl;
-                            
-             _state.downloadFile->setAutoRemove (False);
+            const QString FileName (_state.downloadFile->fileName ());
+            const String Hash (sha_from_file (qPrintable (FileName)));
 
-             if (_state.downloadFile->rename (_state.download->targetFile.get_buffer ())) {
-
-                StringContainer container;
-                container.append (_state.download->targetFile);
-                
-                _handle_reply (RequestId, RequestType, container);
-             }
-             else {
-                
-                _state.downloadFile->setAutoRemove (True);
-
-                String msg ("Failed to rename downloaded file for: ");
-                msg << _state.download->assetId << "/" << _state.download->file;
-
-                _handle_error (RequestId, RequestType, msg);
-             }
+            if (Hash == _state.download->hash) {
+               
+               _state.log.info << "Downloaded file verified: "
+                               << _state.download->assetId << "/"
+                               << _state.download->file << endl;
+            }
+            else {
+               
+               validDownload = False;
+               
+               _state.log.warn << "Invalid hash for download: "
+                               << _state.download->assetId << "/"
+                               << _state.download->file << endl;
+            }
          }
       }
       else {
@@ -918,6 +1097,44 @@ _state.log.warn << "Downloaded file verified: "
          msg << qPrintable (_state.downloadReply->errorString ());
          
          _handle_error (RequestId, RequestType, msg);
+      }
+      
+      if (validDownload) {
+         
+         _state.downloadFile->setAutoRemove (False);
+         
+         if (_state.downloadReply->hasRawHeader (LocalETag)) {
+         
+_state.log.warn << "ETag: " << _state.downloadReply->rawHeader (LocalETag).constData () << endl;
+            String rev;
+            _lookup_revision (_state.download->assetId, rev);
+_state.log.warn << " Rev: " << rev << endl;
+         }
+         
+         if (is_valid_path (_state.download->targetFile)) { 
+            
+            remove_file (_state.download->targetFile);
+         }
+         else { _state.store_etag (_state.download->assetId, _state.download->file); }
+         
+         if (_state.downloadFile->rename (_state.download->targetFile.get_buffer ())) {
+
+            _state.update_etag (_state.download->assetId, _state.download->file);
+            
+            StringContainer container;
+            container.append (_state.download->targetFile);
+
+            _handle_reply (RequestId, RequestType, container);
+         }
+         else {
+ 
+            _state.downloadFile->setAutoRemove (True);
+
+            String msg ("Failed to rename downloaded file for: ");
+            msg << _state.download->assetId << "/" << _state.download->file;
+
+            _handle_error (RequestId, RequestType, msg);
+         }
       }
       
       delete _state.downloadFile;
@@ -1588,6 +1805,7 @@ dmz::ForgeModuleQt::_request (
       request.setAttribute (LocalAttrId, RequestId);
       request.setAttribute (LocalAttrType, (int)RequestType);
 
+// qDebug () << "url: " << Url.toString ();
       if (LocalGet == Method.toLower ()) {
          
          reply = _state.networkAccessManager->get (request);
@@ -1605,6 +1823,7 @@ dmz::ForgeModuleQt::_request (
          _state.log.warn << "Unknown HTTP method requested: " << qPrintable (Method) << endl;
       }
       
+// _state.log.warn << "--> " << qPrintable (Method.toLower ()) << endl;
       if (reply) {
          
          connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
@@ -1947,7 +2166,7 @@ dmz::ForgeModuleQt::_get_uuid () {
          url.addQueryItem ("count", QString::number (10));
 
          QNetworkReply *reply = _request (LocalGet, url, requestId, LocalGetUuids);
-_state.log.debug << " --> _get_uuid: " << requestId << endl;
+_state.log.info << " --> _get_uuid: " << requestId << endl;
       }
       
       UUID id;

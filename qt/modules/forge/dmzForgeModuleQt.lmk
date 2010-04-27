@@ -5,4 +5,4 @@ lmk.add_files ({"dmzForgeModuleQt.h",}, {src = "moc"})
 lmk.add_files {"dmzForgeModuleQt.cpp",}
 lmk.add_preqs {"dmzForgeFramework",}
 lmk.add_libs {"dmzKernel", "dmzFoundation",}
-lmkQt.add_libs {"QtCore", "QtNetwork",}
+lmkQt.add_libs {"QtCore", "QtNetwork", "QtSql",}
