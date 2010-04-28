@@ -144,7 +144,7 @@ updateCounter = 6;
 //       StringContainer previews;
 //       previews.append ("preview1.jpg");
 //       previews.append ("preview2.jpg");
-//       previews.append ("preview3.png");
+//       previews.append ("preview3.jpg");
 //       
 //       _state.requestId = _state.forgeModule->add_asset_preview (_state.assetId, previews, this);
 // _state.log.debug << "--> add_asset_preview: " << _state.requestId << endl;

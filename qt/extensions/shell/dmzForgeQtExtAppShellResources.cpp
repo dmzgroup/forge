@@ -21,36 +21,16 @@ namespace {
 static String
 local_get_hash (const String &Version) {
 
-   String hash;
+   QString hash;
 
-   const Int32 Length = Version.get_length ();
-   
-   Int32 index (0);
-   Int32 dashFound = -1;
-   Boolean done (False);
-   
-   while (!done) {
-   
-      if (Version.get_char (index) == '-') { dashFound = index; done = True; }
-      else { index++; if (index >= Length) { done = True; } }
+   if (Version) {
+
+      QFileInfo fi (Version.get_buffer ());
+      QString data (fi.baseName ());
+      hash = data.section ('-', 1, 1);
    }
-   
-   Int32 dotFound = -1;
-   index = Length - 1;
-   done = False;
-   
-   while (!done) {
-      
-      if (Version.get_char (index) == '.') { dotFound = index; done = True; }
-      else { index--; if (index < 0) { done = True; } }
-   }
-   
-   if ((dashFound > 0) && (dotFound > 0)) {
-      
-      hash = Version.get_sub (dashFound + 1, dotFound -1);
-   }
-   
-   return hash;
+
+   return qPrintable (hash);
 }
 
 

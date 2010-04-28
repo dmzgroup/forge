@@ -120,11 +120,9 @@ namespace dmz {
          void _handle_get_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
-         // void _handle_get_asset_media (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset_media_phase1 (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset_media_phase2 (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset_media_phase3 (const UInt64 RequestId, const String &JsonData);
-         // void _handle_get_asset_preview (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase1 (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase2 (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase3 (const UInt64 RequestId, const String &JsonData);

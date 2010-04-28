@@ -20,6 +20,7 @@
 #include <QtNetwork/QtNetwork>
 #include <QtSql/QtSql>
 
+
 using namespace dmz;
 
 namespace {
@@ -273,9 +274,9 @@ dmz::ForgeModuleQt::State::init_cache_database () {
    Boolean retVal (False);
    
    if (is_valid_path (cacheDir)) {
-      
-      String dbName = format_path (cacheDir + "/cache.db");
    
+      String dbName = format_path (cacheDir + "/cache.db");
+      
       cacheDb = QSqlDatabase::addDatabase ("QSQLITE");
       cacheDb.setDatabaseName (dbName.get_buffer ());
    
@@ -331,8 +332,6 @@ dmz::ForgeModuleQt::State::exec (QSqlQuery &query) {
 
    Boolean retVal (query.exec ());
    
-log.warn << "SQL: " << qPrintable  (query.lastQuery ()) << endl;
-
    if (query.lastError ().isValid ()) {
    
       log.debug << "SQL: " << qPrintable  (query.lastQuery ()) << endl;
@@ -347,6 +346,7 @@ dmz::String
 dmz::ForgeModuleQt::State::get_etag (const String &AssetId, const String &Name) {
 
    String etag;
+
    QSqlQuery query (cacheDb);
    
    query.prepare ("SELECT etag FROM previews WHERE asset = :asset AND name = :name");
@@ -355,7 +355,7 @@ dmz::ForgeModuleQt::State::get_etag (const String &AssetId, const String &Name) 
    exec (query);
    
    if (query.next ()) { etag = qPrintable (query.value (0).toString ()); }
-   
+
    return etag;
 }
 
@@ -369,7 +369,7 @@ dmz::ForgeModuleQt::State::store_etag (
    String revision;
    AssetStruct *asset = assetTable.lookup (AssetId);
    if (asset) { revision = asset->revision; }
-   
+
    QSqlQuery query (cacheDb);
 
    if (Update) {
@@ -928,12 +928,6 @@ dmz::ForgeModuleQt::_reply_finished () {
       const Int32 RequestType = request.attribute (LocalAttrType).toInt ();
       const UInt64 RequestId = request.attribute (LocalAttrId).toULongLong ();
 
-// _state.log.warn << "Status: " << StatusCode << endl;
-// if (reply->hasRawHeader (LocalETag)) {
-// 
-//    _state.log.warn << "ETag: " << reply->rawHeader (LocalETag).constData () << endl;
-// }  
-
       QByteArray data (reply->readAll ());
       const String JsonData (data.constData ());
       
@@ -953,57 +947,57 @@ dmz::ForgeModuleQt::_reply_finished () {
          switch (RequestType) {
 
             case ForgeTypeSearch:
-_state.log.warn << "<-- ForgeTypeSearch" << endl;
+// _state.log.warn << "<-- ForgeTypeSearch" << endl;
                _handle_search (RequestId, JsonData);
                break;
          
             case ForgeTypeGetAsset:
-_state.log.warn << "<-- ForgeTypeGetAsset" << endl;
+// _state.log.warn << "<-- ForgeTypeGetAsset" << endl;
                _handle_get_asset (RequestId, JsonData);
                break;
             
             case ForgeTypePutAsset:
+// _state.log.warn << "<-- ForgeTypePutAsset" << endl;
                   _handle_put_asset (RequestId, JsonData);
-_state.log.warn << "<-- ForgeTypePutAsset" << endl;
                break;
          
             case ForgeTypeDeleteAsset:
-_state.log.warn << "<-- ForgeTypePutAsset" << endl;
+// _state.log.warn << "<-- ForgeTypePutAsset" << endl;
                _handle_delete_asset (RequestId, JsonData);
                break;
          
             case LocalPutAssetMediaPhase1:
-_state.log.warn << "<-- LocalPutAssetMediaPhase1" << endl;
+// _state.log.warn << "<-- LocalPutAssetMediaPhase1" << endl;
                _handle_put_asset_media_phase1 (RequestId, JsonData);
                break;
 
             case LocalPutAssetMediaPhase2:
-_state.log.warn << "<-- LocalPutAssetMediaPhase2" << endl;
+// _state.log.warn << "<-- LocalPutAssetMediaPhase2" << endl;
                _handle_put_asset_media_phase2 (RequestId, JsonData);
                break;
 
             case LocalPutAssetMediaPhase3:
-_state.log.warn << "<-- LocalPutAssetMediaPhase3" << endl;
+// _state.log.warn << "<-- LocalPutAssetMediaPhase3" << endl;
                _handle_put_asset_media_phase3 (RequestId, JsonData);
                break;
          
             case LocalAddAssetPreviewPhase1:
-_state.log.warn << "<-- LocalAddAssetPreviewPhase1" << endl;
+// _state.log.warn << "<-- LocalAddAssetPreviewPhase1" << endl;
                _handle_add_asset_preview_phase1 (RequestId, JsonData);
                break;
          
             case LocalAddAssetPreviewPhase2:
-_state.log.warn << "<-- LocalAddAssetPreviewPhase2" << endl;
+// _state.log.warn << "<-- LocalAddAssetPreviewPhase2" << endl;
                _handle_add_asset_preview_phase2 (RequestId, JsonData);
                break;
 
             case LocalAddAssetPreviewPhase3:
-_state.log.warn << "<-- LocalAddAssetPreviewPhase3" << endl;
+// _state.log.warn << "<-- LocalAddAssetPreviewPhase3" << endl;
                _handle_add_asset_preview_phase3 (RequestId, JsonData);
                break;
 
             case LocalGetUuids:
-_state.log.warn << "<-- LocalGetUuids" << endl;
+// _state.log.warn << "<-- LocalGetUuids" << endl;
                _handle_get_uuids (RequestId, JsonData);
                break;
          
@@ -1016,17 +1010,6 @@ _state.log.warn << "<-- LocalGetUuids" << endl;
                _handle_error (RequestId, RequestType, msg);
          }
       }
-      
-      // else {
-      //    
-      //    QByteArray data (reply->readAll ());
-      //    _state.log.warn << "json: " << data.constData () << endl;
-      // 
-      //    String msg ("Network Error: ");
-      //    msg << qPrintable (reply->errorString ());
-      //    
-      //    _handle_error (RequestId, qPrintable (RequestType), msg);
-      // }
       
       reply->deleteLater ();
    }
@@ -1103,14 +1086,6 @@ dmz::ForgeModuleQt::_download_finished () {
          
          _state.downloadFile->setAutoRemove (False);
          
-         if (_state.downloadReply->hasRawHeader (LocalETag)) {
-         
-_state.log.warn << "ETag: " << _state.downloadReply->rawHeader (LocalETag).constData () << endl;
-            String rev;
-            _lookup_revision (_state.download->assetId, rev);
-_state.log.warn << " Rev: " << rev << endl;
-         }
-         
          if (is_valid_path (_state.download->targetFile)) { 
             
             remove_file (_state.download->targetFile);
@@ -1154,13 +1129,12 @@ _state.log.warn << " Rev: " << rev << endl;
 void
 dmz::ForgeModuleQt::_upload_progress (qint64 bytesSent, qint64 bytesTotal) {
 
-   // QNetworkReply *reply = (QNetworkReply *)sender ();
-   if (_state.uploadReply) {
-      
-      QNetworkRequest request = _state.uploadReply->request ();
-      const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
+//    if (_state.uploadReply) {
+//       
+//       QNetworkRequest request = _state.uploadReply->request ();
+//       const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
 // _state.log.error << "_upload_progress["  << Id  << "]: " << bytesSent << " of " << bytesTotal << endl;
-   }
+//    }
 }
 
 
@@ -1169,8 +1143,8 @@ dmz::ForgeModuleQt::_upload_finished () {
 
    if (_state.uploadReply) {
       
-      QNetworkRequest request = _state.uploadReply->request ();
-      const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
+      // QNetworkRequest request = _state.uploadReply->request ();
+      // const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
       
       _state.uploadReply->deleteLater ();
       _state.uploadReply = 0;
@@ -1183,10 +1157,7 @@ dmz::ForgeModuleQt::_upload_finished () {
       _state.uploadFile = 0;
    }
 
-   if (_state.upload) {
-      
-      if (_state.upload->files.get_count () == 0) { _state.upload = 0; }
-   }
+   if (_state.upload && (_state.upload->files.get_count () == 0)) { _state.upload = 0; }
    
    _start_next_upload ();
 }
@@ -1805,7 +1776,6 @@ dmz::ForgeModuleQt::_request (
       request.setAttribute (LocalAttrId, RequestId);
       request.setAttribute (LocalAttrType, (int)RequestType);
 
-// qDebug () << "url: " << Url.toString ();
       if (LocalGet == Method.toLower ()) {
          
          reply = _state.networkAccessManager->get (request);
@@ -1821,9 +1791,9 @@ dmz::ForgeModuleQt::_request (
       else {
          
          _state.log.warn << "Unknown HTTP method requested: " << qPrintable (Method) << endl;
+         _state.log.warn << "with url: " << qPrintable (Url.toString ()) << endl;
       }
       
-// _state.log.warn << "--> " << qPrintable (Method.toLower ()) << endl;
       if (reply) {
          
          connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
@@ -1873,7 +1843,6 @@ dmz::ForgeModuleQt::_put_asset (
 
       QByteArray byteArray (assetJson.get_buffer ());
 
-// qDebug () << "PUT: " << byteArray << endl;
       reply = _request (LocalPut, url, RequestId, RequestType, byteArray);
    }
    
@@ -2166,7 +2135,6 @@ dmz::ForgeModuleQt::_get_uuid () {
          url.addQueryItem ("count", QString::number (10));
 
          QNetworkReply *reply = _request (LocalGet, url, requestId, LocalGetUuids);
-_state.log.info << " --> _get_uuid: " << requestId << endl;
       }
       
       UUID id;
