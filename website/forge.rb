@@ -6,6 +6,7 @@ require 'haml'
 require 'pp'
 
 @@forge = "http://localhost:8080"
+# @@forge = "http://api.dmzforge.org:8080"
 
 helpers do
   def thumbnail_link(doc, options={})
