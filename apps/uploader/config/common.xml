@@ -5,7 +5,7 @@
 <!--
    <plugin name="dmzPluginMsgDump"/>
    <plugin name="dmzPluginDefinitionsDump"/>
-   <plugin name="dmzPluginTermExit"/>
+   <plugin name="dmzPluginConsole"/>
    <plugin name="dmzRenderPluginPortalSize"/>
 -->
 </plugin-list>
