@@ -1,13 +1,13 @@
 require "lmkQt"
 require "lmkOSG"
 
-lmkOSG.set_name ("dmzForgeUploaderPluginMenu", lmkQt.get_flags ())
+lmkOSG.set_name ("dmzViewerPluginMenu", lmkQt.get_flags ())
 
 lmk.set_type "plugin"
 
-lmk.add_files ({"dmzForgeUploaderPluginMenu.h",},{src = "moc"})
+lmk.add_files ({"dmzViewerPluginMenu.h",},{src = "moc"})
 
-lmk.add_files {"dmzForgeUploaderPluginMenu.cpp",}
+lmk.add_files {"dmzViewerPluginMenu.cpp",}
 
 lmk.add_libs {
    "dmzQtUtil",

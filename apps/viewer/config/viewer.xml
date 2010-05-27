@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<plugin-list>
+   <plugin name="dmzQtModuleMainWindowBasic" scope="window" unload="false" delete="false"/>
+   <!-- <plugin name="dmzQtPluginTabWidget" unique="central-widget"/> -->
+   <plugin name="dmzForgeUploaderPluginMenu" scope="main-menu"/>
+   <plugin name="dmzForgeModuleQt" unique="forge-qt" unload="false"/>
+</plugin-list>
+<window>
+   <!-- <showUnifiedTitleAndToolBar value="true"/> -->
+   <window title="DMZ Forge: Uploader"/>
+   <central-widget name="viewer"/>
+   <menu-bar>
+      <menu text="&amp;File"/>
+      <!-- <menu text="&amp;Edit"/>
+      <menu text="&amp;Window"/>
+      <menu text="&amp;Help"/> -->
+   </menu-bar>
+   <statusbar-hidden value="True"/>
+</window>
+<main-menu>
+   <menu name="&amp;File">
+      <action text="Load Model..." statusTip="Load Model" shortcut="Ctrl+L">
+         <object name="openAction"/>
+         <!-- <icon>
+            <image file="images:Button_File.png"/>
+         </icon> -->
+      </action>
+   </menu>
+</main-menu>
+<forge-qt>
+   <webservice host="localhost" port="5984" db="forge">
+   <!-- <webservice host="api.dmzforge.org" port="5984" db="forge"> -->
+      <!-- <proxy host="localhost" port="8888"/> -->
+   </webservice>
+</forge-qt>
+</dmz>

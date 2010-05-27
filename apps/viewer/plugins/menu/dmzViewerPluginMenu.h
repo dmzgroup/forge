@@ -1,5 +1,5 @@
-#ifndef DMZ_FORGE_UPLOADER_PLUGIN_MENU_DOT_H
-#define DMZ_FORGE_UPLOADER_PLUGIN_MENU_DOT_H
+#ifndef DMZ_VIEWER_PLUGIN_MENU_DOT_H
+#define DMZ_VIEWER_PLUGIN_MENU_DOT_H
 
 #include <dmzApplicationState.h>
 #include <dmzInputObserverUtil.h>
@@ -19,7 +19,7 @@ namespace dmz {
    class RenderModulePortal;
    class QtModuleMainWindow;
 
-   class ForgeUploaderPluginMenu :
+   class ViewerPluginMenu :
          public QObject,
          public Plugin,
          public InputObserverUtil {
@@ -27,8 +27,8 @@ namespace dmz {
       Q_OBJECT
 
       public:
-         ForgeUploaderPluginMenu (const PluginInfo &Info, Config &local);
-         ~ForgeUploaderPluginMenu ();
+         ViewerPluginMenu (const PluginInfo &Info, Config &local);
+         ~ViewerPluginMenu ();
 
          // Plugin Interface
          virtual void update_plugin_state (
@@ -83,11 +83,11 @@ namespace dmz {
          Float64 _pitch;
 
       private:
-         ForgeUploaderPluginMenu ();
-         ForgeUploaderPluginMenu (const ForgeUploaderPluginMenu &);
-         ForgeUploaderPluginMenu &operator= (const ForgeUploaderPluginMenu &);
+         ViewerPluginMenu ();
+         ViewerPluginMenu (const ViewerPluginMenu &);
+         ViewerPluginMenu &operator= (const ViewerPluginMenu &);
    };
 };
 
 
-#endif // DMZ_FORGE_UPLOADER_PLUGIN_MENU_DOT_H
+#endif // DMZ_VIEWER_PLUGIN_MENU_DOT_H

@@ -1,4 +1,3 @@
-#include "dmzForgeUploaderPluginMenu.h"
 #include <dmzInputEventMasks.h>
 #include <dmzInputEventMouse.h>
 #include <dmzQtModuleMainWindow.h>
@@ -11,15 +10,12 @@
 #include <dmzSystemFile.h>
 #include <dmzTypesMatrix.h>
 #include <dmzTypesConsts.h>
+#include "dmzViewerPluginMenu.h"
 #include <osgDB/ReadFile>
 #include <QtGui/QtGui>
 
-namespace {
 
-};
-
-
-dmz::ForgeUploaderPluginMenu::ForgeUploaderPluginMenu (
+dmz::ViewerPluginMenu::ViewerPluginMenu (
       const PluginInfo &Info,
       Config &local) :
       QObject (0),
@@ -42,7 +38,7 @@ dmz::ForgeUploaderPluginMenu::ForgeUploaderPluginMenu (
 }
 
 
-dmz::ForgeUploaderPluginMenu::~ForgeUploaderPluginMenu () {
+dmz::ViewerPluginMenu::~ViewerPluginMenu () {
 
    _menuTable.empty ();
 }
@@ -50,7 +46,7 @@ dmz::ForgeUploaderPluginMenu::~ForgeUploaderPluginMenu () {
 
 // Plugin Interface
 void
-dmz::ForgeUploaderPluginMenu::update_plugin_state (
+dmz::ViewerPluginMenu::update_plugin_state (
       const PluginStateEnum State,
       const UInt32 Level) {
 
@@ -70,7 +66,7 @@ dmz::ForgeUploaderPluginMenu::update_plugin_state (
 
 
 void
-dmz::ForgeUploaderPluginMenu::discover_plugin (
+dmz::ViewerPluginMenu::discover_plugin (
       const PluginDiscoverEnum Mode,
       const Plugin *PluginPtr) {
 
@@ -124,7 +120,7 @@ dmz::ForgeUploaderPluginMenu::discover_plugin (
 
 // Input Observer Util Interface
 void
-dmz::ForgeUploaderPluginMenu::receive_mouse_event (
+dmz::ViewerPluginMenu::receive_mouse_event (
       const Handle Channel,
       const InputEventMouse &Value) {
 
@@ -180,7 +176,7 @@ dmz::ForgeUploaderPluginMenu::receive_mouse_event (
 
 
 void
-dmz::ForgeUploaderPluginMenu::on_openAction_triggered () {
+dmz::ViewerPluginMenu::on_openAction_triggered () {
 
    const QString FileName = QFileDialog::getOpenFileName (
       _mainWindowModule ? _mainWindowModule->get_qt_main_window () : 0,
@@ -193,7 +189,7 @@ dmz::ForgeUploaderPluginMenu::on_openAction_triggered () {
 
 
 void
-dmz::ForgeUploaderPluginMenu::_load_node_file (const QString &FileName) {
+dmz::ViewerPluginMenu::_load_node_file (const QString &FileName) {
 
    QFileInfo fi (FileName);
    if (fi.exists () && _core) {
@@ -234,7 +230,7 @@ dmz::ForgeUploaderPluginMenu::_load_node_file (const QString &FileName) {
 
 
 void
-dmz::ForgeUploaderPluginMenu::_reset_portal () {
+dmz::ViewerPluginMenu::_reset_portal () {
 
    if (_node.valid ()) {
 
@@ -250,7 +246,7 @@ dmz::ForgeUploaderPluginMenu::_reset_portal () {
 
 
 void
-dmz::ForgeUploaderPluginMenu::_update_portal () {
+dmz::ViewerPluginMenu::_update_portal () {
 
    if (_portal) {
 
@@ -266,7 +262,7 @@ dmz::ForgeUploaderPluginMenu::_update_portal () {
 
 
 QString
-dmz::ForgeUploaderPluginMenu::_get_last_path () {
+dmz::ViewerPluginMenu::_get_last_path () {
 
    String lastPath (_appState.get_default_directory ());
 
@@ -282,7 +278,7 @@ dmz::ForgeUploaderPluginMenu::_get_last_path () {
 
 
 void
-dmz::ForgeUploaderPluginMenu::_init_action_list (Config &actionList, MenuStruct &ms) {
+dmz::ViewerPluginMenu::_init_action_list (Config &actionList, MenuStruct &ms) {
 
    ConfigIterator it;
    Config actionConfig;
@@ -302,7 +298,7 @@ dmz::ForgeUploaderPluginMenu::_init_action_list (Config &actionList, MenuStruct 
 
 
 void
-dmz::ForgeUploaderPluginMenu::_init_menu_list (Config &menuList) {
+dmz::ViewerPluginMenu::_init_menu_list (Config &menuList) {
 
    ConfigIterator it;
    Config menu;
@@ -333,7 +329,7 @@ dmz::ForgeUploaderPluginMenu::_init_menu_list (Config &menuList) {
 
 
 void
-dmz::ForgeUploaderPluginMenu::_init (Config &local) {
+dmz::ViewerPluginMenu::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
 
@@ -351,12 +347,12 @@ dmz::ForgeUploaderPluginMenu::_init (Config &local) {
 extern "C" {
 
 DMZ_PLUGIN_FACTORY_LINK_SYMBOL dmz::Plugin *
-create_dmzForgeUploaderPluginMenu (
+create_dmzViewerPluginMenu (
       const dmz::PluginInfo &Info,
       dmz::Config &local,
       dmz::Config &global) {
 
-   return new dmz::ForgeUploaderPluginMenu (Info, local);
+   return new dmz::ViewerPluginMenu (Info, local);
 }
 
 };
