@@ -7,9 +7,9 @@
 </plugin-list>
 <key-messages>
    <channel>
-      <converter key="L">
+      <!-- <converter key="L">
          <target name="dmzQtExtLuaConsole" message="DMZ_Show_Lua_Console"/>
-      </converter>
+      </converter> -->
    </channel>
 </key-messages>
 </dmz>
