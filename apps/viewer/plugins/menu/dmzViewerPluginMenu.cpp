@@ -1,17 +1,11 @@
-#include <dmzInputEventMasks.h>
-#include <dmzInputEventMouse.h>
+#include <dmzObjectModule.h>
 #include <dmzQtModuleMainWindow.h>
 #include <dmzQtUtil.h>
-#include <dmzRenderConsts.h>
-#include <dmzRenderModuleCoreOSG.h>
-#include <dmzRenderModulePortal.h>
+#include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzSystemFile.h>
-#include <dmzTypesMatrix.h>
-#include <dmzTypesConsts.h>
 #include "dmzViewerPluginMenu.h"
-#include <osgDB/ReadFile>
 #include <QtGui/QtGui>
 
 
@@ -20,19 +14,14 @@ dmz::ViewerPluginMenu::ViewerPluginMenu (
       Config &local) :
       QObject (0),
       Plugin (Info),
-      InputObserverUtil (Info, local),
       _log (Info),
       _appState (Info),
+      _objectModule (0),
       _mainWindowModule (0),
       _mainWindowModuleName (),
-      _core (0),
-      _portal (0),
       _menuTable (),
-      _node (),
-      _nodeFile (),
-      _radius (0.0),
-      _heading (0.0),
-      _pitch (0.0) {
+      _type (),
+      _model3dAttrHandle (0) {
 
    _init (local);
 }
@@ -71,6 +60,8 @@ dmz::ViewerPluginMenu::discover_plugin (
       const Plugin *PluginPtr) {
 
    if (Mode == PluginDiscoverAdd) {
+      
+      if (!_objectModule) { _objectModule = ObjectModule::cast (PluginPtr); }
 
       if (!_mainWindowModule) {
 
@@ -89,11 +80,13 @@ dmz::ViewerPluginMenu::discover_plugin (
             }
          }
       }
-
-      if (!_core) { _core = RenderModuleCoreOSG::cast (PluginPtr); }
-      if (!_portal) { _portal = RenderModulePortal::cast (PluginPtr); }
    }
    else if (Mode == PluginDiscoverRemove) {
+
+      if (_objectModule && (_objectModule == ObjectModule::cast (PluginPtr))) {
+         
+         _objectModule = 0;
+      }
 
       if (_mainWindowModule &&
             (_mainWindowModule == QtModuleMainWindow::cast (PluginPtr))) {
@@ -111,66 +104,6 @@ dmz::ViewerPluginMenu::discover_plugin (
 
          _mainWindowModule = 0;
       }
-
-      if (_core && (_core == RenderModuleCoreOSG::cast (PluginPtr))) { _core = 0; }
-      if (_portal && (_portal == RenderModulePortal::cast (PluginPtr))) { _portal = 0; }
-   }
-}
-
-
-// Input Observer Util Interface
-void
-dmz::ViewerPluginMenu::receive_mouse_event (
-      const Handle Channel,
-      const InputEventMouse &Value) {
-
-   if (_portal) {
-
-      Boolean updatePortal = False;
-
-      const Float64 SizeY = Float64 (Value.get_window_size_y ());
-
-      if (Value.is_button_pressed (1)) {
-
-         const Float64 SizeX = Float64 (Value.get_window_size_x ());
-
-         const Float64 PercentX =
-            Float64 (Value.get_mouse_delta_x ()) / (SizeX > 0.0 ? SizeX : 0.0);
-
-         const Float64 PercentY =
-            Float64 (Value.get_mouse_delta_y ()) / (SizeY > 0.0 ? SizeY : 0.0);
-
-         _heading -= PercentX * Pi64;
-         _pitch -= PercentY * Pi64;
-
-         if (_heading < 0) { _heading += TwoPi64; }
-         else if (_heading > TwoPi64) { _heading -= TwoPi64; }
-
-         if (_pitch < 0) { _pitch += TwoPi64; }
-         else if (_pitch > TwoPi64) { _pitch -= TwoPi64; }
-
-         updatePortal = True;
-      }
-
-      if (Value.is_button_pressed (3)) {
-
-         const Float64 PercentY =
-            Float64 (Value.get_mouse_delta_y ()) / (SizeY > 0.0 ? SizeY : 0.0);
-
-         _radius += PercentY * 5.0;
-
-         updatePortal = True;
-      }
-
-      const Int32 ZoomInt = Value.get_scroll_delta_y ();
-
-      if (ZoomInt != 0) {
-
-         _radius += Float64 (ZoomInt) * 0.2;
-         updatePortal = True;
-      }
-
-      if (updatePortal) { _update_portal (); }
    }
 }
 
@@ -184,79 +117,25 @@ dmz::ViewerPluginMenu::on_openAction_triggered () {
       _get_last_path (),
       QString ("*.ive | *.dae"));
 
-   if (!FileName.isEmpty ()) { _load_node_file (FileName); }
+   if (!FileName.isEmpty ()) { _open_file (FileName); }
 }
 
 
 void
-dmz::ViewerPluginMenu::_load_node_file (const QString &FileName) {
+dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
 
    QFileInfo fi (FileName);
-   if (fi.exists () && _core) {
+   if (fi.exists () && _objectModule) {
 
-      qApp->setOverrideCursor (QCursor (Qt::BusyCursor));
-
-      osg::ref_ptr<osg::Group> scene = _core->get_scene ();
-
-      if (scene.valid ()) {
-
-         if (_node.valid ()) {
-
-            scene->removeChild (_node.get ());
-            _node = 0;
-         }
-
-         _nodeFile = qPrintable (fi.filePath ());
-         _node = osgDB::readNodeFile (_nodeFile.get_buffer ());
-
-         if (_node.valid ()) {
-
-            _appState.set_default_directory (_nodeFile);
-
-            scene->addChild (_node);
-
-            _reset_portal ();
-         }
-         else {
-
-            _log.error << "Unable to load file: " << _nodeFile << endl;
-            _nodeFile.flush ();
-         }
-      }
-
-      qApp->restoreOverrideCursor ();
-   }
-}
-
-
-void
-dmz::ViewerPluginMenu::_reset_portal () {
-
-   if (_node.valid ()) {
-
-      osg::BoundingSphere bound = _node->computeBound ();
-      osg::Vec3 center = bound.center ();
-      _center.set_xyz (center.x (), center.z (), -center.y ());
-      _radius = bound.radius () + 2.0;
-      _heading = 1.25 * Pi64;
-      _pitch = -Pi64 / 8.0;
-      _update_portal ();
-   }
-}
-
-
-void
-dmz::ViewerPluginMenu::_update_portal () {
-
-   if (_portal) {
-
-      Matrix hmat (Vector (0.0, 1.0, 0.0), _heading);
-      Matrix pmat (Vector (1.0, 0.0, 0.0), _pitch);
-      Matrix dmat = hmat * pmat;
-      Vector dir (0.0, 0.0, _radius);
-      dmat.transform_vector (dir);
-
-      _portal->set_view (_center + dir, dmat);
+      Handle objectHandle = _objectModule->create_object (_type, ObjectLocal);
+      
+      const String ModelFile (qPrintable (fi.absoluteFilePath ()));
+      
+      _objectModule->store_text (objectHandle, _model3dAttrHandle, ModelFile);
+      
+      _objectModule->activate_object (objectHandle);
+      
+      _appState.set_default_directory (ModelFile);
    }
 }
 
@@ -333,14 +212,20 @@ dmz::ViewerPluginMenu::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
 
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
    Config menuList;
    if (local.lookup_all_config ("menu", menuList)) { _init_menu_list (menuList); }
 
    QMetaObject::connectSlotsByName (this);
+   
+   const String TypeName (config_to_string ("object-type.name", local));
+   _type.set_type (TypeName, context);
 
-   activate_default_input_channel (InputEventMouseMask);
+   _model3dAttrHandle = config_to_named_handle (
+      "attribute.model-3d.name", local, "VIEWER_MODEL_3D", context);
 }
 
 

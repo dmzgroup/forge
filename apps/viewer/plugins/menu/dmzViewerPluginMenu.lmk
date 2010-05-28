@@ -1,7 +1,6 @@
 require "lmkQt"
-require "lmkOSG"
 
-lmkOSG.set_name ("dmzViewerPluginMenu", lmkQt.get_flags ())
+lmkQt.set_name "dmzViewerPluginMenu"
 
 lmk.set_type "plugin"
 
@@ -11,18 +10,14 @@ lmk.add_files {"dmzViewerPluginMenu.cpp",}
 
 lmk.add_libs {
    "dmzQtUtil",
-   "dmzInputEvents",
-   "dmzInputUtil",
    "dmzFoundation",
    "dmzKernel",
 }
 
 lmk.add_preqs {
    "dmzQtFramework",
-   "dmzInputFramework",
-   "dmzRenderFramework",
+   "dmzObjectFramework",
    "dmzRenderModuleCoreOSG",
 }
 
-lmkOSG.add_libs {"osgDB", "osgUtil", "osg", "OpenThreads",}
 lmkQt.add_libs {"QtCore","QtGui",}
