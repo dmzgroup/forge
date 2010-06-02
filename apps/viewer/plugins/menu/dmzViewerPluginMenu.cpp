@@ -128,7 +128,7 @@ void
 dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
 
    QFileInfo fi (FileName);
-   if (fi.exists () && _objectModule) {
+   if (fi.exists () && _objectModule && _mainWindowModule) {
 
       if (_objectHandle) {
          
@@ -146,6 +146,13 @@ dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
       _objectModule->activate_object (_objectHandle);
       
       _appState.set_default_directory (ModelFile);
+
+      QMainWindow *mainWindow = _mainWindowModule->get_qt_main_window ();
+      if (mainWindow) {
+         
+         QString title (_mainWindowModule->get_window_name ());
+         mainWindow->setWindowTitle (title + ": " + fi.fileName ());
+      }
    }
 }
 

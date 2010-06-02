@@ -7,8 +7,7 @@
    <instance name="spectatorOverlay"/>
 </javascript>
 <overlay>
-   <color name="text color" r="0" g="0.75" b="0" a="0.5"/>
-   <color name="spectator ring color" r="0" g="0.75" b="0" a="0.5"/>
+   <color name="text color" r="0" g="0" b="0" a="0.5"/>
    <layout node="spectator info">
       <x type="absolute" value="4"/>
       <y type="relative" value="0"/>

@@ -1,16 +1,17 @@
-#ifndef DMZ_FORGE_QT_PLUGIN_CLIENT_DOT_H
-#define DMZ_FORGE_QT_PLUGIN_CLIENT_DOT_H
+#ifndef DMZ_FORGE_PLUGIN_PUBLISH_DOT_H
+#define DMZ_FORGE_PLUGIN_PUBLISH_DOT_H
 
 #include <dmzForgeObserver.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
-#include <QtCore/QObject>
+#include <QtGui/QFrame>
+#include <ui_PublishForm.h>
 
 
 namespace dmz {
 
-   class ForgeQtPluginClient :
-      public QObject,
+   class ForgePluginPublish :
+      public QFrame,
       public Plugin,
       public TimeSlice,
       public ForgeObserver {
@@ -18,8 +19,8 @@ namespace dmz {
       Q_OBJECT
       
       public:
-         ForgeQtPluginClient (const PluginInfo &Info, Config &local);
-         ~ForgeQtPluginClient ();
+         ForgePluginPublish (const PluginInfo &Info, Config &local);
+         ~ForgePluginPublish ();
 
          // Plugin Interface
          virtual void update_plugin_state (
@@ -45,13 +46,15 @@ namespace dmz {
 
          struct State;
          State &_state;
+
+         Ui::PublishForm _ui;
          
       private:
-         ForgeQtPluginClient ();
-         ForgeQtPluginClient (const ForgeQtPluginClient &);
-         ForgeQtPluginClient &operator= (const ForgeQtPluginClient &);
+         ForgePluginPublish ();
+         ForgePluginPublish (const ForgePluginPublish &);
+         ForgePluginPublish &operator= (const ForgePluginPublish &);
    };
 };
 
 
-#endif // DMZ_FORGE_QT_PLUGIN_CLIENT_DOT_H
+#endif // DMZ_FORGE_PLUGIN_PUBLISH_DOT_H

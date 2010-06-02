@@ -1,0 +1,9 @@
+require "lmkQt"
+lmkQt.set_name "dmzForgePluginPublish"
+lmk.set_type "plugin"
+lmk.add_files {"PublishForm.ui",}
+lmk.add_files ({"dmzForgePluginPublish.h",}, {src = "moc"})
+lmk.add_files {"dmzForgePluginPublish.cpp",}
+lmk.add_preqs {"dmzForgeFramework","dmzQtFramework",}
+lmk.add_libs {"dmzQtUtil","dmzKernel",}
+lmkQt.add_libs {"QtCore", "QtGui",}

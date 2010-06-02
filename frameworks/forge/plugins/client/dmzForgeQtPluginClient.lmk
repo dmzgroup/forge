@@ -1,8 +1,0 @@
-require "lmkQt"
-lmkQt.set_name "dmzForgeQtPluginClient"
-lmk.set_type "plugin"
-lmk.add_files ({"dmzForgeQtPluginClient.h",}, {src = "moc"})
-lmk.add_files {"dmzForgeQtPluginClient.cpp",}
-lmk.add_preqs {"dmzForgeFramework",}
-lmk.add_libs {"dmzKernel",}
-lmkQt.add_libs {"QtCore", "QtGui", "QtNetwork",}
