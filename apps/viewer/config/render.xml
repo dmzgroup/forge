@@ -14,7 +14,6 @@
    <plugin name="dmzRenderPluginLightingOSG" scope="render"/>
    <plugin name="dmzRenderPluginScreenCaptureOSG"/>
    <plugin name="dmzRenderPluginObjectLoaderOSG"/>
-   <plugin name="dmzRenderModuleOverlayOSG" scope="overlay"/>
 </plugin-list>
 <render>
    <osg-up value="z"/>

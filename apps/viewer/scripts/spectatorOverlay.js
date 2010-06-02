@@ -22,8 +22,8 @@ var dmz =
        , ori: oriOverlay.text()
        }
 //  Constants
+  , TetherChannel = dmz.defs.createNamedHandle("tether-portal")
   , OrbitChannel = dmz.defs.createNamedHandle("orbit-portal")
-  // , TetherChannel = dmz.defs.createNamedHandle("tether-portal")
 //  Functions 
   , channelState
   ;
@@ -43,14 +43,14 @@ channelState = function (channel, state) {
 
    if (state) {
 
-      if (channel === OrbitChannel) {
+      if (channel === TetherChannel) {
+      
+         modeOverlay.text(text.mode + "Free Fly");
+      }
+      else if (channel === OrbitChannel) {
 
          modeOverlay.text(text.mode + "Orbit");
       }
-      // else if (channel === TetherChannel) {
-      // 
-      //    modeOverlay.text(text.mode + "Free Fly");
-      // }
    }
 };
 
@@ -82,8 +82,8 @@ dmz.time.setRepeatingTimer (self,  function (time) {
 });
 
 
+dmz.input.channel.observe(self, TetherChannel, channelState);
 dmz.input.channel.observe(self, OrbitChannel, channelState);
-// dmz.input.channel.observe(self, TetherChannel, channelState);
 
 
 dmz.messaging.subscribe("DMZ_Entity_Attach_Message", self,  function (data) {

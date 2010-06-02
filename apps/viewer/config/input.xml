@@ -13,7 +13,7 @@
       </converter>
    </channel>
 </key-messages>
-<keyboard-controller>
+<!-- <keyboard-controller>
    <controller>
       <axis id="1" negative="a" positive="d"/>
       <axis id="2" negative="w" positive="s"/>
@@ -28,5 +28,5 @@
       <button id="5" key="r"/>
       <scale key="shift" value="0.1" sticky="false"/>
    </controller>
-</keyboard-controller>
+</keyboard-controller> -->
 </dmz>

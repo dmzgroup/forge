@@ -4,10 +4,11 @@
    <plugin name="dmzQtModuleMainWindowBasic" scope="main-window" unload="false" delete="false"/>
    <plugin name="dmzViewerPluginMenu" scope="main-menu"/>
    <plugin name="dmzEntityModulePortalBasic"/>
-   <!-- <plugin name="dmzEntityPluginFreeFly" scope="freefly"/> -->
+   <plugin name="dmzEntityPluginFreeFly" scope="freefly"/>
+   <plugin name="dmzEntityPluginPortalTether" unique="tether-portal"/>
    <plugin name="dmzInputPluginChannelSwitch" scope="view-switch"/>
-   <!-- <plugin name="dmzEntityPluginPortalTether" unique="tether-portal"/> -->
    <plugin name="dmzEntityPluginPortalOrbit" unique="orbit-portal"/>
+   <plugin name="dmzEntityPluginMimic" scope="mimic"/>
    <plugin name="dmzEntityPluginAutoAttach" scope="auto"/>
 </plugin-list>
 <main-window>
@@ -34,43 +35,34 @@
    <object-type name="node"/>
 </main-menu>
 <freefly>
+   <input>
+      <channel name="tether-portal"/>
+   </input>
    <movement speed="100" turn-rate="2.4"/>
 </freefly>
 <view-switch>
    <switch>
       <channel name="orbit-portal"/>
-      <!-- <channel name="tether-portal"/> -->
+      <channel name="tether-portal"/>
    </switch>
 </view-switch>
-<orbit-portal>
+<mimic>
    <input>
       <channel name="orbit-portal"/>
    </input>
-</orbit-portal>
+</mimic>
 <tether-portal>
    <input>
       <channel name="tether-portal"/>
    </input>
    <offset x="0.0" y="0.0" z="0.0"/>
 </tether-portal>
+<orbit-portal>
+   <input>
+      <channel name="orbit-portal"/>
+   </input>
+</orbit-portal>
 <auto>
    <object-type name="node"/>
 </auto>
-<archive>
-   <object type="spectator">
-      <attributes>
-         <!-- <position x="0" y="0" z="0"/>
-         <orientation 
-            v0="1.0" v1="0.0" v2="0.0"
-            v3="0.0" v4="1.0" v5="0.0"
-            v6="0.0" v7="0.0" v8="1.0"
-         /> -->
-         <velocity x="0.0" y="0.0" z="0.0"/>
-         <acceleration x="0.0" y="0.0" z="0.0"/>
-      </attributes>
-      <attributes name="Object_Human_In_The_Loop">
-         <flag value="true"/>
-      </attributes>
-   </object>
-</archive>
 </dmz>
