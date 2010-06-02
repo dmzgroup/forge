@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<plugin-list>
+   <plugin name="dmzRenderModulePickBasic"/>
+   <plugin name="dmzRenderPluginPickOSG" scope="pick"/>
+   <!-- <plugin name="dmzInputPluginMouseEventToMessage" unique="pick-target"/> -->
+</plugin-list>
+<pick-target>
+   <input>
+      <source name="DMZ_Render_Main_Portal"/>
+      <channel name="freefly-portal"/>
+   </input>
+   <converter start="first">
+      <state name="first" type="basic">
+         <condition
+               button="1"
+               result="none"
+               action="pressed"
+               message="DMZ_Entity_Attach_Message"
+               next="first"
+         >
+            <attribute type="object" name="handle"/>
+         </condition>
+      </state>
+   </converter>
+</pick-target>
+<pick>
+   <source name="DMZ_Render_Main_Portal"/>
+</pick>
+</dmz>

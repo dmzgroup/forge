@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<runtime>
+   <time>
+      <frequency value="0.0"/>
+   </time>
+   <object-type name="spectator">
+   </object-type>
+   <object-type name="node">
+   </object-type>
+</runtime>
+</dmz>

@@ -2,6 +2,7 @@
 #include <dmzQtModuleMainWindow.h>
 #include <dmzQtUtil.h>
 #include <dmzRuntimeConfigToNamedHandle.h>
+#include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzSystemFile.h>
@@ -21,6 +22,8 @@ dmz::ViewerPluginMenu::ViewerPluginMenu (
       _mainWindowModuleName (),
       _menuTable (),
       _type (),
+      _objectHandle (0),
+      _defaultAttrHandle (0),
       _model3dAttrHandle (0) {
 
    _init (local);
@@ -127,13 +130,20 @@ dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
    QFileInfo fi (FileName);
    if (fi.exists () && _objectModule) {
 
-      Handle objectHandle = _objectModule->create_object (_type, ObjectLocal);
+      if (_objectHandle) {
+         
+         _objectModule->destroy_object (_objectHandle);
+      }
+
+      _objectHandle = _objectModule->create_object (_type, ObjectLocal);
       
       const String ModelFile (qPrintable (fi.absoluteFilePath ()));
       
-      _objectModule->store_text (objectHandle, _model3dAttrHandle, ModelFile);
+      _objectModule->store_text (_objectHandle, _model3dAttrHandle, ModelFile);
       
-      _objectModule->activate_object (objectHandle);
+      _objectModule->store_position (_objectHandle, _defaultAttrHandle, Vector ());
+      
+      _objectModule->activate_object (_objectHandle);
       
       _appState.set_default_directory (ModelFile);
    }
@@ -213,9 +223,12 @@ dmz::ViewerPluginMenu::_init (Config &local) {
    setObjectName (get_plugin_name ().get_buffer ());
 
    RuntimeContext *context (get_plugin_runtime_context ());
+   Definitions defs (context, &_log);
 
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
+   _defaultAttrHandle = defs.create_named_handle (ObjectAttributeDefaultName);
+   
    Config menuList;
    if (local.lookup_all_config ("menu", menuList)) { _init_menu_list (menuList); }
 
@@ -225,7 +238,7 @@ dmz::ViewerPluginMenu::_init (Config &local) {
    _type.set_type (TypeName, context);
 
    _model3dAttrHandle = config_to_named_handle (
-      "attribute.model-3d.name", local, "VIEWER_MODEL_3D", context);
+      "attribute.model.name", local, "Object_Model_Attribute", context);
 }
 
 

@@ -2,14 +2,31 @@
 <dmz>
 <plugin-list>
    <plugin name="dmzInputModuleBasic"/>
-   <plugin name="dmzInputPluginExit"/>
    <plugin name="dmzInputPluginKeyEventToMessage" scope="key-messages"/>
+   <plugin name="dmzInputPluginControllerKey" scope="keyboard-controller"/>
+   <plugin name="dmzInputPluginExit"/>
 </plugin-list>
 <key-messages>
    <channel>
-      <!-- <converter key="L">
-         <target name="dmzQtExtLuaConsole" message="DMZ_Show_Lua_Console"/>
-      </converter> -->
+      <converter key="J">
+         <target name="dmzJsPluginV8ConsoleQt" message="DMZ_Show_Java_Script_Console"/>
+      </converter>
    </channel>
 </key-messages>
+<keyboard-controller>
+   <controller>
+      <axis id="1" negative="a" positive="d"/>
+      <axis id="2" negative="w" positive="s"/>
+      <axis id="1" negative="A" positive="D"/>
+      <axis id="2" negative="W" positive="S"/>
+      <axis id="3" negative="leftarrow" positive="rightarrow"/>
+      <axis id="4" negative="uparrow" positive="downarrow"/>
+      <button id="1" key=","/>
+      <button id="2" key="space"/>
+      <button id="3" key="."/>
+      <button id="4" key="enter"/>
+      <button id="5" key="r"/>
+      <scale key="shift" value="0.1" sticky="false"/>
+   </controller>
+</keyboard-controller>
 </dmz>

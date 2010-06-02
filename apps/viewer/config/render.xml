@@ -12,8 +12,9 @@
    <plugin name="dmzRenderModuleIsectOSG"/>
    <plugin name="dmzRenderModulePortalOSG" scope="render"/>
    <plugin name="dmzRenderPluginLightingOSG" scope="render"/>
-   <!-- <plugin name="dmzRenderPluginScreenCaptureOSG"/> -->
-   <!-- <plugin name="dmzForgeLoaderPluginModelOSG"/> -->
+   <plugin name="dmzRenderPluginScreenCaptureOSG"/>
+   <plugin name="dmzRenderPluginObjectLoaderOSG"/>
+   <plugin name="dmzRenderModuleOverlayOSG" scope="overlay"/>
 </plugin-list>
 <render>
    <osg-up value="z"/>
@@ -25,6 +26,12 @@
       <specular r="0.2" g="0.2" b="0.2"/>
       <diffuse r="0.9" g="0.9" b="0.9"/>
    </light>
+   <highlight attribute="Object_Select_Attribute">
+      <emission r="1" g="1" b="1" a="0"/>
+   </highlight>
+   <highlight attribute="Object_Highlight_Attribute">
+      <emission r="1" g="1" b="0" a="0"/>
+   </highlight>
 </render>
 <viewer>
    <aa samples="4"/>

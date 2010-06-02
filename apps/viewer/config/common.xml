@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <dmz>
 <plugin-list>
-   <!-- <plugin name="dmzForgePluginAssetDocumentQt"/> -->
+   <plugin name="dmzArchiveModuleBasic"/>
+   <plugin name="dmzArchivePluginAutoLoad"/>
+   <plugin name="dmzArchivePluginQuickSave"/>
+   <plugin name="dmzArchivePluginObject"/>
+   <plugin name="dmzObjectModuleBasic"/>
+   <plugin name="dmzQtPluginObjectInspector" unique="object-inspector"/>
 <!--
    <plugin name="dmzPluginMsgDump"/>
    <plugin name="dmzPluginDefinitionsDump"/>

@@ -62,6 +62,8 @@ namespace dmz {
          String _mainWindowModuleName;
          HashTableStringTemplate<MenuStruct> _menuTable;
          ObjectType _type;
+         Handle _objectHandle;
+         Handle _defaultAttrHandle;
          Handle _model3dAttrHandle;
 
       private:

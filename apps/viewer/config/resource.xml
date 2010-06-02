@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<runtime>
+<resource-map>
+   <search name="font">
+      <path value="../../../../assets/viewer/fonts"/>
+      <path value="./assets/"/>
+   </search>
+   <resource name="font" file="data-latin.ttf" path="font"/>
+</resource-map>
+</runtime>
+</dmz>
