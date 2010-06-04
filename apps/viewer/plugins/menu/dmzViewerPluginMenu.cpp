@@ -24,7 +24,7 @@ dmz::ViewerPluginMenu::ViewerPluginMenu (
       _type (),
       _objectHandle (0),
       _defaultAttrHandle (0),
-      _model3dAttrHandle (0) {
+      _modelAttrHandle (0) {
 
    _init (local);
 }
@@ -63,7 +63,7 @@ dmz::ViewerPluginMenu::discover_plugin (
       const Plugin *PluginPtr) {
 
    if (Mode == PluginDiscoverAdd) {
-      
+
       if (!_objectModule) { _objectModule = ObjectModule::cast (PluginPtr); }
 
       if (!_mainWindowModule) {
@@ -87,7 +87,7 @@ dmz::ViewerPluginMenu::discover_plugin (
    else if (Mode == PluginDiscoverRemove) {
 
       if (_objectModule && (_objectModule == ObjectModule::cast (PluginPtr))) {
-         
+
          _objectModule = 0;
       }
 
@@ -131,25 +131,25 @@ dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
    if (fi.exists () && _objectModule && _mainWindowModule) {
 
       if (_objectHandle) {
-         
+
          _objectModule->destroy_object (_objectHandle);
       }
 
       _objectHandle = _objectModule->create_object (_type, ObjectLocal);
-      
+
       const String ModelFile (qPrintable (fi.absoluteFilePath ()));
-      
-      _objectModule->store_text (_objectHandle, _model3dAttrHandle, ModelFile);
-      
+
+      _objectModule->store_text (_objectHandle, _modelAttrHandle, ModelFile);
+
       _objectModule->store_position (_objectHandle, _defaultAttrHandle, Vector ());
-      
+
       _objectModule->activate_object (_objectHandle);
-      
+
       _appState.set_default_directory (ModelFile);
 
       QMainWindow *mainWindow = _mainWindowModule->get_qt_main_window ();
       if (mainWindow) {
-         
+
          QString title (_mainWindowModule->get_window_name ());
          mainWindow->setWindowTitle (title + ": " + fi.fileName ());
       }
@@ -235,16 +235,16 @@ dmz::ViewerPluginMenu::_init (Config &local) {
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
    _defaultAttrHandle = defs.create_named_handle (ObjectAttributeDefaultName);
-   
+
    Config menuList;
    if (local.lookup_all_config ("menu", menuList)) { _init_menu_list (menuList); }
 
    QMetaObject::connectSlotsByName (this);
-   
+
    const String TypeName (config_to_string ("object-type.name", local));
    _type.set_type (TypeName, context);
 
-   _model3dAttrHandle = config_to_named_handle (
+   _modelAttrHandle = config_to_named_handle (
       "attribute.model.name", local, "Object_Model_Attribute", context);
 }
 

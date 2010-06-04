@@ -17,10 +17,17 @@
    <central-widget name="viewer"/>
    <menu-bar>
       <menu text="&amp;File"/>
-      <!-- <menu text="&amp;Edit"/>
+      <!-- <menu text="&amp;Edit"/> -->
       <menu text="&amp;Window"/>
-      <menu text="&amp;Help"/> -->
+      <!-- <menu text="&amp;Help"/> -->
    </menu-bar>
+   <dock-windows>
+      <group area="bottom">
+         <widget name="object-inspector" title="Object Inspector" visible="false" floating="true">
+            <allowed-areas bottom="true"/>
+         </widget>
+      </group>
+   </dock-windows>
    <statusbar-hidden value="True"/>
 </main-window>
 <main-menu>

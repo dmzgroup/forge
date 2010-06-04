@@ -2,17 +2,31 @@
 <dmz>
 <plugin-list>
    <plugin name="dmzForgeModuleQt" unique="forge-qt" unload="false"/>
-   <plugin name="dmzForgePluginPublish" scope="publish"/>
+   <plugin name="dmzForgePluginPublish" unique="publish"/>
 </plugin-list>
 <main-window>
    <window title="DMZ Forge Editor"/>
+   <!-- <menu-bar> -->
+      <!-- <menu text="&amp;File"/> -->
+      <!-- <menu text="&amp;Edit"/> -->
+      <!-- <menu text="&amp;Window"/> -->
+      <!-- <menu text="&amp;Help"/> -->
+   <!-- </menu-bar> -->
+   <dock-windows>
+      <group area="right">
+         <widget name="publish" title="Publish" visible="true" floating="true">
+            <allowed-areas left="true" right="true"/>
+         </widget>
+      </group>
+   </dock-windows>
 </main-window>
 <forge-qt>
-   <!-- <webservice host="localhost" port="5984" db="forge"> -->
-   <webservice host="api.dmzforge.org" port="5984" db="forge">
+   <webservice host="localhost" port="5984" db="assets">
+   <!-- <webservice host="api.dmzforge.org" port="5984" db="forge"> -->
       <!-- <proxy host="localhost" port="8888"/> -->
    </webservice>
 </forge-qt>
 <publish>
+   <attach-message name="DMZ_Entity_Attach_Message"/>
 </publish>
 </dmz>

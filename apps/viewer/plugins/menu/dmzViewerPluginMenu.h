@@ -54,7 +54,7 @@ namespace dmz {
 
             MenuStruct (const String &TheName) : Name (TheName) {;}
          };
-         
+
          Log _log;
          ApplicationState _appState;
          ObjectModule *_objectModule;
@@ -64,7 +64,7 @@ namespace dmz {
          ObjectType _type;
          Handle _objectHandle;
          Handle _defaultAttrHandle;
-         Handle _model3dAttrHandle;
+         Handle _modelAttrHandle;
 
       private:
          ViewerPluginMenu ();
