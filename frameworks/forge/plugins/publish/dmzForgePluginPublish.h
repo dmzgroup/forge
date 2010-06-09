@@ -1,13 +1,13 @@
 #ifndef DMZ_FORGE_PLUGIN_PUBLISH_DOT_H
 #define DMZ_FORGE_PLUGIN_PUBLISH_DOT_H
 
+#include "AssetPublisher.h"
 #include <dmzForgeObserver.h>
 #include <dmzQtWidget.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
 #include <QtGui/QFrame>
-#include <ui_PublishForm.h>
 
 
 namespace dmz {
@@ -57,22 +57,18 @@ namespace dmz {
             const StringContainer &Results);
 
       protected Q_SLOTS:
-         void on_publishButton_clicked ();
+         void on_cancelButton_clicked ();
+         void _slot_publish ();
+         void _slot_reset ();
 
       protected:
-         void _publish_phase_1 ();
-         void _publish_phase_2 ();
-         void _publish_phase_3 ();
-         void _publish_phase_4 ();
-         void _dump_model ();
+         Boolean _dump_model (const String &File);
          void _init (Config &local);
 
-         struct Asset;
+         AssetPublisher _asset;
 
          struct State;
          State &_state;
-
-         Ui::PublishForm _ui;
 
       private:
          ForgePluginPublish ();

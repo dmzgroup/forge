@@ -5,7 +5,8 @@ lmkQt.set_name ("dmzForgePluginPublish", lmkOSG.get_flags ())
 lmk.set_type "plugin"
 lmk.add_files {"PublishForm.ui",}
 lmk.add_files ({"dmzForgePluginPublish.h",}, {src = "moc"})
-lmk.add_files {"dmzForgePluginPublish.cpp",}
+lmk.add_files {"AssetPublisher.qrc"}
+lmk.add_files {"AssetPublisher.cpp", "dmzForgePluginPublish.cpp",}
 lmk.add_preqs {"dmzRenderModuleCoreOSG","dmzObjectFramework","dmzForgeFramework","dmzQtFramework",}
 lmk.add_libs {"dmzQtUtil","dmzKernel",}
 lmkQt.add_libs {"QtCore", "QtGui",}

@@ -28,9 +28,10 @@ struct dmz::ForgePluginPublish::State {
    String assetId;
    UInt64 requestId;
    Handle target;
-   String mediaFile;
+   String model;
 
    State (const PluginInfo &Info);
+   ~State ();
 };
 
 
@@ -45,7 +46,12 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       assetId (),
       requestId (),
       target (0),
-      mediaFile () {;}
+      model () {;}
+
+
+dmz::ForgePluginPublish::State::~State () {
+
+}
 
 
 dmz::ForgePluginPublish::ForgePluginPublish (const PluginInfo &Info, Config &local) :
@@ -55,9 +61,26 @@ dmz::ForgePluginPublish::ForgePluginPublish (const PluginInfo &Info, Config &loc
       TimeSlice (Info, TimeSliceTypeSystemTime, TimeSliceModeSingle, 1.0),
       MessageObserver (Info),
       ForgeObserver (Info),
+      _asset (Info),
       _state (*(new State (Info))) {
 
-   _ui.setupUi (this);
+   _asset.setupUi (this);
+   _asset.reset ();
+
+   QPushButton *button = _asset.buttonBox->button (QDialogButtonBox::Apply);
+   if (button) {
+
+      button->setDefault (True);
+      button->setText (QLatin1String ("Publish"));
+
+      connect (button, SIGNAL (clicked ()), this, SLOT (_slot_publish ()));
+   }
+
+   button = _asset.buttonBox->button (QDialogButtonBox::Reset);
+   if (button) {
+
+      connect (button, SIGNAL (clicked ()), this, SLOT (_slot_reset ()));
+   }
 
    _init (local);
 }
@@ -85,7 +108,6 @@ dmz::ForgePluginPublish::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      _ui.publishButton->setEnabled (False);
    }
    else if (State == PluginStateStart) {
 
@@ -111,6 +133,11 @@ dmz::ForgePluginPublish::discover_plugin (
       if (!_state.forgeModule) {
 
          _state.forgeModule = ForgeModule::cast (PluginPtr, _state.forgeModuleName);
+
+         if (_state.forgeModule) {
+
+            _asset.set_forge_module (_state.forgeModule);
+         }
       }
 
       if (!_state.core) { _state.core = RenderModuleCoreOSG::cast (PluginPtr); }
@@ -124,6 +151,7 @@ dmz::ForgePluginPublish::discover_plugin (
 
       if (_state.forgeModule && (_state.forgeModule == ForgeModule::cast (PluginPtr))) {
 
+         _asset.set_forge_module (0);
          _state.forgeModule = 0;
       }
 
@@ -155,10 +183,14 @@ dmz::ForgePluginPublish::receive_message (
 
    if (_state.target && _state.objectModule) {
 
-      if (_state.objectModule->lookup_text (
-            _state.target, _state.modelAttrHandle, _state.mediaFile)) {
+      _state.model.flush ();
 
-         _ui.publishButton->setEnabled (True);
+      if (_state.objectModule->lookup_text (
+            _state.target,
+            _state.modelAttrHandle,
+            _state.model)) {
+
+         _asset.add_media (_state.model);
       }
    }
 }
@@ -188,7 +220,6 @@ dmz::ForgePluginPublish::handle_reply (
          break;
 
       case ForgeTypePutAsset:
-         if (RequestId == _state.requestId) { _publish_phase_2 (); }
          break;
 
       case ForgeTypeDeleteAsset:
@@ -198,11 +229,9 @@ dmz::ForgePluginPublish::handle_reply (
          break;
 
       case ForgeTypePutAssetMedia:
-         if (RequestId == _state.requestId) { _publish_phase_3 (); }
          break;
 
       case ForgeTypeAddAssetPreview:
-         if (RequestId == _state.requestId) { _publish_phase_4 (); }
          break;
 
       default:
@@ -217,107 +246,62 @@ _state.log.error << "Results: " << Results << endl;
 
 
 void
-dmz::ForgePluginPublish::on_publishButton_clicked () {
+dmz::ForgePluginPublish::on_cancelButton_clicked () {
 
-   _publish_phase_1 ();
+   _asset.cancel ();
 }
 
 
 void
-dmz::ForgePluginPublish::_publish_phase_1 () {
+dmz::ForgePluginPublish::_slot_publish () {
 
-   if (!_state.assetId && !_state.requestId && _state.forgeModule) {
+   QFileInfo fi (_state.model.get_buffer ());
+   if (fi.suffix () == "dae") {
 
-      String name (qPrintable (_ui.nameLineEdit->text ()));
-      String brief (qPrintable (_ui.briefLineEdit->text ()));
-      String details (qPrintable (_ui.detailsTextEdit->toPlainText ()));
+      QString tempFile = QDir::tempPath () + "/" + fi.baseName () + ".ive";
+      String outFile (qPrintable (tempFile));
 
-      _state.assetId = _state.forgeModule->create_asset ();
+      if (_dump_model (outFile)) {
 
-      _state.forgeModule->store_name (_state.assetId, name);
-      _state.forgeModule->store_brief (_state.assetId, brief);
-      _state.forgeModule->store_details (_state.assetId, details);
-
-      _state.requestId = _state.forgeModule->put_asset (_state.assetId, this);
-
-_state.log.warn << "AssetID: " << _state.assetId << " : " << _state.requestId << endl;
-   }
-}
-
-
-void
-dmz::ForgePluginPublish::_publish_phase_2 () {
-
-   if (_state.requestId && _state.forgeModule && _state.objectModule) {
-
-      QFileInfo fi (_state.mediaFile.get_buffer ());
-
-      if (fi.suffix () == "dae") {
-
-         //_state.rawFile = _state.mediaFile;
-//         _state.mediaFile =
-         _dump_model ();
+         _asset.add_media (outFile);
       }
-
-//      _state.requestId = _state.forgeModule->put_asset_media (_state.assetId, file, this);
    }
+
+   _asset.publish ();
 }
 
 
 void
-dmz::ForgePluginPublish::_publish_phase_3 () {
+dmz::ForgePluginPublish::_slot_reset () {
 
-   if (_state.assetId && _state.forgeModule) {
-
-   }
+   _asset.reset ();
 }
 
 
-void
-dmz::ForgePluginPublish::_publish_phase_4 () {
+dmz::Boolean
+dmz::ForgePluginPublish::_dump_model (const String &File) {
 
-   if (_state.assetId && _state.forgeModule) {
-
-   }
-}
-
-
-void
-dmz::ForgePluginPublish::_dump_model () {
+   Boolean retVal (False);
 
    if (_state.core) {
 
       osg::Group *group = _state.core->lookup_dynamic_object (_state.target);
-
       if (group) {
 
          osg::Node *node = group->getChild (0);
-
          if (node) {
 
-            osgDB::ReaderWriter::WriteResult result =
-               osgDB::Registry::instance()->writeNode (
-                  *node,
-                  "recognizer.ive",
-                  osgDB::Registry::instance()->getOptions());
-
-//            if (result.success())
-//            {
-//                osg::notify(osg::NOTICE)<<"Data written to '"<<fileNameOut<<"'."<< std::endl;
-//            }
-//            else if  (result.message().empty())
-//            {
-//                osg::notify(osg::NOTICE)<<"Warning: file write to '"<<fileNameOut<<"' no supported."<< std::endl;
-//            }
-//            else
-//            {
-//                osg::notify(osg::NOTICE)<<result.message()<< std::endl;
-//            }
-
-//            osgDB::writeNodeFile (*node, "recognizer.ive");
+           retVal =  osgDB::writeNodeFile (*node, File.get_buffer ());
          }
       }
    }
+
+if (!retVal) {
+
+_state.log.error << "Failed saving model to file: " << File << endl;
+}
+
+   return retVal;
 }
 
 
