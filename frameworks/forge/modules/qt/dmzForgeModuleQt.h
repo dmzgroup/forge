@@ -19,70 +19,70 @@ namespace dmz {
          public QObject,
          public Plugin,
          protected ForgeModule {
-         
+
       Q_OBJECT
-         
+
       public:
          ForgeModuleQt (const PluginInfo &Info, Config &local);
          ~ForgeModuleQt ();
-         
+
          // Plugin Interface
          virtual void update_plugin_state (
             const PluginStateEnum State,
             const UInt32 Level);
-         
+
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
-            
+
          // ForgeModule Interface
          virtual Boolean is_saved (const String &AssetId);
-         
+
          virtual String create_asset (const String &AssetId);
-         
+
          virtual ForgeAssetTypeEnum lookup_asset_type (const String &AssetId);
-         
+
          virtual Boolean store_name (const String &AssetId, const String &Value);
          virtual Boolean lookup_name (const String &AssetId, String &value);
-         
+
          virtual Boolean store_brief (const String &AssetId, const String &Value);
          virtual Boolean lookup_brief (const String &AssetId, String &value);
-         
+
          virtual Boolean store_details (const String &AssetId, const String &Value);
          virtual Boolean lookup_details (const String &AssetId, String &value);
-         
+
          virtual Boolean store_keywords (
             const String &AssetId,
             const StringContainer &Value);
-            
+
          virtual Boolean lookup_keywords (
             const String &AssetId,
             StringContainer &value);
-         
+
          virtual Boolean lookup_asset_media (
             const String &AssetId,
             StringContainer &value);
-         
+
          virtual Boolean lookup_previews (
             const String &AssetId,
             StringContainer &value);
-         
+
          // methods that communicate with api.dmzforge.org
-         
+
          virtual UInt64 search (
             const String &Value,
             ForgeObserver *observer,
             const UInt32 Limit);
-            
+
          virtual UInt64 get_asset (const String &AssetId, ForgeObserver *observer);
          virtual UInt64 put_asset (const String &AssetId, ForgeObserver *observer);
          virtual UInt64 delete_asset (const String &AssetId, ForgeObserver *observer);
-         
+
          virtual UInt64 get_asset_media (
             const String &AssetId,
             const String &File,
             ForgeObserver *observer);
-         
+
          virtual UInt64 put_asset_media (
             const String &AssetId,
             const String &File,
@@ -93,7 +93,7 @@ namespace dmz {
             const String &AssetId,
             const String &File,
             ForgeObserver *observer);
-         
+
          virtual UInt64 add_asset_preview (
             const String &AssetId,
             const StringContainer &Files,
@@ -126,25 +126,25 @@ namespace dmz {
          void _handle_add_asset_preview_phase1 (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase2 (const UInt64 RequestId, const String &JsonData);
          void _handle_add_asset_preview_phase3 (const UInt64 RequestId, const String &JsonData);
-         
+
          void _handle_get_uuids (const UInt64 RequestId, const String &JsonData);
-         
+
          void _handle_not_found (
             const String &AssetId,
             const UInt64 RequestId,
             const Int32 RequestType,
             ForgeObserver *observer);
-            
+
          void _handle_reply (
             const UInt64 RequestId,
             const Int32 RequestType,
             StringContainer &Container);
-         
+
          void _handle_error (
             const UInt64 RequestId,
             const Int32 RequestType,
             const String &Message);
-         
+
          Boolean _store_revision (const String &AssetId, const String &Value);
          Boolean _lookup_revision (const String &AssetId, String &value);
 
@@ -154,26 +154,28 @@ namespace dmz {
                const UInt64 RequestId,
                const Int32 RequestType,
                const QByteArray &Data = "");
-               
+
          QNetworkReply *_get_asset (
             const String &AssetId,
             const UInt64 RequestId,
             const Int32 RequestType);
-         
+
          QNetworkReply *_put_asset (
             const String &AssetId,
             const UInt64 RequestId,
             const Int32 RequestType);
-            
+
          QString _add_asset_media_file (const String &AssetId, const String &File);
          QString _add_asset_preview_file (const String &AssetId, const String &File);
-            
+
+         Boolean _is_media_unique (const String &AssetId, const String &File);
+
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
          Boolean _config_to_asset (const Config &AssetConfig);
-         
+
          String _get_uuid ();
-         
+
          void _init (Config &local);
 
       protected:

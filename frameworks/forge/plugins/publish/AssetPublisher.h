@@ -8,6 +8,8 @@
 #include <QtCore/QQueue>
 #include <ui_PublishForm.h>
 
+class QWidget;
+
 
 namespace dmz {
 

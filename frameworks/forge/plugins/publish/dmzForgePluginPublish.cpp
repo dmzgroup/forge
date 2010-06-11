@@ -28,7 +28,9 @@ struct dmz::ForgePluginPublish::State {
    String assetId;
    UInt64 requestId;
    Handle target;
-   String model;
+   String modelSource;
+   String modelTarget;
+   Boolean createTarget;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -46,7 +48,9 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       assetId (),
       requestId (),
       target (0),
-      model () {;}
+      modelSource (),
+      modelTarget (),
+      createTarget (False) {;}
 
 
 dmz::ForgePluginPublish::State::~State () {
@@ -183,14 +187,29 @@ dmz::ForgePluginPublish::receive_message (
 
    if (_state.target && _state.objectModule) {
 
-      _state.model.flush ();
+      _state.modelSource.flush ();
+      _state.modelTarget.flush ();
+      _state.createTarget = False;
 
       if (_state.objectModule->lookup_text (
             _state.target,
             _state.modelAttrHandle,
-            _state.model)) {
+            _state.modelSource)) {
 
-         _asset.add_media (_state.model);
+         QFileInfo fi (_state.modelSource.get_buffer ());
+         if (fi.suffix () == "ive") {
+
+            _state.modelTarget = _state.modelSource;
+            _state.createTarget = False;
+         }
+         else {
+
+            QString tempFile = QDir::tempPath () + "/" + fi.baseName () + ".ive";
+            _state.modelTarget = qPrintable (QDir::toNativeSeparators (tempFile));
+            _state.createTarget = True;
+         }
+
+         //_asset.add_media (_state.modelTarget);
       }
    }
 }
@@ -255,15 +274,16 @@ dmz::ForgePluginPublish::on_cancelButton_clicked () {
 void
 dmz::ForgePluginPublish::_slot_publish () {
 
-   QFileInfo fi (_state.model.get_buffer ());
-   if (fi.suffix () == "dae") {
+   if (_state.createTarget) {
 
-      QString tempFile = QDir::tempPath () + "/" + fi.baseName () + ".ive";
-      String outFile (qPrintable (tempFile));
+      if (_dump_model (_state.modelTarget)) {
 
-      if (_dump_model (outFile)) {
+         _asset.add_media (_state.modelTarget);
+         _state.createTarget = False;
+      }
+      else {
 
-         _asset.add_media (outFile);
+_state.log.error << "Failed saving model to file: " << _state.modelTarget << endl;
       }
    }
 
@@ -289,17 +309,9 @@ dmz::ForgePluginPublish::_dump_model (const String &File) {
       if (group) {
 
          osg::Node *node = group->getChild (0);
-         if (node) {
-
-           retVal =  osgDB::writeNodeFile (*node, File.get_buffer ());
-         }
+         if (node) { retVal =  osgDB::writeNodeFile (*node, File.get_buffer ()); }
       }
    }
-
-if (!retVal) {
-
-_state.log.error << "Failed saving model to file: " << File << endl;
-}
 
    return retVal;
 }
