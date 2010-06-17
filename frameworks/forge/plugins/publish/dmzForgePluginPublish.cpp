@@ -6,6 +6,7 @@
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzRuntimeDataConverterStringContainer.h>
 #include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRenderModuleCoreOSG.h>
@@ -19,7 +20,9 @@
 struct dmz::ForgePluginPublish::State {
 
    Log log;
-   DataConverterHandle convert;
+   DataConverterHandle convertHandle;
+   DataConverterString convertString;
+   DataConverterStringContainer convertList;
    ObjectModule *objectModule;
    ForgeModule *forgeModule;
    RenderModuleCoreOSG *core;
@@ -30,7 +33,10 @@ struct dmz::ForgePluginPublish::State {
    Handle target;
    String modelSource;
    String modelTarget;
+   String targetBase;
    Boolean createTarget;
+   Message startCaptureMsg;
+   Message finishedCaptureMsg;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -39,7 +45,9 @@ struct dmz::ForgePluginPublish::State {
 
 dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       log (Info),
-      convert (Info),
+      convertHandle (Info),
+      convertString (Info),
+      convertList (Info),
       objectModule (0),
       forgeModule (0),
       forgeModuleName (),
@@ -50,7 +58,10 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       target (0),
       modelSource (),
       modelTarget (),
-      createTarget (False) {;}
+      targetBase (),
+      createTarget (False),
+      startCaptureMsg (),
+      finishedCaptureMsg () {;}
 
 
 dmz::ForgePluginPublish::State::~State () {
@@ -183,7 +194,7 @@ dmz::ForgePluginPublish::receive_message (
       const Data *InData,
       Data *outData) {
 
-   _state.target = _state.convert.to_handle (InData);
+   _state.target = _state.convertHandle.to_handle (InData);
 
    if (_state.target && _state.objectModule) {
 
@@ -197,6 +208,12 @@ dmz::ForgePluginPublish::receive_message (
             _state.modelSource)) {
 
          QFileInfo fi (_state.modelSource.get_buffer ());
+
+         QString tempFile = QDir::tempPath () + "/" + fi.baseName ();
+         tempFile = QDir::toNativeSeparators (tempFile);
+
+         _state.targetBase = qPrintable (tempFile);
+
          if (fi.suffix () == "ive") {
 
             _state.modelTarget = _state.modelSource;
@@ -204,10 +221,13 @@ dmz::ForgePluginPublish::receive_message (
          }
          else {
 
-            QString tempFile = QDir::tempPath () + "/" + fi.baseName () + ".ive";
-            _state.modelTarget = qPrintable (QDir::toNativeSeparators (tempFile));
+            _state.modelTarget = _state.targetBase + ".ive";
             _state.createTarget = True;
          }
+
+         _state.log.warn << "modelSource: " << _state.modelSource << endl;
+         _state.log.warn << "targetBase: " << _state.targetBase << endl;
+         _state.log.warn << "modelTarget: " << _state.modelTarget << endl;
 
          //_asset.add_media (_state.modelTarget);
       }
@@ -272,6 +292,17 @@ dmz::ForgePluginPublish::on_cancelButton_clicked () {
 
 
 void
+dmz::ForgePluginPublish::on_updatePreviewsButton_clicked () {
+
+   String baseName = _state.targetBase;
+   baseName << "_preview_";
+
+   Data out = _state.convertString.to_data (baseName);
+   _state.startCaptureMsg.send (&out);
+}
+
+
+void
 dmz::ForgePluginPublish::_slot_publish () {
 
    if (_state.createTarget) {
@@ -326,11 +357,13 @@ dmz::ForgePluginPublish::_init (Config &local) {
 
    _state.forgeModuleName = config_to_string ("module.forge.name", local);
 
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    Message msg = config_create_message (
       "attach-message.name",
       local,
       "DMZ_Entity_Attach_Message",
-      get_plugin_runtime_context ());
+      context);
 
    subscribe_to_message (msg);
 
@@ -338,7 +371,21 @@ dmz::ForgePluginPublish::_init (Config &local) {
       "attribute.model.name",
       local,
       "Object_Model_Attribute",
-      get_plugin_runtime_context ());
+      context);
+
+   _state.startCaptureMsg = config_create_message (
+      "start-screen-capture-message.name",
+      local,
+      "Start_Screen_Capture_Message",
+      context);
+
+   _state.finishedCaptureMsg = config_create_message (
+      "finished-screen-capture-message.name",
+      local,
+      "Finished_Screen_Capture_Message",
+      context);
+
+    subscribe_to_message (_state.finishedCaptureMsg);
 }
 
 

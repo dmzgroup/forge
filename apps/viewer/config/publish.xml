@@ -3,6 +3,8 @@
 <plugin-list>
    <plugin name="dmzForgeModuleQt" unique="forge-qt" unload="false"/>
    <plugin name="dmzForgePluginPublish" unique="publish"/>
+   <plugin name="dmzRenderPluginScreenCaptureOSG" unique="capture"/>
+   <plugin name="dmzForgePluginScreenCaptureMulti" unique="capture-multi"/>
 </plugin-list>
 <main-window>
    <window title="DMZ Forge Editor"/>

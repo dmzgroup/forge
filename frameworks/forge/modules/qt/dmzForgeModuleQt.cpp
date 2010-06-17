@@ -606,11 +606,11 @@ dmz::ForgeModuleQt::store_keywords (const String &AssetId, const StringContainer
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) {
 
-      if (Value != asset->keywords) {
+      //if (Value != asset->keywords) {
 
          asset->keywords = Value;
          asset->dirty = True;
-      }
+      //}
 
       retVal = True;
    }

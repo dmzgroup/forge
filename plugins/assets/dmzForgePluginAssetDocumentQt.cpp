@@ -368,7 +368,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
                   LocalPreviews + "." + LocalImages,
                   imgList)) {
 
- 
+
                ConfigIterator it;
                Config img;
                StringContainer list;
@@ -376,7 +376,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
                while (imgList.get_next_config (it, img)) {
 
                   const String File = config_to_string (LocalValue, img);
- 
+
                   const String Path = _currentConfigFile + ".tdb/" + File;
 
                   list.append (Path);
@@ -387,7 +387,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
          }
       }
       else {
-         
+
          UUID id;
          create_uuid (id);
 

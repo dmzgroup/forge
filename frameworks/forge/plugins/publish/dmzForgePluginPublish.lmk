@@ -7,7 +7,15 @@ lmk.add_files {"PublishForm.ui",}
 lmk.add_files ({"dmzForgePluginPublish.h",}, {src = "moc"})
 lmk.add_files {"AssetPublisher.qrc"}
 lmk.add_files {"AssetPublisher.cpp", "dmzForgePluginPublish.cpp",}
-lmk.add_preqs {"dmzRenderModuleCoreOSG","dmzObjectFramework","dmzForgeFramework","dmzQtFramework",}
+
+lmk.add_preqs {
+   "dmzRenderModuleCoreOSG",
+   "dmzRenderFramework",
+   "dmzObjectFramework",
+   "dmzForgeFramework",
+   "dmzQtFramework",
+}
+
 lmk.add_libs {"dmzQtUtil","dmzKernel",}
 lmkQt.add_libs {"QtCore", "QtGui",}
 lmkOSG.add_libs {"osg", "osgDB", "OpenThreads",}

@@ -58,6 +58,7 @@ namespace dmz {
 
       protected Q_SLOTS:
          void on_cancelButton_clicked ();
+         void on_updatePreviewsButton_clicked ();
          void _slot_publish ();
          void _slot_reset ();
 
