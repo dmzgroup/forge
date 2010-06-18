@@ -35,8 +35,13 @@ struct dmz::ForgePluginPublish::State {
    String modelTarget;
    String targetBase;
    Boolean createTarget;
+   Message attachMsg;
    Message startCaptureMsg;
    Message finishedCaptureMsg;
+   StringContainer previews;
+   StringContainerIterator previewIt;
+   String currentPreview;
+   UInt32 currentPreviewIndex;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -50,18 +55,12 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       convertList (Info),
       objectModule (0),
       forgeModule (0),
-      forgeModuleName (),
       core (0),
       modelAttrHandle (0),
-      assetId (),
-      requestId (),
+      requestId (0),
       target (0),
-      modelSource (),
-      modelTarget (),
-      targetBase (),
       createTarget (False),
-      startCaptureMsg (),
-      finishedCaptureMsg () {;}
+      currentPreviewIndex (1) {;}
 
 
 dmz::ForgePluginPublish::State::~State () {
@@ -98,6 +97,8 @@ dmz::ForgePluginPublish::ForgePluginPublish (const PluginInfo &Info, Config &loc
    }
 
    _init (local);
+
+   QPixmapCache::setCacheLimit (1024 * 1024);
 }
 
 
@@ -194,43 +195,55 @@ dmz::ForgePluginPublish::receive_message (
       const Data *InData,
       Data *outData) {
 
-   _state.target = _state.convertHandle.to_handle (InData);
+   if (Type == _state.attachMsg) {
 
-   if (_state.target && _state.objectModule) {
+      _state.target = _state.convertHandle.to_handle (InData);
 
-      _state.modelSource.flush ();
-      _state.modelTarget.flush ();
-      _state.createTarget = False;
+      if (_state.target && _state.objectModule) {
 
-      if (_state.objectModule->lookup_text (
-            _state.target,
-            _state.modelAttrHandle,
-            _state.modelSource)) {
+         _state.modelSource.flush ();
+         _state.modelTarget.flush ();
+         _state.createTarget = False;
 
-         QFileInfo fi (_state.modelSource.get_buffer ());
+         if (_state.objectModule->lookup_text (
+               _state.target,
+               _state.modelAttrHandle,
+               _state.modelSource)) {
 
-         QString tempFile = QDir::tempPath () + "/" + fi.baseName ();
-         tempFile = QDir::toNativeSeparators (tempFile);
+            QFileInfo fi (_state.modelSource.get_buffer ());
 
-         _state.targetBase = qPrintable (tempFile);
+            QString tempFile = QDir::tempPath () + "/" + fi.baseName ();
+            tempFile = QDir::toNativeSeparators (tempFile);
 
-         if (fi.suffix () == "ive") {
+            _state.targetBase = qPrintable (tempFile);
 
-            _state.modelTarget = _state.modelSource;
-            _state.createTarget = False;
+            if (fi.suffix () == "ive") {
+
+               _state.modelTarget = _state.modelSource;
+               _state.createTarget = False;
+            }
+            else {
+
+               _state.modelTarget = _state.targetBase + ".ive";
+               _state.createTarget = True;
+            }
+
+_state.log.warn << "modelSource: " << _state.modelSource << endl;
+_state.log.warn << "targetBase: " << _state.targetBase << endl;
+_state.log.warn << "modelTarget: " << _state.modelTarget << endl;
+
+            //_asset.add_media (_state.modelTarget);
          }
-         else {
-
-            _state.modelTarget = _state.targetBase + ".ive";
-            _state.createTarget = True;
-         }
-
-         _state.log.warn << "modelSource: " << _state.modelSource << endl;
-         _state.log.warn << "targetBase: " << _state.targetBase << endl;
-         _state.log.warn << "modelTarget: " << _state.modelTarget << endl;
-
-         //_asset.add_media (_state.modelTarget);
       }
+   }
+   else if (Type == _state.finishedCaptureMsg) {
+
+      QPixmapCache::clear ();
+
+      _state.previews = _state.convertList.to_string_container (InData);
+      _state.previews.get_first (_state.previewIt, _state.currentPreview);
+      _state.currentPreviewIndex = 1;
+      _update_preview ();
    }
 }
 
@@ -294,12 +307,50 @@ dmz::ForgePluginPublish::on_cancelButton_clicked () {
 void
 dmz::ForgePluginPublish::on_updatePreviewsButton_clicked () {
 
-   String baseName = _state.targetBase;
-   baseName << "_preview_";
+   if (_state.targetBase) {
 
-   Data out = _state.convertString.to_data (baseName);
-   _state.startCaptureMsg.send (&out);
+      String baseName = _state.targetBase;
+      baseName << "_preview_";
+
+      Data out = _state.convertString.to_data (baseName);
+      _state.startCaptureMsg.send (&out);
+   }
 }
+
+
+void
+dmz::ForgePluginPublish::on_nextPreviewButton_clicked () {
+
+   if (_state.previews.get_next (_state.previewIt, _state.currentPreview)) {
+
+      _state.currentPreviewIndex++;
+   }
+   else {
+
+      _state.previews.get_first (_state.previewIt, _state.currentPreview);
+      _state.currentPreviewIndex = 1;
+   }
+
+   _update_preview ();
+}
+
+
+void
+dmz::ForgePluginPublish::on_prevPreviewButton_clicked () {
+
+   if (_state.previews.get_prev (_state.previewIt, _state.currentPreview)) {
+
+      _state.currentPreviewIndex--;
+   }
+   else {
+
+      _state.previews.get_last (_state.previewIt, _state.currentPreview);
+      _state.currentPreviewIndex = _state.previews.get_count ();
+   }
+
+   _update_preview ();
+}
+
 
 
 void
@@ -310,6 +361,7 @@ dmz::ForgePluginPublish::_slot_publish () {
       if (_dump_model (_state.modelTarget)) {
 
          _asset.add_media (_state.modelTarget);
+         _asset.add_previews (_state.previews);
          _state.createTarget = False;
       }
       else {
@@ -326,6 +378,32 @@ void
 dmz::ForgePluginPublish::_slot_reset () {
 
    _asset.reset ();
+}
+
+
+void
+dmz::ForgePluginPublish::_update_preview () {
+
+   const QString Key = QString ("preview_%1").arg (_state.currentPreviewIndex);
+
+   QPixmap pixmap;
+   if (!QPixmapCache::find (Key, &pixmap)) {
+
+      pixmap.load (_state.currentPreview.get_buffer ());
+
+      if ((pixmap.width () > 200) || (pixmap.height () > 200)) {
+
+         pixmap = pixmap.scaled (200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+      }
+
+      QPixmapCache::insert (Key, pixmap);
+   }
+
+   _asset.previewLabel->setPixmap (pixmap);
+
+   _asset.previewInfoLabel->setText (
+      QString ("%1/%2").arg (_state.currentPreviewIndex)
+                       .arg (_state.previews.get_count ()));
 }
 
 
@@ -359,13 +437,13 @@ dmz::ForgePluginPublish::_init (Config &local) {
 
    RuntimeContext *context (get_plugin_runtime_context ());
 
-   Message msg = config_create_message (
+   _state.attachMsg = config_create_message (
       "attach-message.name",
       local,
       "DMZ_Entity_Attach_Message",
       context);
 
-   subscribe_to_message (msg);
+   subscribe_to_message (_state.attachMsg);
 
    _state.modelAttrHandle = config_to_named_handle (
       "attribute.model.name",

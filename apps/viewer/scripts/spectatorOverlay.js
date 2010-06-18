@@ -24,7 +24,7 @@ var dmz =
 //  Constants
   , TetherChannel = dmz.defs.createNamedHandle("tether-portal")
   , OrbitChannel = dmz.defs.createNamedHandle("orbit-portal")
-//  Functions 
+//  Functions
   , channelState
   ;
 
@@ -44,7 +44,7 @@ channelState = function (channel, state) {
    if (state) {
 
       if (channel === TetherChannel) {
-      
+
          modeOverlay.text(text.mode + "Free Fly");
       }
       else if (channel === OrbitChannel) {

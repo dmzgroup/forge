@@ -59,10 +59,13 @@ namespace dmz {
       protected Q_SLOTS:
          void on_cancelButton_clicked ();
          void on_updatePreviewsButton_clicked ();
+         void on_nextPreviewButton_clicked ();
+         void on_prevPreviewButton_clicked ();
          void _slot_publish ();
          void _slot_reset ();
 
       protected:
+         void _update_preview ();
          Boolean _dump_model (const String &File);
          void _init (Config &local);
 

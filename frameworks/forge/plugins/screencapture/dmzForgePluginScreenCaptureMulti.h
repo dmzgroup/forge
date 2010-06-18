@@ -8,11 +8,13 @@
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
 #include <dmzSystemFile.h>
+#include <dmzTypesMatrix.h>
 #include <dmzTypesVector.h>
 
 
 namespace dmz {
 
+   class ObjectModule;
    class RenderModulePortal;
 
    class ForgePluginScreenCaptureMulti :
@@ -49,11 +51,17 @@ namespace dmz {
          void _init (Config &local);
 
          Log _log;
-         DataConverterString _convert;
-         DataConverterStringContainer _listConvert;
+         DataConverterHandle _convertHandle;
+         DataConverterString _convertString;
+         DataConverterStringContainer _convertList;
 
+         ObjectModule *_objMod;
          RenderModulePortal *_portal;
 
+         Handle _defaultAttrHandle;
+         Handle _target;
+
+         Message _attachMsg;
          Message _startCaptureMsg;
          Message _doCaptureMsg;
          Message _finishedCaptureMsg;
@@ -63,9 +71,12 @@ namespace dmz {
          Int32 _maxFiles;
          StringContainer _fileList;
 
+         Matrix _portalOri;
+         Vector _portalPos;
+
+         Vector _targetPos;
+
          Float64 _heading;
-         Float64 _pitch;
-         Vector _pos;
 
       private:
          ForgePluginScreenCaptureMulti ();

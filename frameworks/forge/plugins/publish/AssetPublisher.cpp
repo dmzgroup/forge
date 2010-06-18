@@ -53,6 +53,13 @@ dmz::AssetPublisher::add_media (const String &File) {
 
 
 void
+dmz::AssetPublisher::add_previews (const StringContainer &Container) {
+
+   _previews = Container;
+}
+
+
+void
 dmz::AssetPublisher::publish () {
 
    if (!_requestId && _forge) {
@@ -182,11 +189,9 @@ dmz::AssetPublisher::_publish_previews () {
 
       if (_assetId && _forge) {
 
-         String file;
-         _previews.get_first (file);
-         _previews.remove (file);
+_log.warn << "_publish_previews: " << _previews << endl;
 
-_log.warn << "_publish_previews: " << file << endl;
+         _requestId = _forge->add_asset_preview (_assetId, _previews, this);
       }
    }
    else { _publish_finished (); }

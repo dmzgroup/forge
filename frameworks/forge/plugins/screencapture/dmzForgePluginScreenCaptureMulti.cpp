@@ -1,9 +1,10 @@
 #include "dmzForgePluginScreenCaptureMulti.h"
-#include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzObjectModule.h>
 #include <dmzRenderModulePortal.h>
+#include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
-#include <dmzTypesMatrix.h>
 #include <dmzTypesConsts.h>
 
 
@@ -14,13 +15,16 @@ dmz::ForgePluginScreenCaptureMulti::ForgePluginScreenCaptureMulti (
       TimeSlice (Info),
       MessageObserver (Info),
       _log (Info),
-      _convert (Info),
-      _listConvert (Info),
+      _convertHandle (Info),
+      _convertString (Info),
+      _convertList (Info),
+      _objMod (0),
       _portal (0),
+      _defaultAttrHandle (0),
+      _target (0),
       _fileIndex (0),
       _maxFiles (16),
-      _heading (0),
-      _pitch (0) {
+      _heading (0) {
 
    _init (local);
 }
@@ -59,10 +63,12 @@ dmz::ForgePluginScreenCaptureMulti::discover_plugin (
 
    if (Mode == PluginDiscoverAdd) {
 
+      if (!_objMod) { _objMod = ObjectModule::cast (PluginPtr); }
       if (!_portal) { _portal = RenderModulePortal::cast (PluginPtr); }
    }
    else if (Mode == PluginDiscoverRemove) {
 
+      if (_objMod && (_objMod == ObjectModule::cast (PluginPtr))) { _objMod = 0; }
       if (_portal && (_portal == RenderModulePortal::cast (PluginPtr))) { _portal = 0; }
    }
 }
@@ -74,15 +80,18 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
 
    if (_fileIndex > 0) {
 
-      if (_fileIndex > 1) { _heading += TwoPi64 / Float64 (_maxFiles); }
-      _log.warn << "_heading: " << _heading << endl;
+      if (_fileIndex > 1) {
+
+         _heading += TwoPi64 / Float64 (_maxFiles);
+      }
+
       _update_portal ();
 
       String file (_fileRoot);
       file << _fileIndex << ".png";
       _fileList.append (file);
 
-      Data out = _convert.to_data (file);
+      Data out = _convertString.to_data (file);
       _doCaptureMsg.send (&out);
 
       _fileIndex++;
@@ -91,6 +100,7 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
    else if (_fileIndex < 0) {
 
       const Int32 Size (_fileList.get_count ());
+
       Int32 count (0);
       StringContainerIterator it;
       String file;
@@ -102,11 +112,15 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
 
       if (Size == count) {
 
-         Data out = _listConvert.to_data (_fileList);
+         Data out = _convertList.to_data (_fileList);
          _finishedCaptureMsg.send (&out);
          _fileIndex = 0;
+
          _heading += TwoPi64 / Float64 (_maxFiles);
          _update_portal ();
+
+         // reset portal to original pos, ori before capture started
+//         if (_portal) { _portal->set_view (_portalPos, _portalOri); }
       }
       else {
 
@@ -125,20 +139,24 @@ dmz::ForgePluginScreenCaptureMulti::receive_message (
       const Data *InData,
       Data *outData) {
 
-   if (Type == _startCaptureMsg) {
+   if (Type == _attachMsg) {
 
-      if (_portal) {
+      _target = _convertHandle.to_handle (InData);
+   }
+   else if (Type == _startCaptureMsg) {
 
-         Matrix ori;
-         _portal->get_view (_pos, ori);
+      if (_target && _objMod && _portal) {
 
-         Float64 roll;
-         ori.to_euler_angles (_heading, _pitch, roll);
+         _objMod->lookup_position (_target, _defaultAttrHandle, _targetPos);
+
+         _portal->get_view (_portalPos, _portalOri);
+
+         _heading = 0;
+
+         _fileList.clear ();
+         _fileRoot = _convertString.to_string (InData);
+         if (_fileRoot) { _fileIndex = 1; }
       }
-
-      _fileList.clear ();
-      _fileRoot = _convert.to_string (InData);
-      if (_fileRoot) { _fileIndex = 1; }
    }
 }
 
@@ -148,11 +166,15 @@ dmz::ForgePluginScreenCaptureMulti::_update_portal () {
 
    if (_portal) {
 
-      Matrix hmat (Vector (0.0, 1.0, 0.0), _heading);
-      Matrix pmat (Vector (1.0, 0.0, 0.0), _pitch);
-      Matrix dmat = hmat * pmat;
+      Vector dir (_portalPos - _targetPos);
 
-      _portal->set_view (_pos, dmat);
+      Matrix hmat (Vector (0.0, 1.0, 0.0), _heading);
+      hmat.transform_vector (dir);
+
+      Matrix ori;
+      ori.from_vector (-dir);
+
+      _portal->set_view (_targetPos + dir, ori);
    }
 }
 
@@ -161,6 +183,18 @@ void
 dmz::ForgePluginScreenCaptureMulti::_init (Config &local) {
 
    RuntimeContext *context = get_plugin_runtime_context ();
+
+   Definitions defs (context, &_log);
+
+   _defaultAttrHandle = defs.create_named_handle (ObjectAttributeDefaultName);
+
+   _attachMsg = config_create_message (
+      "attach-message.name",
+      local,
+      "DMZ_Entity_Attach_Message",
+      context);
+
+   subscribe_to_message (_attachMsg);
 
    _startCaptureMsg = config_create_message (
       "start-screen-capture-message.name",
