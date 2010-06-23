@@ -4,6 +4,7 @@
 #include <dmzForgeConsts.h>
 #include <dmzForgeModule.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzRuntimeTimeSlice.h>
 #include <QtCore/QObject>
 
 class QByteArray;
@@ -18,6 +19,7 @@ namespace dmz {
    class ForgeModuleQt :
          public QObject,
          public Plugin,
+         public TimeSlice,
          protected ForgeModule {
 
       Q_OBJECT
@@ -34,6 +36,9 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
+
+         // TimeSlice Interface
+         virtual void update_time_slice (const Float64 TimeDelta);
 
          // ForgeModule Interface
          virtual Boolean is_saved (const String &AssetId);
@@ -173,6 +178,7 @@ namespace dmz {
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
          Boolean _config_to_asset (const Config &AssetConfig);
+         Boolean _update_asset (const String &AssetId, const Config &AssetConfig);
 
          String _get_uuid ();
 

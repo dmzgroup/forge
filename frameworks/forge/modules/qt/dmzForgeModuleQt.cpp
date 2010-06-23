@@ -134,6 +134,24 @@ namespace {
 
       DownloadStruct () : requestId (0), requestType (0) {;}
    };
+
+   struct ReplyStruct {
+
+      const UInt64 RequestId;
+      const Int32 RequestType;
+      const Boolean Error;
+      const StringContainer Container;
+
+      ReplyStruct (
+         const UInt64 TheRequestId,
+         const Int32 TheRequestType,
+         const Boolean TheError,
+         const StringContainer &TheContainer) :
+         RequestId (TheRequestId),
+         RequestType (TheRequestType),
+         Error (TheError),
+         Container (TheContainer) {;}
+   };
 };
 
 struct dmz::ForgeModuleQt::AssetStruct {
@@ -167,6 +185,7 @@ struct dmz::ForgeModuleQt::State {
    HashTableStringTemplate<AssetStruct> assetTable;
    QQueue<UploadStruct *> uploadQueue;
    QQueue<DownloadStruct *> downloadQueue;
+   QQueue<ReplyStruct *> replyQueue;
    Boolean uploading;
    Boolean downloading;
    QUrl baseUrl;
@@ -231,6 +250,7 @@ dmz::ForgeModuleQt::State::~State () {
 
    while (!uploadQueue.isEmpty ()) { delete uploadQueue.takeFirst (); }
    while (!downloadQueue.isEmpty ()) { delete downloadQueue.takeFirst (); }
+   while (!replyQueue.isEmpty ()) { delete replyQueue.takeFirst (); }
 
    obsTable.clear ();
    assetTable.empty ();
@@ -400,12 +420,15 @@ dmz::ForgeModuleQt::State::update_etag (const String &AssetId, const String &Nam
 dmz::ForgeModuleQt::ForgeModuleQt (const PluginInfo &Info, Config &local) :
       QObject (0),
       Plugin (Info),
+      TimeSlice (Info),
       ForgeModule (Info),
       _state (*(new State (Info))) {
 
    local_init_mime_types ();
 
    _state.networkAccessManager = new QNetworkAccessManager (this);
+
+   stop_time_slice ();
 
    _init (local);
 
@@ -456,8 +479,28 @@ dmz::ForgeModuleQt::discover_plugin (
 }
 
 
-// ForgeModule Interface
+// TimeSlice Interface
+void
+dmz::ForgeModuleQt::update_time_slice (const Float64 TimeDelta) {
 
+   if (!_state.replyQueue.isEmpty ()) {
+
+      ReplyStruct *rs = _state.replyQueue.dequeue ();
+
+      if (_state.replyQueue.isEmpty ()) { stop_time_slice (); }
+
+      ForgeObserver *observer = _state.obsTable.remove (rs->RequestId);
+      if (observer) {
+
+         observer->handle_reply (rs->RequestId, rs->RequestType, rs->Error, rs->Container);
+      }
+
+      delete rs; rs = 0;
+   }
+}
+
+
+// ForgeModule Interface
 dmz::Boolean
 dmz::ForgeModuleQt::is_saved (const String &AssetId) {
 
@@ -606,11 +649,11 @@ dmz::ForgeModuleQt::store_keywords (const String &AssetId, const StringContainer
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) {
 
-      //if (Value != asset->keywords) {
+      if (!(Value == asset->keywords)) {
 
          asset->keywords = Value;
          asset->dirty = True;
-      //}
+      }
 
       retVal = True;
    }
@@ -709,7 +752,28 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
 
          _state.obsTable.store (requestId, observer);
 
-         QNetworkReply *reply = _put_asset (AssetId, requestId, ForgeTypePutAsset);
+         if (asset->dirty) {
+
+            QNetworkReply *reply = _put_asset (AssetId, requestId, ForgeTypePutAsset);
+            asset->dirty = False;
+         }
+         else {
+
+            Config config ("global");
+            config.store_attribute ("ok", "true");
+            config.store_attribute (Local_Id, asset->Id);
+            config.store_attribute (Local_Rev, asset->revision);
+
+            String jsonData;
+            StreamString out (jsonData);
+
+            format_config_to_json (config, out, ConfigStripGlobal, &_state.log);
+
+            StringContainer container;
+            container.append (jsonData);
+
+            _handle_reply (requestId, ForgeTypePutAsset, container);
+         }
       }
       else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset, observer); }
    }
@@ -1534,23 +1598,8 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase2 (
 
       const String AssetId (config_to_string (Local_Id, global));
 
-      AssetStruct *asset = _state.assetTable.lookup (AssetId);
-      if (asset){
-
-         // _config_to_asset will overwrite type, save it so we don't loose it
-         String type = asset->type;
-         QMap<QString, String>current = asset->current;
-         QMap<QString, String>originalName = asset->originalName;
-
-         _config_to_asset (global);
-
-         // now lets restore type and push to server
-         asset->type = type;
-         asset->current = current;
-         asset->originalName = originalName;
-
-         _put_asset (AssetId, RequestId, LocalPutAssetMediaPhase3);
-      }
+      _update_asset (AssetId, global);
+      _put_asset (AssetId, RequestId, LocalPutAssetMediaPhase3);
    }
    else {
 
@@ -1648,17 +1697,8 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase2 (
 
       const String AssetId (config_to_string (Local_Id, global));
 
-      AssetStruct *asset = _state.assetTable.lookup (AssetId);
-      if (asset){
-
-         // _config_to_asset will overwrite previews, save it so we don't loose it
-         StringContainer previews = asset->previews;
-         _config_to_asset (global);
-
-         // now lets restore previews and push to server
-         asset->previews = previews;
-         _put_asset (AssetId, RequestId, LocalAddAssetPreviewPhase3);
-      }
+      _update_asset (AssetId, global);
+      _put_asset (AssetId, RequestId, LocalAddAssetPreviewPhase3);
    }
    else {
 
@@ -1755,11 +1795,10 @@ dmz::ForgeModuleQt::_handle_reply (
       const Int32 RequestType,
       StringContainer &Container) {
 
-   ForgeObserver *observer = _state.obsTable.remove (RequestId);
-   if (observer) {
+   ReplyStruct *rs = new ReplyStruct (RequestId, RequestType, False, Container);
+   _state.replyQueue.enqueue (rs);
 
-      observer->handle_reply (RequestId, RequestType, False, Container);
-   }
+   if (_state.replyQueue.count () == 1) { start_time_slice (); }
 }
 
 
@@ -1769,14 +1808,13 @@ dmz::ForgeModuleQt::_handle_error (
       const Int32 RequestType,
       const String &Message) {
 
-   ForgeObserver *observer = _state.obsTable.remove (RequestId);
-   if (observer) {
+   StringContainer container;
+   container.append (Message);
 
-      StringContainer container;
-      container.append (Message);
+   ReplyStruct *rs = new ReplyStruct (RequestId, RequestType, True, container);
+   _state.replyQueue.enqueue (rs);
 
-      observer->handle_reply (RequestId, RequestType, True, container);
-   }
+   if (_state.replyQueue.count () == 1) { start_time_slice (); }
 }
 
 
@@ -2181,6 +2219,36 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
       AssetConfig.lookup_config (Local_Attachments, asset->attachments);
 
       retVal = True;
+   }
+
+   return retVal;
+}
+
+
+dmz::Boolean
+dmz::ForgeModuleQt::_update_asset (const String &AssetId, const Config &AssetConfig) {
+
+   Boolean retVal (False);
+
+   AssetStruct *asset = _state.assetTable.lookup (AssetId);
+   if (asset){
+
+      // _config_to_asset will overwrite type, save it so we don't loose it
+      String type = asset->type;
+      QMap<QString, String>current = asset->current;
+      QMap<QString, String>originalName = asset->originalName;
+      StringContainer previews = asset->previews;
+
+      if (_config_to_asset (AssetConfig)) {
+
+         // now lets restore type and push to server
+         asset->type = type;
+         asset->current = current;
+         asset->originalName = originalName;
+         asset->previews = previews;
+
+         retVal = True;
+      }
    }
 
    return retVal;

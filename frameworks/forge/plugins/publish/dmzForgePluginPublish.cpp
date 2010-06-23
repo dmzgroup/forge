@@ -3,15 +3,17 @@
 #include "dmzForgePluginPublish.h"
 #include <dmzObjectModule.h>
 #include <dmzQtConfigRead.h>
+#include <dmzRenderModuleCoreOSG.h>
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimeDataConverterStringContainer.h>
 #include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
-#include <dmzRenderModuleCoreOSG.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzRuntimeUUID.h>
+#include <dmzSystemFile.h>
 #include <dmzTypesStringContainer.h>
 #include <QtGui/QtGui>
 #include <osgDB/WriteFile>
@@ -42,6 +44,7 @@ struct dmz::ForgePluginPublish::State {
    StringContainerIterator previewIt;
    String currentPreview;
    UInt32 currentPreviewIndex;
+   Boolean newPreviews;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -60,11 +63,36 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       requestId (0),
       target (0),
       createTarget (False),
-      currentPreviewIndex (1) {;}
+      currentPreviewIndex (1),
+      newPreviews (False) {
+
+   const UUID RuntimeId (get_runtime_uuid (Info));
+
+   targetBase = qPrintable (QDir::tempPath ());
+   targetBase = format_path (targetBase + "/" + RuntimeId.to_string ());
+
+   // create runtime temp directory
+   if (!is_valid_path (targetBase)) {
+
+      create_directory (targetBase);
+      log.info << "Created runtime temp dir: " << targetBase << endl;
+   }
+}
 
 
 dmz::ForgePluginPublish::State::~State () {
 
+   String file;
+   StringContainer fileList;
+   get_file_list (targetBase, fileList);
+
+   while (fileList.get_next (file)) {
+
+      file = format_path (targetBase + "/" + file);
+      remove_file (file);
+   }
+
+   remove_file (targetBase);
 }
 
 
@@ -212,11 +240,6 @@ dmz::ForgePluginPublish::receive_message (
 
             QFileInfo fi (_state.modelSource.get_buffer ());
 
-            QString tempFile = QDir::tempPath () + "/" + fi.baseName ();
-            tempFile = QDir::toNativeSeparators (tempFile);
-
-            _state.targetBase = qPrintable (tempFile);
-
             if (fi.suffix () == "ive") {
 
                _state.modelTarget = _state.modelSource;
@@ -224,25 +247,21 @@ dmz::ForgePluginPublish::receive_message (
             }
             else {
 
-               _state.modelTarget = _state.targetBase + ".ive";
+               _state.modelTarget = _state.targetBase;
+               _state.modelTarget << "/" << qPrintable (fi.baseName ()) << ".ive";
                _state.createTarget = True;
             }
 
-_state.log.warn << "modelSource: " << _state.modelSource << endl;
-_state.log.warn << "targetBase: " << _state.targetBase << endl;
-_state.log.warn << "modelTarget: " << _state.modelTarget << endl;
-
-            //_asset.add_media (_state.modelTarget);
+            _state.modelTarget.replace_sub (" ", "_");
          }
       }
    }
    else if (Type == _state.finishedCaptureMsg) {
 
-      QPixmapCache::clear ();
-
       _state.previews = _state.convertList.to_string_container (InData);
       _state.previews.get_first (_state.previewIt, _state.currentPreview);
       _state.currentPreviewIndex = 1;
+      _state.newPreviews = True;
       _update_preview ();
    }
 }
@@ -268,24 +287,6 @@ dmz::ForgePluginPublish::handle_reply (
          break;
       }
 
-      case ForgeTypeGetAsset:
-         break;
-
-      case ForgeTypePutAsset:
-         break;
-
-      case ForgeTypeDeleteAsset:
-         break;
-
-      case ForgeTypeGetAssetMedia:
-         break;
-
-      case ForgeTypePutAssetMedia:
-         break;
-
-      case ForgeTypeAddAssetPreview:
-         break;
-
       default:
          break;
    }
@@ -309,10 +310,9 @@ dmz::ForgePluginPublish::on_updatePreviewsButton_clicked () {
 
    if (_state.targetBase) {
 
-      String baseName = _state.targetBase;
-      baseName << "_preview_";
+      const String BaseName (format_path (_state.targetBase + "/preview_"));
 
-      Data out = _state.convertString.to_data (baseName);
+      Data out = _state.convertString.to_data (BaseName);
       _state.startCaptureMsg.send (&out);
    }
 }
@@ -361,7 +361,6 @@ dmz::ForgePluginPublish::_slot_publish () {
       if (_dump_model (_state.modelTarget)) {
 
          _asset.add_media (_state.modelTarget);
-         _asset.add_previews (_state.previews);
          _state.createTarget = False;
       }
       else {
@@ -383,6 +382,13 @@ dmz::ForgePluginPublish::_slot_reset () {
 
 void
 dmz::ForgePluginPublish::_update_preview () {
+
+   if (_state.newPreviews) {
+
+      QPixmapCache::clear ();
+      _asset.add_previews (_state.previews);
+      _state.newPreviews = False;
+   }
 
    const QString Key = QString ("preview_%1").arg (_state.currentPreviewIndex);
 

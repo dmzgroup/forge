@@ -1,6 +1,7 @@
 #include "AssetPublisher.h"
 #include <dmzForgeConsts.h>
 #include <dmzForgeModule.h>
+#include <dmzQtUtil.h>
 #include <QtGui/QtGui>
 
 
@@ -68,11 +69,15 @@ dmz::AssetPublisher::publish () {
       String brief (qPrintable (briefLineEdit->text ()));
       String details (qPrintable (detailsTextEdit->toPlainText ()));
 
+      StringContainer keywords;
+      to_dmz_string_container (keywordLineEdit->text ().split (" "), keywords);
+
       if (!_assetId) { _assetId = _forge->create_asset (); }
 
       _forge->store_name (_assetId, name);
       _forge->store_brief (_assetId, brief);
       _forge->store_details (_assetId, details);
+      _forge->store_keywords (_assetId, keywords);
 
       _requestId = _forge->put_asset (_assetId, this);
 _log.warn << "AssetID: " << _assetId << " : " << _requestId << endl;
@@ -114,24 +119,14 @@ dmz::AssetPublisher::handle_reply (
 
    switch (ReqeustType) {
 
-      case ForgeTypeSearch: {
-//         String assetId;
-//         while (Results.get_next (assetId)) {
-
-//            // _state.log.info << "getting asset: " << assetId << endl;
-//            // _state.forgeModule->get_asset (assetId, this);
-//         }
+      case ForgeTypeSearch:
          break;
-      }
 
       case ForgeTypeGetAsset:
          break;
 
       case ForgeTypePutAsset:
-         if (RequestId == _requestId) {
-
-            _publish_media ();
-         }
+         if (RequestId == _requestId) { _publish_media (); }
          break;
 
       case ForgeTypeDeleteAsset:
@@ -189,7 +184,7 @@ dmz::AssetPublisher::_publish_previews () {
 
       if (_assetId && _forge) {
 
-_log.warn << "_publish_previews: " << _previews << endl;
+_log.warn << "_publish_previews: " << _previews.get_count () << endl;
 
          _requestId = _forge->add_asset_preview (_assetId, _previews, this);
       }

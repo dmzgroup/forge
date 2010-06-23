@@ -24,6 +24,7 @@ dmz::ForgePluginScreenCaptureMulti::ForgePluginScreenCaptureMulti (
       _target (0),
       _fileIndex (0),
       _maxFiles (16),
+      _maxLength (2),
       _heading (0) {
 
    _init (local);
@@ -83,12 +84,17 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
       if (_fileIndex > 1) {
 
          _heading += TwoPi64 / Float64 (_maxFiles);
+         _update_portal ();
       }
 
-      _update_portal ();
+      String count (String::number (_fileIndex));
+      if (count.get_length () < _maxLength) {
+
+         count.shift (_maxLength - count.get_length (), '0');
+      }
 
       String file (_fileRoot);
-      file << _fileIndex << ".png";
+      file << count << ".png";
       _fileList.append (file);
 
       Data out = _convertString.to_data (file);
@@ -110,17 +116,13 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
          else { break; }
       }
 
+      _update_portal ();
+
       if (Size == count) {
 
          Data out = _convertList.to_data (_fileList);
          _finishedCaptureMsg.send (&out);
          _fileIndex = 0;
-
-         _heading += TwoPi64 / Float64 (_maxFiles);
-         _update_portal ();
-
-         // reset portal to original pos, ori before capture started
-//         if (_portal) { _portal->set_view (_portalPos, _portalOri); }
       }
       else {
 
@@ -217,6 +219,7 @@ dmz::ForgePluginScreenCaptureMulti::_init (Config &local) {
       context);
 
    _maxFiles = config_to_int32 ("max-files.value", local, _maxFiles);
+   _maxLength = String::number (_maxFiles).get_length ();
 }
 
 
