@@ -2,14 +2,25 @@
 #include <dmzObjectConsts.h>
 #include <dmzObjectModule.h>
 #include <dmzObjectModuleSelect.h>
+#include <dmzQtConfigRead.h>
+#include <dmzQtConfigWrite.h>
+#include <dmzRenderIsectUtil.h>
+#include <dmzRuntimeConfigWrite.h>
 #include <dmzRenderModuleIsect.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzRuntimeSession.h>
 #include "dmzToolsPluginObjectEditQt.h"
 #include <dmzTypesMath.h>
 #include <dmzTypesMatrix.h>
 #include <dmzTypesUUID.h>
 #include <dmzTypesVector.h>
+
+namespace {
+
+static const dmz::Vector Up (0.0, 1.0, 0.0);
+
+};
 
 dmz::ToolsPluginObjectEditQt::ToolsPluginObjectEditQt (
       const PluginInfo &Info,
@@ -58,6 +69,21 @@ dmz::ToolsPluginObjectEditQt::update_plugin_state (
    }
    else if (State == PluginStateShutdown) {
 
+      RuntimeContext *context (get_plugin_runtime_context ());
+
+      if (context) {
+
+         Config session (get_plugin_name ());
+
+         session.add_config (qbytearray_to_config ("geometry", saveGeometry ()));
+
+         if (isVisible ()) {
+
+            session.add_config (boolean_to_config ("window", "visible", True));
+         }
+
+         set_session_config (context, session);
+      }
    }
 }
 
@@ -183,7 +209,7 @@ dmz::ToolsPluginObjectEditQt::update_object_position (
       const Vector &Value,
       const Vector *PreviousValue) {
 
-   if (ObjectHandle == _currentObject) {
+   if (!_inUpdate && (ObjectHandle == _currentObject)) {
 
       _inUpdate = True;
       _ui.xedit->setValue (Value.get_x ());
@@ -202,7 +228,7 @@ dmz::ToolsPluginObjectEditQt::update_object_orientation (
       const Matrix &Value,
       const Matrix *PreviousValue) {
 
-   if (ObjectHandle == _currentObject) {
+   if (!_inUpdate && (ObjectHandle == _currentObject)) {
 
       _inUpdate = True;
       Float64 hy (0.0), px (0.0), rz (0.0);
@@ -264,7 +290,7 @@ dmz::ToolsPluginObjectEditQt::on_hedit_valueChanged (double value) {
    if (!_inUpdate) {
 
       _inUpdate = True;
-
+      _update_orientation ();
       _inUpdate = False;
    }
 }
@@ -276,7 +302,7 @@ dmz::ToolsPluginObjectEditQt::on_pedit_valueChanged (double value) {
    if (!_inUpdate) {
 
       _inUpdate = True;
-
+      _update_orientation ();
       _inUpdate = False;
    }
 }
@@ -288,7 +314,7 @@ dmz::ToolsPluginObjectEditQt::on_redit_valueChanged (double value) {
    if (!_inUpdate) {
 
       _inUpdate = True;
-
+      _update_orientation ();
       _inUpdate = False;
    }
 }
@@ -297,70 +323,101 @@ dmz::ToolsPluginObjectEditQt::on_redit_valueChanged (double value) {
 void
 dmz::ToolsPluginObjectEditQt::on_hdial_valueChanged (int value) {
 
-   if (!_inUpdate) {
-
-      _inUpdate = True;
-
-      _inUpdate = False;
-   }
+   if (!_inUpdate) { _ui.hedit->setValue ((double)(value) * 0.5); }
 }
 
 
 void
 dmz::ToolsPluginObjectEditQt::on_pdial_valueChanged (int value) {
 
-   if (!_inUpdate) {
-
-      _inUpdate = True;
-
-      _inUpdate = False;
-   }
+   if (!_inUpdate) { _ui.pedit->setValue ((double)(value) * 0.5); }
 }
 
 
 void
 dmz::ToolsPluginObjectEditQt::on_rdial_valueChanged (int value) {
 
-   if (!_inUpdate) {
-
-      _inUpdate = True;
-
-      _inUpdate = False;
-   }
+   if (!_inUpdate) { _ui.redit->setValue ((double)(value) * 0.5); }
 }
 
 
 void
 dmz::ToolsPluginObjectEditQt::on_clampButton_pressed () {
 
-}
+   if (_select) {
 
+      HandleContainer list;
 
-void
-dmz::ToolsPluginObjectEditQt::on_inPlaceCheckBox_stateChanged (int state) {
+      _select->get_selected_objects (list);
 
+      HandleContainerIterator it;
+      Handle next (0);
+
+      while (list.get_next (it, next)) { _clamp (next); }
+   }
 }
 
 
 void
 dmz::ToolsPluginObjectEditQt::on_autoClampCheckBox_stateChanged (int state) {
 
+   const bool Mode (state != Qt::Checked);
+
+   _ui.pedit->setEnabled (Mode);
+   _ui.pdial->setEnabled (Mode);
+
+   _ui.redit->setEnabled (Mode);
+   _ui.rdial->setEnabled (Mode);
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::_clamp (const Handle Object) {
+
+   ObjectModule *module (get_object_module ());
+
+   if (module && _isect) {
+
+      Vector pos, normal;
+      Matrix ori;
+      module->lookup_position (Object, _defaultAttrHandle, pos);
+      module->lookup_orientation (Object, _defaultAttrHandle, ori);
+
+      _isect->disable_isect (Object);
+      isect_clamp_point (pos, *_isect, pos, normal);
+      _isect->enable_isect (Object);
+
+      if (!normal.is_zero ()) {
+
+         Float64 hy (0.0), px (0.0), rz (0.0);
+         ori.to_euler_angles (hy, px, rz);
+         ori.from_axis_and_angle (Up, hy);
+         Matrix tilt (Up, normal);
+
+         ori = tilt * ori;
+      }
+
+      module->store_position (Object, _defaultAttrHandle, pos);
+      module->store_orientation (Object, _defaultAttrHandle, ori);
+   }
 }
 
 
 void
 dmz::ToolsPluginObjectEditQt::_update_position () {
 
-
    ObjectModule *module (get_object_module ());
 
    if (_currentObject && module) {
+
+      Boolean doClamp = False;
+
+      if (_ui.autoClampCheckBox->checkState () == Qt::Checked) { doClamp = True; }
 
       const Vector NewPos (
          _ui.xedit->value (),
          _ui.yedit->value (),
          _ui.zedit->value ());
-_log.error << "Update position" << NewPos << endl;
 
       Vector pos;
       module->lookup_position (_currentObject, _defaultAttrHandle, pos);
@@ -381,6 +438,61 @@ _log.error << "Update position" << NewPos << endl;
             Vector cpos;
             module->lookup_position (next, _defaultAttrHandle, cpos);
             module->store_position (next, _defaultAttrHandle, cpos + Offset);
+            if (doClamp) { _clamp (next); }
+         }
+      }
+   }
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::_update_orientation () {
+
+   ObjectModule *module (get_object_module ());
+
+   if (_currentObject && module) {
+
+      Boolean doClamp = False;
+
+      if (_ui.autoClampCheckBox->checkState () == Qt::Checked) { doClamp = True; }
+
+      const Float64 NewH (to_radians (_ui.hedit->value ())),
+         NewP (to_radians (_ui.pedit->value ())),
+         NewR (to_radians (_ui.redit->value ()));
+
+      _ui.hdial->setValue ((int)(_ui.hedit->value () * 2.0));
+      _ui.pdial->setValue ((int)(_ui.pedit->value () * 2.0));
+      _ui.rdial->setValue ((int)(_ui.redit->value () * 2.0));
+
+      Matrix ori;
+      module->lookup_orientation (_currentObject, _defaultAttrHandle, ori);
+
+      Float64 hy (0.0), px (0.0), rz (0.0);
+
+      ori.to_euler_angles (hy, px, rz);
+
+      hy = NewH - hy;
+      px = NewP - px;
+      rz = NewR - rz;
+
+      if (_select) {
+
+         HandleContainer list;
+
+         _select->get_selected_objects (list);
+
+         HandleContainerIterator it;
+         Handle next (0);
+
+         while (list.get_next (it, next)) {
+
+            module->lookup_orientation (next, _defaultAttrHandle, ori);
+
+            Float64 chy (0.0), cpx (0.0), crz (0.0);
+            ori.to_euler_angles (chy, cpx, crz);
+            ori.from_euler_angles (chy + hy, cpx + px, crz + rz);
+            module->store_orientation (next, _defaultAttrHandle, ori);
+            if (doClamp) { _clamp (next); }
          }
       }
    }
@@ -389,6 +501,22 @@ _log.error << "Update position" << NewPos << endl;
 
 void
 dmz::ToolsPluginObjectEditQt::_init (Config &local) {
+
+   RuntimeContext *context = get_plugin_runtime_context ();
+
+   if (context) {
+
+      Config session (get_session_config (get_plugin_name (), context));
+
+      Config gdata;
+
+      if (session.lookup_config ("geometry", gdata)) {
+
+         restoreGeometry (config_to_qbytearray (gdata));
+      }
+
+      if (config_to_boolean ("window.visible", session, False)) { show (); }
+   }
 
    _defaultAttrHandle = activate_default_object_attribute (
       ObjectDestroyMask | ObjectPositionMask | ObjectOrientationMask);

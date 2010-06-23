@@ -5,6 +5,8 @@ lmk.add_files {"ObjectAttributeEditor.ui",}
 lmk.add_files ({"dmzToolsPluginObjectEditQt.h",}, {src="moc"})
 lmk.add_files {"dmzToolsPluginObjectEditQt.cpp",}
 lmk.add_libs {
+   "dmzRenderIsect",
+   "dmzQtUtil",
    "dmzObjectUtil",
    "dmzKernel",
 }

@@ -86,11 +86,12 @@ namespace dmz {
 
          void on_clampButton_pressed ();
 
-         void on_inPlaceCheckBox_stateChanged (int state);
          void on_autoClampCheckBox_stateChanged (int state);
 
       protected:
+         void _clamp (const Handle Object);
          void _update_position ();
+         void _update_orientation ();
          void _init (Config &local);
 
          Log _log;
