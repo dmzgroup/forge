@@ -25,7 +25,7 @@
      <property name="title">
       <string>Position</string>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_10">
+     <layout class="QHBoxLayout" name="horizontalLayout_6">
       <item>
        <layout class="QVBoxLayout" name="verticalLayout_5">
         <item>
@@ -147,7 +147,7 @@
        </spacer>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_8">
+       <layout class="QVBoxLayout" name="verticalLayout_6">
         <item>
          <widget class="QLabel" name="label_7">
           <property name="text">
@@ -160,81 +160,56 @@
         </item>
         <item>
          <widget class="QWidget" name="widget" native="true">
-          <layout class="QVBoxLayout" name="verticalLayout_7">
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_6">
-             <item>
-              <widget class="QToolButton" name="flbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="fbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="frbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-            </layout>
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="1">
+            <widget class="QToolButton" name="fbutton">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="arrowType">
+              <enum>Qt::UpArrow</enum>
+             </property>
+            </widget>
            </item>
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_7">
-             <item>
-              <widget class="QToolButton" name="lbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="cbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="rbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-            </layout>
+           <item row="1" column="0">
+            <widget class="QToolButton" name="lbutton">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="arrowType">
+              <enum>Qt::LeftArrow</enum>
+             </property>
+            </widget>
            </item>
-           <item>
-            <layout class="QHBoxLayout" name="horizontalLayout_8">
-             <item>
-              <widget class="QToolButton" name="blbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="bbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="brbutton">
-               <property name="text">
-                <string/>
-               </property>
-              </widget>
-             </item>
-            </layout>
+           <item row="1" column="1">
+            <widget class="QToolButton" name="cbutton">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QToolButton" name="rbutton">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="arrowType">
+              <enum>Qt::RightArrow</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QToolButton" name="bbutton">
+             <property name="text">
+              <string/>
+             </property>
+             <property name="arrowType">
+              <enum>Qt::DownArrow</enum>
+             </property>
+            </widget>
            </item>
           </layout>
          </widget>
@@ -271,7 +246,7 @@
            <enum>Qt::Horizontal</enum>
           </property>
           <property name="invertedAppearance">
-           <bool>false</bool>
+           <bool>true</bool>
           </property>
           <property name="invertedControls">
            <bool>false</bool>
@@ -449,16 +424,14 @@
   <tabstop>hdial</tabstop>
   <tabstop>pdial</tabstop>
   <tabstop>rdial</tabstop>
-  <tabstop>flbutton</tabstop>
   <tabstop>fbutton</tabstop>
-  <tabstop>frbutton</tabstop>
   <tabstop>lbutton</tabstop>
   <tabstop>cbutton</tabstop>
   <tabstop>rbutton</tabstop>
-  <tabstop>blbutton</tabstop>
   <tabstop>bbutton</tabstop>
-  <tabstop>brbutton</tabstop>
  </tabstops>
- <resources/>
+ <resources>
+  <include location="assets.qrc"/>
+ </resources>
  <connections/>
 </ui>

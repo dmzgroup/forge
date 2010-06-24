@@ -76,6 +76,13 @@ namespace dmz {
          void on_yedit_valueChanged (double value);
          void on_zedit_valueChanged (double value);
 
+         void on_fbutton_pressed ();
+         void on_rbutton_pressed ();
+         void on_lbutton_pressed ();
+         void on_bbutton_pressed ();
+
+         void on_stepEdit_valueChanged (double value);
+
          void on_hedit_valueChanged (double value);
          void on_pedit_valueChanged (double value);
          void on_redit_valueChanged (double value);
@@ -89,6 +96,7 @@ namespace dmz {
          void on_autoClampCheckBox_stateChanged (int state);
 
       protected:
+         void _move (const Vector &Value);
          void _clamp (const Handle Object);
          void _update_position ();
          void _update_orientation ();
@@ -96,6 +104,8 @@ namespace dmz {
 
          Log _log;
          Undo _undo;
+
+         Float64 _stepValue;
 
          Boolean _inUpdate;
 

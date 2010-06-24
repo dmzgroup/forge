@@ -30,6 +30,7 @@ dmz::ToolsPluginObjectEditQt::ToolsPluginObjectEditQt (
       ObjectObserverUtil (Info, local),
       _log (Info),
       _undo (Info),
+      _stepValue (1.0),
       _inUpdate (False),
       _currentObject (0),
       _defaultAttrHandle (0),
@@ -44,6 +45,8 @@ dmz::ToolsPluginObjectEditQt::ToolsPluginObjectEditQt (
    show ();
 
    _init (local);
+
+   _stepValue = _ui.stepEdit->singleStep ();
 }
 
 
@@ -285,6 +288,49 @@ dmz::ToolsPluginObjectEditQt::on_zedit_valueChanged (double value) {
 
 
 void
+dmz::ToolsPluginObjectEditQt::on_fbutton_pressed () {
+
+   const Vector Value (0.0, 0.0, -_stepValue);
+   _move (Value);
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::on_rbutton_pressed () {
+
+   const Vector Value (_stepValue, 0.0, 0.0);
+   _move (Value);
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::on_lbutton_pressed () {
+
+   const Vector Value (-_stepValue, 0.0, 0.0);
+   _move (Value);
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::on_bbutton_pressed () {
+
+   const Vector Value (0.0, 0.0, _stepValue);
+   _move (Value);
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::on_stepEdit_valueChanged (double value) {
+
+   _stepValue = value;
+
+   _ui.xedit->setSingleStep (value);
+   _ui.yedit->setSingleStep (value);
+   _ui.zedit->setSingleStep (value);
+}
+
+
+void
 dmz::ToolsPluginObjectEditQt::on_hedit_valueChanged (double value) {
 
    if (!_inUpdate) {
@@ -368,6 +414,44 @@ dmz::ToolsPluginObjectEditQt::on_autoClampCheckBox_stateChanged (int state) {
 
    _ui.redit->setEnabled (Mode);
    _ui.rdial->setEnabled (Mode);
+
+   if (!Mode) { on_clampButton_pressed (); }
+}
+
+
+void
+dmz::ToolsPluginObjectEditQt::_move (const Vector &Value) {
+
+   ObjectModule *module (get_object_module ());
+
+   if (module) {
+
+      Boolean doClamp = False;
+
+      if (_ui.autoClampCheckBox->checkState () == Qt::Checked) { doClamp = True; }
+
+      if (_select) {
+
+         HandleContainer list;
+
+         _select->get_selected_objects (list);
+
+         HandleContainerIterator it;
+         Handle next (0);
+
+         while (list.get_next (it, next)) {
+
+            Vector pos;
+            Matrix ori;
+            module->lookup_position (next, _defaultAttrHandle, pos);
+            module->lookup_orientation (next, _defaultAttrHandle, ori);
+            Vector offset (Value);
+            ori.transform_vector (offset);
+            module->store_position (next, _defaultAttrHandle, pos + offset);
+            if (doClamp) { _clamp (next); }
+         }
+      }
+   }
 }
 
 
