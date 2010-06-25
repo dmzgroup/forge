@@ -46,7 +46,7 @@ namespace dmz {
 
       protected:
          // ToolsPluginSelectObjectType Interface
-         void _add_type (const ObjectType &Type);
+         void _add_type (const ObjectType &Type, const Boolean ParentAdded);
          void _init (Config &local);
 
          Log _log;

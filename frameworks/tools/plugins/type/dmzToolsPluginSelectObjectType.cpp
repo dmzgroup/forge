@@ -130,14 +130,24 @@ dmz::ToolsPluginSelectObjectType::on_typeList_itemClicked (QListWidgetItem *item
 }
 
 void
-dmz::ToolsPluginSelectObjectType::_add_type (const ObjectType &Type) {
+dmz::ToolsPluginSelectObjectType::_add_type (
+      const ObjectType &Type,
+      const Boolean ParentAdded) {
 
-   _ui.typeList->addItem (Type.get_name ().get_buffer ());
+   Boolean add (ParentAdded);
+
+   if (!add) {
+
+      Config tmp;
+      if (Type.get_config ().lookup_config ("render", tmp)) { add = True; }
+   }
+
+   if (add) { _ui.typeList->addItem (Type.get_name ().get_buffer ()); }
 
    ObjectTypeIterator it;
    ObjectType next;
 
-   while (Type.get_next_child (it, next)) { _add_type (next); }
+   while (Type.get_next_child (it, next)) { _add_type (next, add); }
 }
 
 
@@ -160,7 +170,7 @@ dmz::ToolsPluginSelectObjectType::_init (Config &local) {
       if (config_to_boolean ("window.visible", session, False)) { show (); }
    }
 
-   _add_type (_defs.get_root_object_type ());
+   _add_type (_defs.get_root_object_type (), False);
 
    _typeMsg = config_create_monostate_message (
       "message.name",

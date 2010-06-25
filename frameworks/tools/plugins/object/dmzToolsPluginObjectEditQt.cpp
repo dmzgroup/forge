@@ -143,10 +143,9 @@ dmz::ToolsPluginObjectEditQt::update_object_flag (
 
    Handle newObject (0);
 
-   if (!_currentObject) {
+   if (!_currentObject && Value) {
 
       newObject = ObjectHandle;
-
    }
    else if (ObjectHandle == _currentObject) {
 
@@ -200,6 +199,20 @@ dmz::ToolsPluginObjectEditQt::update_object_flag (
    else if (!_currentObject) {
 
       setEnabled (false);
+
+      _inUpdate = True;
+      _ui.xedit->setValue (0.0);
+      _ui.yedit->setValue (0.0);
+      _ui.zedit->setValue (0.0);
+
+      _ui.hedit->setValue (0.0);
+      _ui.pedit->setValue (0.0);
+      _ui.redit->setValue (0.0);
+
+      _ui.hdial->setValue (0);
+      _ui.pdial->setValue (0);
+      _ui.rdial->setValue (0);
+      _inUpdate = False;
    }
 }
 
@@ -439,7 +452,11 @@ dmz::ToolsPluginObjectEditQt::_move (const Vector &Value) {
          HandleContainerIterator it;
          Handle next (0);
 
+         Handle undo (0);
+
          while (list.get_next (it, next)) {
+
+            if (!undo) { undo = _undo.start_record ("Move Object(s)"); }
 
             Vector pos;
             Matrix ori;
@@ -450,6 +467,8 @@ dmz::ToolsPluginObjectEditQt::_move (const Vector &Value) {
             module->store_position (next, _defaultAttrHandle, pos + offset);
             if (doClamp) { _clamp (next); }
          }
+
+         if (undo) { _undo.stop_record (undo); }
       }
    }
 }
@@ -481,8 +500,10 @@ dmz::ToolsPluginObjectEditQt::_clamp (const Handle Object) {
          ori = tilt * ori;
       }
 
+      const Handle Undo = _undo.start_record ("Clamp Object");
       module->store_position (Object, _defaultAttrHandle, pos);
       module->store_orientation (Object, _defaultAttrHandle, ori);
+      _undo.stop_record (Undo);
    }
 }
 
@@ -517,13 +538,19 @@ dmz::ToolsPluginObjectEditQt::_update_position () {
          HandleContainerIterator it;
          Handle next (0);
 
+         Handle undo (0);
+
          while (list.get_next (it, next)) {
+
+            if (!undo) { undo = _undo.start_record ("Move Object(s)"); }
 
             Vector cpos;
             module->lookup_position (next, _defaultAttrHandle, cpos);
             module->store_position (next, _defaultAttrHandle, cpos + Offset);
             if (doClamp) { _clamp (next); }
          }
+
+         if (undo) { _undo.stop_record (undo); }
       }
    }
 }
@@ -568,7 +595,11 @@ dmz::ToolsPluginObjectEditQt::_update_orientation () {
          HandleContainerIterator it;
          Handle next (0);
 
+         Handle undo (0);
+
          while (list.get_next (it, next)) {
+
+            if (!undo) { undo = _undo.start_record ("Rotate Object(s)"); }
 
             module->lookup_orientation (next, _defaultAttrHandle, ori);
 
@@ -578,6 +609,8 @@ dmz::ToolsPluginObjectEditQt::_update_orientation () {
             module->store_orientation (next, _defaultAttrHandle, ori);
             if (doClamp) { _clamp (next); }
          }
+
+         if (undo ) { _undo.stop_record (undo); }
       }
    }
 }
