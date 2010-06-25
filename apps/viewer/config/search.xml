@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmz>
+<plugin-list>
+   <plugin name="dmzForgePluginSearch" unique="search"/>
+</plugin-list>
+<main-window>
+   <!-- <menu-bar> -->
+      <!-- <menu text="&amp;File"/> -->
+      <!-- <menu text="&amp;Edit"/> -->
+      <!-- <menu text="&amp;Window"/> -->
+      <!-- <menu text="&amp;Help"/> -->
+   <!-- </menu-bar> -->
+   <!-- <dock-windows>
+      <group area="left">
+         <widget name="search" title="Search" visible="true" floating="true">
+            <allowed-areas left="true" right="true"/>
+         </widget>
+      </group>
+   </dock-windows> -->
+</main-window>
+<search>
+</search>
+</dmz>

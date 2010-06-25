@@ -1,0 +1,19 @@
+require "lmkQt"
+lmkQt.set_name "dmzForgePluginSearch"
+lmk.set_type "plugin"
+
+lmk.add_files {"SearchForm.ui",}
+lmk.add_files ({"dmzForgePluginSearch.h",},{src = "moc"})
+lmk.add_files {"dmzForgePluginSearch.cpp",}
+
+lmk.add_libs {
+   "dmzQtUtil",
+   "dmzKernel",
+}
+
+lmk.add_preqs {
+   "dmzForgeFramework",
+   "dmzQtFramework",
+}
+
+lmkQt.add_libs {"QtCore","QtGui",}
