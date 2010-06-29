@@ -109,9 +109,12 @@ dmz::ForgePluginSearch::handle_reply (
          _log.info << "Search results: " << endl;
          while (Results.get_next (it, assetId)) {
 
-             _log.info << "asset: " << assetId << endl;
-            // _state.forgeModule->get_asset (assetId, this);
+            String name;
+            _forgeModule->lookup_name (assetId, name);
+            _log.info << "asset: " << assetId << ": " << name << endl;
          }
+
+         _requestId = 0;
          break;
       }
 

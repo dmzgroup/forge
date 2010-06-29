@@ -483,7 +483,7 @@ dmz::ForgeModuleQt::discover_plugin (
 void
 dmz::ForgeModuleQt::update_time_slice (const Float64 TimeDelta) {
 
-   if (!_state.replyQueue.isEmpty ()) {
+   while (!_state.replyQueue.isEmpty ()) {
 
       ReplyStruct *rs = _state.replyQueue.dequeue ();
 
@@ -708,14 +708,16 @@ dmz::ForgeModuleQt::search (
       _state.obsTable.store (requestId, observer);
 
       QUrl url (_state.baseUrl);
-      QString path ("/%1/search");
+      QString path ("/%1/_fti/assets/all");
       url.setPath (path.arg (_state.db));
       url.addQueryItem ("q", Value.get_buffer ());
-
       if (Limit) { url.addQueryItem ("limit", QString::number (Limit)); }
+      url.addQueryItem ("include_docs", "true");
 
       QNetworkReply *reply = _request (LocalGet, url, requestId, ForgeTypeSearch);
    }
+
+_state.log.warn << "DO SEARCH: " << requestId << " for " << Value << endl;
 
    return requestId;
 }
@@ -1039,7 +1041,7 @@ dmz::ForgeModuleQt::_reply_finished () {
       QByteArray data (reply->readAll ());
       const String JsonData (data.constData ());
 
-// _state.log.warn << "_reply_finished[" << StatusCode << "]: " << Id << endl;
+//_state.log.warn << "_reply_finished[" << StatusCode << "]: " << RequestId << endl;
 
       if (!JsonData) {
 
@@ -1050,16 +1052,16 @@ dmz::ForgeModuleQt::_reply_finished () {
       }
       else {
 
-// _state.log.warn << "json: " << JsonData << endl;
+//_state.log.warn << "json: " << JsonData << endl;
 
          switch (RequestType) {
 
             case ForgeTypeSearch:
-// _state.log.warn << "<-- ForgeTypeSearch" << endl;
+_state.log.warn << "<-- ForgeTypeSearch" << endl;
                _handle_search (RequestId, JsonData);
                break;
 
-            case ForgeTypeGetAsset:
+         case ForgeTypeGetAsset:
 // _state.log.warn << "<-- ForgeTypeGetAsset" << endl;
                _handle_get_asset (RequestId, JsonData);
                break;
@@ -1437,12 +1439,16 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
       if (global.lookup_all_config ("rows", list)) {
 
          ConfigIterator it;
-         Config cd;
+         Config row;
 
-         while (list.get_next_config (it, cd)) {
+         while (list.get_next_config (it, row)) {
 
-            String assetId = config_to_string (LocalId, cd);
-            if (assetId) { container.append (assetId); }
+            Config cd;
+            if (row.lookup_config ("doc", cd)) {
+
+               const String AssetId (_config_to_asset (cd));
+               if (AssetId) { container.append (AssetId); }
+            }
          }
       }
 
@@ -1453,6 +1459,111 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
       _handle_error (RequestId, ForgeTypeSearch, LocalJsonParseErrorMessage);
    }
 }
+
+
+#if 0
+void
+dmz::ForgeModuleQt::_handle_search_phase1 (const UInt64 RequestId, const String &JsonData) {
+
+   Boolean error (False);
+   String errorMsg;
+
+   Config global ("global");
+
+   if (json_string_to_config (JsonData, global)) {
+
+      SearchStruct *ss = new SearchStruct (RequestId);
+      Config list;
+
+      if (global.lookup_all_config ("rows", list)) {
+
+         ConfigIterator it;
+         Config cd;
+
+         while (list.get_next_config (it, cd)) {
+
+            const String AssetId (config_to_string (LocalId, cd));
+            if (AssetId) {
+
+               ss->add (AssetId);
+
+               _get_asset (AssetId, RequestId, LocalSearchPhase2);
+            }
+         }
+      }
+
+      if (ss->container.get_count ()) {
+
+_state.log.warn << "search count: " << ss->updateCount << " : " << ss->container.get_count () << endl;
+
+         if (!_state.searchTable.store (RequestId, ss)) {
+
+            delete ss; ss = 0;
+         }
+      }
+      else {
+
+         StringContainer container;
+         _handle_reply (RequestId, ForgeTypeSearch, container);
+
+         delete ss; ss = 0;
+      }
+   }
+   else {
+
+      _handle_error (RequestId, ForgeTypeSearch, LocalJsonParseErrorMessage);
+   }
+
+   if (error) {
+
+      _handle_error (RequestId, ForgeTypeSearch, LocalJsonParseErrorMessage);
+   }
+}
+
+
+void
+dmz::ForgeModuleQt::_handle_search_phase2 (const UInt64 RequestId, const String &JsonData) {
+
+   Config global ("global");
+
+   if (json_string_to_config (JsonData, global)) {
+
+      String error = config_to_string ("error", global);
+      if (error) {
+
+         _handle_error (RequestId, ForgeTypeSearch, config_to_string ("reason", global));
+      }
+      else {
+
+         _config_to_asset (global);
+
+         SearchStruct *ss = _state.searchTable.lookup (RequestId);
+         if (ss) {
+
+            ss->updateCount--;
+_state.log.warn << "updateCount: " << ss->updateCount << endl;
+
+            if (ss->updateCount <= 0) {
+
+               _handle_reply (RequestId, ForgeTypeSearch, ss->container);
+
+               _state.searchTable.remove (RequestId);
+               delete ss; ss = 0;
+            }
+         }
+         else {
+
+            String msg ("Error retrieving results for phase 2 of search");
+            _handle_error (RequestId, ForgeTypeSearch, LocalJsonParseErrorMessage);
+         }
+      }
+   }
+   else {
+
+      _handle_error (RequestId, ForgeTypeSearch, LocalJsonParseErrorMessage);
+   }
+}
+#endif
 
 
 void
@@ -2120,10 +2231,8 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
 }
 
 
-dmz::Boolean
+dmz::String
 dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
-
-   Boolean retVal (False);
 
    const String AssetId (config_to_string (Local_Id, AssetConfig));
 
@@ -2217,11 +2326,9 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
       // _attachments
       AssetConfig.lookup_config (Local_Attachments, asset->attachments);
-
-      retVal = True;
    }
 
-   return retVal;
+   return AssetId;
 }
 
 

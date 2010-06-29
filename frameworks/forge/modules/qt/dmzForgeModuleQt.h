@@ -110,7 +110,6 @@ namespace dmz {
             ForgeObserver *observer);
 
       protected Q_SLOTS:
-         // void _reply_finished (QNetworkReply *reply);
          void _reply_finished ();
          void _download_progress (qint64 bytesReceived, qint64 bytesTotal);
          void _download_ready_read ();
@@ -122,6 +121,8 @@ namespace dmz {
 
       protected:
          void _handle_search (const UInt64 RequestId, const String &JsonData);
+//         void _handle_search_phase1 (const UInt64 RequestId, const String &JsonData);
+//         void _handle_search_phase2 (const UInt64 RequestId, const String &JsonData);
          void _handle_get_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_put_asset (const UInt64 RequestId, const String &JsonData);
          void _handle_delete_asset (const UInt64 RequestId, const String &JsonData);
@@ -177,7 +178,7 @@ namespace dmz {
 
          Boolean _asset_to_json (const String &AssetId, String &jsonData);
          Boolean _asset_to_config (const String &AssetId, Config &assetConfig);
-         Boolean _config_to_asset (const Config &AssetConfig);
+         String _config_to_asset (const Config &AssetConfig);
          Boolean _update_asset (const String &AssetId, const Config &AssetConfig);
 
          String _get_uuid ();
