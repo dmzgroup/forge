@@ -8,6 +8,23 @@
 #include <QtGui/QtGui>
 
 
+struct dmz::ForgePluginSearch::ItemStruct {
+
+   const String AssetId;
+   UInt64 requestId;
+   QListWidgetItem *item;
+   QPixmap pixmap;
+
+   ItemStruct (const String &TheAssetId);
+};
+
+
+dmz::ForgePluginSearch::ItemStruct::ItemStruct (const String &TheAssetId) :
+      AssetId (TheAssetId),
+      requestId (0),
+      item (0) {;}
+
+
 dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local) :
       QFrame (0),
       QtWidget (Info),
@@ -15,8 +32,7 @@ dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local
       MessageObserver (Info),
       ForgeObserver (Info),
       _log (Info),
-      _forgeModule (0),
-      _requestId (0) {
+      _forgeModule (0) {
 
    _ui.setupUi (this);
 
@@ -26,6 +42,9 @@ dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local
 
 dmz::ForgePluginSearch::~ForgePluginSearch () {
 
+   _itemTable.clear ();
+   _previewTable.clear ();
+   _ui.itemListWidget->clear ();
 }
 
 
@@ -45,7 +64,8 @@ dmz::ForgePluginSearch::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      show ();
+//      show ();
+      on_itemListWidget_currentItemChanged (0, 0);
    }
    else if (State == PluginStateStart) {
 
@@ -101,30 +121,28 @@ dmz::ForgePluginSearch::handle_reply (
       const Boolean Error,
       const StringContainer &Results) {
 
-   switch (ReqeustType) {
-
-      case ForgeTypeSearch: {
-         StringContainerIterator it;
-         String assetId;
-         _log.info << "Search results: " << endl;
-         while (Results.get_next (it, assetId)) {
-
-            String name;
-            _forgeModule->lookup_name (assetId, name);
-            _log.info << "asset: " << assetId << ": " << name << endl;
-         }
-
-         _requestId = 0;
-         break;
-      }
-
-      default:
-         break;
-   }
-
    if (Error) {
 
-_log.error << "Results: " << Results << endl;
+      _log.error << "Results: " << Results << endl;
+   }
+   else {
+
+      switch (ReqeustType) {
+
+         case ForgeTypeSearch:
+            _handle_search (Results);
+            break;
+
+         case ForgeTypeGetAssetPreview: {
+            String image;
+            Results.get_first (image);
+            _handle_get_preview (RequestId, image);
+            break;
+         }
+
+         default:
+            break;
+      }
    }
 }
 
@@ -132,14 +150,92 @@ _log.error << "Results: " << Results << endl;
 void
 dmz::ForgePluginSearch::on_searchButton_clicked () {
 
-   if (_forgeModule && !_requestId) {
+   if (_forgeModule) {
 
       const QString SearchText (_ui.searchLineEdit->text ());
 
       if (!SearchText.isEmpty ()) {
 
-         _requestId = _forgeModule->search (qPrintable (SearchText), this);
+         _itemTable.clear ();
+         _ui.itemListWidget->clear ();
+
+         UInt64 requestId = _forgeModule->search (qPrintable (SearchText), this);
       }
+   }
+}
+
+
+void
+dmz::ForgePluginSearch::on_itemListWidget_currentItemChanged (
+      QListWidgetItem *current,
+      QListWidgetItem *previous) {
+
+   if (current) {
+
+      const String AssetId (qPrintable (current->data (Qt::UserRole + 1).toString ()));
+      ItemStruct *is = _itemTable.lookup (AssetId);
+      if (is && _forgeModule) {
+
+         String data;
+         _forgeModule->lookup_name (is->AssetId, data);
+         _ui.nameLabel->setText (data.get_buffer ());
+
+         _forgeModule->lookup_brief (is->AssetId, data);
+         _ui.briefLabel->setText (data.get_buffer ());
+
+         _ui.previewLabel->setPixmap (is->pixmap);
+      }
+   }
+   else {
+
+      _ui.nameLabel->clear ();
+      _ui.briefLabel->clear ();
+      _ui.previewLabel->clear ();
+   }
+}
+
+
+void
+dmz::ForgePluginSearch::_handle_search (const StringContainer &Results) {
+
+   StringContainerIterator it;
+   String assetId;
+   while (Results.get_next (it, assetId)) {
+
+      String name;
+      _forgeModule->lookup_name (assetId, name);
+
+      ItemStruct *is = new ItemStruct (assetId);
+      is->item = new QListWidgetItem (name.get_buffer (), _ui.itemListWidget);
+      is->item->setData (Qt::UserRole + 1, QVariant (is->AssetId.get_buffer ()));
+
+      StringContainer previews;
+      _forgeModule->lookup_previews (assetId, previews);
+
+      String image;
+      previews.get_first (image);
+
+      is->requestId = _forgeModule->get_asset_preview (assetId, image, this);
+
+      _itemTable.store (is->AssetId, is);
+      _previewTable.store (is->requestId, is);
+   }
+
+   _ui.searchLineEdit->selectAll ();
+}
+
+
+
+void
+dmz::ForgePluginSearch::_handle_get_preview (
+      const UInt64 RequestId,
+      const String &Preview) {
+
+   ItemStruct *is = _previewTable.lookup (RequestId);
+   if (is) {
+
+      QPixmap pixmap (Preview.get_buffer ());
+      is->pixmap = pixmap.scaled (200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
    }
 }
 

@@ -1,30 +1,28 @@
-#ifndef DMZ_VIEWER_PLUGIN_MENU_DOT_H
-#define DMZ_VIEWER_PLUGIN_MENU_DOT_H
+#ifndef DMZ_FORGE_PLUGIN_ASSET_LOADER_DOT_H
+#define DMZ_FORGE_PLUGIN_ASSET_LOADER_DOT_H
 
-#include <dmzApplicationState.h>
+#include <dmzForgeObserver.h>
 #include <dmzObjectObserverUtil.h>
+#include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeLog.h>
-#include <dmzRuntimePlugin.h>
+#include <dmzRuntimeMessaging.h>
 #include <dmzRuntimeObjectType.h>
-#include <dmzTypesHashTableStringTemplate.h>
-#include <QtCore/QObject>
-#include <QtGui/QAction>
-
+#include <dmzRuntimePlugin.h>
 
 namespace dmz {
 
-   class QtModuleMainWindow;
+   class ForgeModule;
 
-   class ViewerPluginMenu :
-         public QObject,
+
+   class ForgePluginAssetLoader :
          public Plugin,
+         public MessageObserver,
+         public ForgeObserver,
          public ObjectObserverUtil {
 
-      Q_OBJECT
-
       public:
-         ViewerPluginMenu (const PluginInfo &Info, Config &local);
-         ~ViewerPluginMenu ();
+         ForgePluginAssetLoader (const PluginInfo &Info, Config &local);
+         ~ForgePluginAssetLoader ();
 
          // Plugin Interface
          virtual void update_plugin_state (
@@ -34,6 +32,21 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
+
+         // Message Observer Interface
+         virtual void receive_message (
+            const Message &Type,
+            const UInt32 MessageSendHandle,
+            const Handle TargetObserverHandle,
+            const Data *InData,
+            Data *outData);
+
+         // ForgeObserver Interface
+         virtual void handle_reply (
+            const UInt64 RequestId,
+            const Int32 ReqeustType,
+            const Boolean Error,
+            const StringContainer &Results);
 
          // Object Observer Interface
          virtual void create_object (
@@ -201,42 +214,26 @@ namespace dmz {
             const Data &Value,
             const Data *PreviousValue) {;}
 
-      protected Q_SLOTS:
-         void on_openAction_triggered ();
-
       protected:
-         struct MenuStruct;
-         void _open_file (const QString &FileName);
-         QString _get_last_path ();
-         void _init_action_list (Config &actionList, MenuStruct &ms);
-         void _init_menu_list (Config &menuList);
+         // ForgePluginAssetLoader Interface
          void _init (Config &local);
 
-      protected:
-         struct MenuStruct {
-
-            const String Name;
-            QList<QAction *> actionList;
-
-            MenuStruct (const String &TheName) : Name (TheName) {;}
-         };
-
          Log _log;
-         ApplicationState _appState;
-         QtModuleMainWindow *_mainWindowModule;
-         String _mainWindowModuleName;
-         HashTableStringTemplate<MenuStruct> _menuTable;
+         DataConverterString _convert;
+         ForgeModule *_forgeModule;
+         String _forgeModuleName;
+         Message _loadAssetMsg;
          ObjectType _type;
          Handle _objectHandle;
          Handle _defaultAttrHandle;
          Handle _modelAttrHandle;
 
       private:
-         ViewerPluginMenu ();
-         ViewerPluginMenu (const ViewerPluginMenu &);
-         ViewerPluginMenu &operator= (const ViewerPluginMenu &);
+         ForgePluginAssetLoader ();
+         ForgePluginAssetLoader (const ForgePluginAssetLoader &);
+         ForgePluginAssetLoader &operator= (const ForgePluginAssetLoader &);
+
    };
 };
 
-
-#endif // DMZ_VIEWER_PLUGIN_MENU_DOT_H
+#endif // DMZ_FORGE_PLUGIN_ASSET_LOADER_DOT_H

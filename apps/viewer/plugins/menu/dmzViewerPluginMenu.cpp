@@ -1,3 +1,4 @@
+#include <dmzObjectAttributeMasks.h>
 #include <dmzObjectModule.h>
 #include <dmzQtModuleMainWindow.h>
 #include <dmzQtUtil.h>
@@ -15,9 +16,9 @@ dmz::ViewerPluginMenu::ViewerPluginMenu (
       Config &local) :
       QObject (0),
       Plugin (Info),
+      ObjectObserverUtil (Info, local),
       _log (Info),
       _appState (Info),
-      _objectModule (0),
       _mainWindowModule (0),
       _mainWindowModuleName (),
       _menuTable (),
@@ -64,8 +65,6 @@ dmz::ViewerPluginMenu::discover_plugin (
 
    if (Mode == PluginDiscoverAdd) {
 
-      if (!_objectModule) { _objectModule = ObjectModule::cast (PluginPtr); }
-
       if (!_mainWindowModule) {
 
          _mainWindowModule = QtModuleMainWindow::cast (PluginPtr, _mainWindowModuleName);
@@ -85,11 +84,6 @@ dmz::ViewerPluginMenu::discover_plugin (
       }
    }
    else if (Mode == PluginDiscoverRemove) {
-
-      if (_objectModule && (_objectModule == ObjectModule::cast (PluginPtr))) {
-
-         _objectModule = 0;
-      }
 
       if (_mainWindowModule &&
             (_mainWindowModule == QtModuleMainWindow::cast (PluginPtr))) {
@@ -111,6 +105,19 @@ dmz::ViewerPluginMenu::discover_plugin (
 }
 
 
+// Object Observer Interface
+void
+dmz::ViewerPluginMenu::destroy_object (
+      const UUID &Identity,
+      const Handle ObjectHandle) {
+
+   if (ObjectHandle == _objectHandle) {
+
+      _objectHandle = 0;
+   }
+}
+
+
 void
 dmz::ViewerPluginMenu::on_openAction_triggered () {
 
@@ -127,23 +134,22 @@ dmz::ViewerPluginMenu::on_openAction_triggered () {
 void
 dmz::ViewerPluginMenu::_open_file (const QString &FileName) {
 
+   ObjectModule *objMod = get_object_module ();
+
    QFileInfo fi (FileName);
-   if (fi.exists () && _objectModule && _mainWindowModule) {
+   if (fi.exists () && objMod && _mainWindowModule) {
 
-      if (_objectHandle) {
+      if (_objectHandle) { objMod->destroy_object (_objectHandle); }
 
-         _objectModule->destroy_object (_objectHandle);
-      }
-
-      _objectHandle = _objectModule->create_object (_type, ObjectLocal);
+      _objectHandle = objMod->create_object (_type, ObjectLocal);
 
       const String ModelFile (qPrintable (fi.absoluteFilePath ()));
 
-      _objectModule->store_text (_objectHandle, _modelAttrHandle, ModelFile);
+      objMod->store_text (_objectHandle, _modelAttrHandle, ModelFile);
 
-      _objectModule->store_position (_objectHandle, _defaultAttrHandle, Vector ());
+      objMod->store_position (_objectHandle, _defaultAttrHandle, Vector ());
 
-      _objectModule->activate_object (_objectHandle);
+      objMod->activate_object (_objectHandle);
 
       _appState.set_default_directory (ModelFile);
 
@@ -230,11 +236,8 @@ dmz::ViewerPluginMenu::_init (Config &local) {
    setObjectName (get_plugin_name ().get_buffer ());
 
    RuntimeContext *context (get_plugin_runtime_context ());
-   Definitions defs (context, &_log);
 
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
-
-   _defaultAttrHandle = defs.create_named_handle (ObjectAttributeDefaultName);
 
    Config menuList;
    if (local.lookup_all_config ("menu", menuList)) { _init_menu_list (menuList); }
@@ -246,6 +249,8 @@ dmz::ViewerPluginMenu::_init (Config &local) {
 
    _modelAttrHandle = config_to_named_handle (
       "attribute.model.name", local, "Object_Model_Attribute", context);
+
+   _defaultAttrHandle = activate_default_object_attribute (ObjectDestroyMask);
 }
 
 

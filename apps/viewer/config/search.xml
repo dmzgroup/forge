@@ -10,13 +10,13 @@
       <!-- <menu text="&amp;Window"/> -->
       <!-- <menu text="&amp;Help"/> -->
    <!-- </menu-bar> -->
-   <!-- <dock-windows>
+   <dock-windows>
       <group area="left">
          <widget name="search" title="Search" visible="true" floating="true">
             <allowed-areas left="true" right="true"/>
          </widget>
       </group>
-   </dock-windows> -->
+   </dock-windows>
 </main-window>
 <search>
 </search>

@@ -281,6 +281,7 @@ dmz::ForgeModuleQt::State::init_cache_dir () {
          create_directory (cacheDir);
          log.info << "Created applicatoin cache dir: " << cacheDir << endl;
       }
+      else { log.info << "Applicatoin cache dir: " << cacheDir << endl; }
 
       retVal = True;
    }
@@ -717,8 +718,6 @@ dmz::ForgeModuleQt::search (
       QNetworkReply *reply = _request (LocalGet, url, requestId, ForgeTypeSearch);
    }
 
-_state.log.warn << "DO SEARCH: " << requestId << " for " << Value << endl;
-
    return requestId;
 }
 
@@ -931,13 +930,13 @@ dmz::ForgeModuleQt::get_asset_preview (
             StringContainer container;
             container.append (targetFile);
 
-            _handle_reply (requestId, ForgeTypeGetAssetMedia, container);
+            _handle_reply (requestId, ForgeTypeGetAssetPreview, container);
          }
          else {
 
             DownloadStruct *ds = new DownloadStruct;
             ds->requestId = requestId;
-            ds->requestType = ForgeTypeGetAssetMedia;
+            ds->requestType = ForgeTypeGetAssetPreview;
             ds->assetId = AssetId;
             ds->file = File;
             ds->hash = local_get_hash (File);
@@ -948,7 +947,7 @@ dmz::ForgeModuleQt::get_asset_preview (
             QTimer::singleShot (0, this, SLOT (_start_next_download ()));
          }
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetMedia, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview, observer); }
    }
 
    return requestId;
@@ -1057,11 +1056,11 @@ dmz::ForgeModuleQt::_reply_finished () {
          switch (RequestType) {
 
             case ForgeTypeSearch:
-_state.log.warn << "<-- ForgeTypeSearch" << endl;
+//_state.log.warn << "<-- ForgeTypeSearch" << endl;
                _handle_search (RequestId, JsonData);
                break;
 
-         case ForgeTypeGetAsset:
+            case ForgeTypeGetAsset:
 // _state.log.warn << "<-- ForgeTypeGetAsset" << endl;
                _handle_get_asset (RequestId, JsonData);
                break;

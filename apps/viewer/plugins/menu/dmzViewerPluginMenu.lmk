@@ -10,6 +10,7 @@ lmk.add_files {"dmzViewerPluginMenu.cpp",}
 
 lmk.add_libs {
    "dmzQtUtil",
+   "dmzObjectUtil",
    "dmzFoundation",
    "dmzKernel",
 }

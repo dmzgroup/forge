@@ -1,0 +1,13 @@
+lmk.set_name "dmzForgePluginAssetLoader"
+lmk.set_type "plugin"
+lmk.add_files {"dmzForgePluginAssetLoader.cpp",}
+
+lmk.add_libs {
+   "dmzObjectUtil",
+   "dmzKernel",
+}
+
+lmk.add_preqs {
+   "dmzForgeFramework",
+   "dmzObjectFramework",
+}

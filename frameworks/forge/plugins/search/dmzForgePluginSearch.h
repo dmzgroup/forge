@@ -6,8 +6,12 @@
 #include <dmzQtWidget.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzTypesHashTableStringTemplate.h>
+#include <dmzTypesHashTableUInt64Template.h>
 #include <QtGui/QFrame>
 #include <ui_SearchForm.h>
+
+class QListWidgetItem;
 
 
 namespace dmz {
@@ -57,15 +61,24 @@ namespace dmz {
       protected Q_SLOTS:
          void on_searchButton_clicked ();
 
+         void on_itemListWidget_currentItemChanged (
+            QListWidgetItem *current,
+            QListWidgetItem *previous);
+
       protected:
+         void _handle_search (const StringContainer &Results);
+         void _handle_get_preview (const UInt64 RequestId, const String &Preview);
+
          void _init (Config &local);
+
+         struct ItemStruct;
 
          Log _log;
          Ui::SearchForm _ui;
          ForgeModule *_forgeModule;
          String _forgeModuleName;
-         UInt64 _requestId;
-
+         HashTableStringTemplate<ItemStruct> _itemTable;
+         HashTableUInt64Template<ItemStruct> _previewTable;
 
       private:
          ForgePluginSearch ();
