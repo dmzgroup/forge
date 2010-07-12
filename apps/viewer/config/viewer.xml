@@ -48,10 +48,8 @@
    <movement speed="100" turn-rate="2.4"/>
 </freefly>
 <view-switch>
-   <switch>
-      <channel name="orbit-portal"/>
-      <channel name="tether-portal"/>
-   </switch>
+   <channel name="orbit-portal"/>
+   <channel name="tether-portal"/>
 </view-switch>
 <mimic>
    <input>
