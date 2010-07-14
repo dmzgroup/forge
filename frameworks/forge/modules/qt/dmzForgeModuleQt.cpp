@@ -81,10 +81,13 @@ namespace {
    static const String LocalCurrent ("current");
    static const String LocalOriginalName ("original_name");
    static const String LocalValue ("value");
+   static const String LocalCreatedAt ("created_at");
+   static const String LocalUpdatedAt ("updated_at");
 
    static const QString LocalGet ("get");
    static const QString LocalPut ("put");
    static const QString LocalDelete ("delete");
+   static const QString LocalTimeStampFormat ("yyyy-M-d-h-m-s");
 
    static const char LocalId[] = "id";
    static const char LocalRev[] = "rev";
@@ -168,9 +171,16 @@ struct dmz::ForgeModuleQt::AssetStruct {
    QMap<QString, String> current;
    QMap<QString, String> originalName;
    Config attachments;
+   QDateTime createdAt;
+   QDateTime updatedAt;
    Boolean dirty;
 
-   AssetStruct (const String &AssetId) : Id (AssetId), type ("unknown"), dirty (True) {;}
+   AssetStruct (const String &AssetId) :
+      Id (AssetId),
+      type ("unknown"),
+      createdAt (QDateTime::currentDateTime ().toUTC ()),
+      updatedAt (createdAt),
+      dirty (True) {;}
 };
 
 
@@ -754,6 +764,8 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
          _state.obsTable.store (requestId, observer);
 
          if (asset->dirty) {
+
+            asset->updatedAt = QDateTime::currentDateTime ().toUTC ();
 
             QNetworkReply *reply = _put_asset (AssetId, requestId, ForgeTypePutAsset);
             asset->dirty = False;
@@ -2177,6 +2189,7 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
       while (asset->keywords.get_next (keywordIt, keyword)) {
 
          Config data (LocalKeywords);
+         data.set_in_array (True);
          data.store_attribute (LocalValue, keyword);
 
          if (first) { assetConfig.overwrite_config (data); first = False; }
@@ -2222,6 +2235,30 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
 
       // _attachments
       assetConfig.overwrite_config (asset->attachments);
+
+      // createdAt
+      QStringList list = asset->createdAt.toString (LocalTimeStampFormat).split ('-');
+      first = True;
+      foreach (QString item, list) {
+
+         Config data (LocalCreatedAt);
+         data.store_attribute (LocalValue, qPrintable (item));
+
+         if (first) { assetConfig.overwrite_config (data); first = False; }
+         else { assetConfig.add_config (data); }
+      }
+
+      // updatedAt
+      list = asset->updatedAt.toString (LocalTimeStampFormat).split ('-');
+      first = True;
+      foreach (QString item, list) {
+
+         Config data (LocalUpdatedAt);
+         data.store_attribute (LocalValue, qPrintable (item));
+
+         if (first) { assetConfig.overwrite_config (data); first = False; }
+         else { assetConfig.add_config (data); }
+      }
 
       retVal = True;
    }
@@ -2325,6 +2362,40 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
       // _attachments
       AssetConfig.lookup_config (Local_Attachments, asset->attachments);
+
+      // createdAt
+      QStringList createdAtList;
+      Config createdAtConfig;
+
+      if (AssetConfig.lookup_all_config (LocalCreatedAt, createdAtConfig)) {
+
+         ConfigIterator it;
+         Config value;
+
+         while (createdAtConfig.get_next_config (it, value)) {
+
+            createdAtList.append (config_to_string (LocalValue, value).get_buffer ());
+         }
+
+         asset->createdAt.fromString (createdAtList.join ("-"), LocalTimeStampFormat);
+      }
+
+      // updatedAt
+      QStringList updatedAtList;
+      Config updatedAtConfig;
+
+      if (AssetConfig.lookup_all_config (LocalUpdatedAt, updatedAtConfig)) {
+
+         ConfigIterator it;
+         Config value;
+
+         while (updatedAtConfig.get_next_config (it, value)) {
+
+            updatedAtList.append (config_to_string (LocalValue, value).get_buffer ());
+         }
+
+         asset->updatedAt.fromString (updatedAtList.join ("-"), LocalTimeStampFormat);
+      }
    }
 
    return AssetId;
@@ -2339,7 +2410,8 @@ dmz::ForgeModuleQt::_update_asset (const String &AssetId, const Config &AssetCon
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset){
 
-      // _config_to_asset will overwrite type, save it so we don't loose it
+      // AssetConfig might now contain all the data the asset has
+      // cuasing some data to be lost, so save the data that could be lost
       String type = asset->type;
       QMap<QString, String>current = asset->current;
       QMap<QString, String>originalName = asset->originalName;
@@ -2347,7 +2419,7 @@ dmz::ForgeModuleQt::_update_asset (const String &AssetId, const Config &AssetCon
 
       if (_config_to_asset (AssetConfig)) {
 
-         // now lets restore type and push to server
+         // now lets restore the saved data
          asset->type = type;
          asset->current = current;
          asset->originalName = originalName;

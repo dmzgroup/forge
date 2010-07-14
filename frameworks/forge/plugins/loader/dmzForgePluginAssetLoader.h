@@ -16,8 +16,8 @@ namespace dmz {
 
    class ForgePluginAssetLoader :
          public Plugin,
-         public MessageObserver,
          public ForgeObserver,
+         public MessageObserver,
          public ObjectObserverUtil {
 
       public:
@@ -33,6 +33,13 @@ namespace dmz {
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
 
+         // ForgeObserver Interface
+         virtual void handle_reply (
+            const UInt64 RequestId,
+            const Int32 ReqeustType,
+            const Boolean Error,
+            const StringContainer &Results);
+
          // Message Observer Interface
          virtual void receive_message (
             const Message &Type,
@@ -40,13 +47,6 @@ namespace dmz {
             const Handle TargetObserverHandle,
             const Data *InData,
             Data *outData);
-
-         // ForgeObserver Interface
-         virtual void handle_reply (
-            const UInt64 RequestId,
-            const Int32 ReqeustType,
-            const Boolean Error,
-            const StringContainer &Results);
 
          // Object Observer Interface
          virtual void create_object (
@@ -227,6 +227,8 @@ namespace dmz {
          Handle _objectHandle;
          Handle _defaultAttrHandle;
          Handle _modelAttrHandle;
+         String _assetId;
+         UInt64 _requestId;
 
       private:
          ForgePluginAssetLoader ();

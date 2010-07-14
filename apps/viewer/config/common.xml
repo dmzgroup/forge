@@ -6,6 +6,7 @@
    <plugin name="dmzArchivePluginQuickSave"/>
    <plugin name="dmzArchivePluginObject"/>
    <plugin name="dmzObjectModuleBasic"/>
+   <plugin name="dmzObjectPluginCleanup"/>
    <plugin name="dmzQtPluginObjectInspector" unique="object-inspector"/>
 <!--
    <plugin name="dmzPluginMsgDump"/>
@@ -14,4 +15,9 @@
    <plugin name="dmzRenderPluginPortalSize"/>
 -->
 </plugin-list>
+<dmzObjectPluginCleanup>
+   <cleanup>
+      <type name="node"/>
+   </cleanup>
+</dmzObjectPluginCleanup>
 </dmz>

@@ -2,6 +2,7 @@
 <dmz>
 <plugin-list>
    <plugin name="dmzForgePluginSearch" unique="search"/>
+   <plugin name="dmzForgePluginAssetLoader"/>
 </plugin-list>
 <main-window>
    <!-- <menu-bar> -->

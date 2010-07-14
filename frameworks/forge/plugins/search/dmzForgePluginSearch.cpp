@@ -32,6 +32,7 @@ dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local
       MessageObserver (Info),
       ForgeObserver (Info),
       _log (Info),
+      _convert (Info),
       _forgeModule (0) {
 
    _ui.setupUi (this);
@@ -180,17 +181,27 @@ dmz::ForgePluginSearch::on_itemListWidget_currentItemChanged (
          _forgeModule->lookup_name (is->AssetId, data);
          _ui.nameLabel->setText (data.get_buffer ());
 
-         _forgeModule->lookup_brief (is->AssetId, data);
-         _ui.briefLabel->setText (data.get_buffer ());
-
          _ui.previewLabel->setPixmap (is->pixmap);
       }
    }
    else {
 
       _ui.nameLabel->clear ();
-      _ui.briefLabel->clear ();
       _ui.previewLabel->clear ();
+   }
+}
+
+
+void
+dmz::ForgePluginSearch::on_itemListWidget_itemActivated (QListWidgetItem * item) {
+
+   if (item) {
+
+      const String AssetId (qPrintable (item->data (Qt::UserRole + 1).toString ()));
+
+      Data out = _convert.to_data (AssetId);
+
+      _loadAssetMsg.send (&out);
    }
 }
 
@@ -243,11 +254,19 @@ dmz::ForgePluginSearch::_handle_get_preview (
 void
 dmz::ForgePluginSearch::_init (Config &local) {
 
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    setObjectName (get_plugin_name ().get_buffer ());
 
    qframe_config_read ("frame", local, this);
 
    _forgeModuleName = config_to_string ("module.forge.name", local);
+
+   _loadAssetMsg = config_create_message (
+      "load-asset-message.name",
+      local,
+      "Load_Asset_Message",
+      context);
 }
 
 

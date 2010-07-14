@@ -4,6 +4,7 @@
 #include <dmzRuntimeLog.h>
 #include <dmzForgeObserver.h>
 #include <dmzQtWidget.h>
+#include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzTypesHashTableStringTemplate.h>
@@ -65,6 +66,8 @@ namespace dmz {
             QListWidgetItem *current,
             QListWidgetItem *previous);
 
+         void on_itemListWidget_itemActivated (QListWidgetItem * item);
+
       protected:
          void _handle_search (const StringContainer &Results);
          void _handle_get_preview (const UInt64 RequestId, const String &Preview);
@@ -74,9 +77,11 @@ namespace dmz {
          struct ItemStruct;
 
          Log _log;
+         DataConverterString _convert;
          Ui::SearchForm _ui;
          ForgeModule *_forgeModule;
          String _forgeModuleName;
+         Message _loadAssetMsg;
          HashTableStringTemplate<ItemStruct> _itemTable;
          HashTableUInt64Template<ItemStruct> _previewTable;
 

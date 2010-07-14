@@ -25,6 +25,8 @@ namespace dmz {
 
          void set_forge_module (ForgeModule *forge);
 
+         void set_asset (const String &AssetId);
+
          void add_media (const String &File);
          void add_previews (const StringContainer &Container);
 

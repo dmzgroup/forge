@@ -114,6 +114,13 @@ dmz::ViewerPluginMenu::destroy_object (
    if (ObjectHandle == _objectHandle) {
 
       _objectHandle = 0;
+
+      QMainWindow *mainWindow = _mainWindowModule->get_qt_main_window ();
+      if (mainWindow) {
+
+         QString title (_mainWindowModule->get_window_name ());
+         mainWindow->setWindowTitle (title);
+      }
    }
 }
 

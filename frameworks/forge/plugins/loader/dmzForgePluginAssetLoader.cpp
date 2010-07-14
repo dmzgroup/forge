@@ -3,21 +3,27 @@
 #include <dmzObjectAttributeMasks.h>
 #include <dmzObjectModule.h>
 #include <dmzRuntimeConfig.h>
+#include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzTypesStringContainer.h>
 
 
 dmz::ForgePluginAssetLoader::ForgePluginAssetLoader (
       const PluginInfo &Info,
       Config &local) :
       Plugin (Info),
+      ForgeObserver (Info),
       MessageObserver (Info),
       ObjectObserverUtil (Info, local),
       _log (Info),
       _convert (Info),
       _forgeModule (0),
-      _defaultAttrHandle (0) {
+      _objectHandle (0),
+      _defaultAttrHandle (0),
+      _modelAttrHandle(0),
+      _requestId (0) {
 
    _init (local);
 }
@@ -71,6 +77,76 @@ dmz::ForgePluginAssetLoader::discover_plugin (
 }
 
 
+// Forge Observer Interface
+void
+dmz::ForgePluginAssetLoader::handle_reply (
+      const UInt64 RequestId,
+      const Int32 ReqeustType,
+      const Boolean Error,
+      const StringContainer &Results) {
+
+   switch (ReqeustType) {
+
+      case ForgeTypeSearch:
+         break;
+
+      case ForgeTypeGetAsset: {
+
+         if (RequestId == _requestId) {
+
+            StringContainer container;
+            if (_forgeModule->lookup_asset_media (_assetId, container)) {
+
+_log.warn << "asset_media: " << container << endl;
+            }
+
+//            String preview;
+//            previews.get_first (preview);
+
+//            _requestId = _forgeModule->get_asset_media (_assetId, preview, this);
+         }
+
+         break;
+      }
+
+      case ForgeTypePutAsset:
+         break;
+
+      case ForgeTypeDeleteAsset:
+         break;
+
+      case ForgeTypeGetAssetMedia: {
+
+//            ObjectModule *objMod = get_object_module ();
+
+//            if (objMod) {
+
+//               _objectHandle = objMod->create_object (_type, ObjectLocal);
+
+//               const String ModelFile (qPrintable (fi.absoluteFilePath ()));
+
+//               objMod->store_text (_objectHandle, _modelAttrHandle, ModelFile);
+
+//               objMod->store_position (_objectHandle, _defaultAttrHandle, Vector ());
+
+//               objMod->activate_object (_objectHandle);
+//            }
+
+         break;
+      }
+
+      case ForgeTypePutAssetMedia:
+         break;
+
+      case ForgeTypeAddAssetPreview:
+         break;
+
+      default:
+         break;
+   }
+}
+
+
 // Message Observer Interface
 void
 dmz::ForgePluginAssetLoader::receive_message (
@@ -82,11 +158,26 @@ dmz::ForgePluginAssetLoader::receive_message (
 
    if (Type == _loadAssetMsg) {
 
-      ObjectModule *objMod = get_object_module ();
+      if (_objectHandle) {
 
-      const String &AssetId (_convert.to_string (InData));
+      }
 
-      if (AssetId && objMod) {
+      _assetId = _convert.to_string (InData);
+
+_log.warn << "recieved load asset message: " << _assetId << endl;
+
+      if (_assetId && _forgeModule) {
+
+         _requestId = _forgeModule->get_asset (_assetId, this);
+
+//         Boolean lookup_previews (
+//                     const String &AssetId,
+//                     StringContainer &value);
+
+//         StringContainer previews;
+//         _forgeModule->lo
+
+//         _forgeModule->get_asset_media (AssetId, this);
 
 //         _objectHandle = objMod->create_object (_type, ObjectLocal);
 

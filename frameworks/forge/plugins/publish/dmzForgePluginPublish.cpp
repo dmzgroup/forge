@@ -30,8 +30,6 @@ struct dmz::ForgePluginPublish::State {
    RenderModuleCoreOSG *core;
    String forgeModuleName;
    Handle modelAttrHandle;
-   String assetId;
-   UInt64 requestId;
    Handle target;
    String modelSource;
    String modelTarget;
@@ -40,6 +38,8 @@ struct dmz::ForgePluginPublish::State {
    Message attachMsg;
    Message startCaptureMsg;
    Message finishedCaptureMsg;
+   Message cleanupMsg;
+   Message loadAssetMsg;
    StringContainer previews;
    StringContainerIterator previewIt;
    String currentPreview;
@@ -60,7 +60,6 @@ dmz::ForgePluginPublish::State::State (const PluginInfo &Info) :
       forgeModule (0),
       core (0),
       modelAttrHandle (0),
-      requestId (0),
       target (0),
       createTarget (False),
       currentPreviewIndex (1),
@@ -240,7 +239,7 @@ dmz::ForgePluginPublish::receive_message (
 
             QFileInfo fi (_state.modelSource.get_buffer ());
 
-            if (fi.suffix () == "ive") {
+            if (fi.suffix ().toLower () == "ive") {
 
                _state.modelTarget = _state.modelSource;
                _state.createTarget = False;
@@ -263,6 +262,11 @@ dmz::ForgePluginPublish::receive_message (
       _state.currentPreviewIndex = 1;
       _state.newPreviews = True;
       _update_preview ();
+   }
+   else if (Type == _state.loadAssetMsg) {
+
+      String assetId = _state.convertString.to_string (InData);
+      _asset.set_asset (assetId);
    }
 }
 
@@ -352,7 +356,6 @@ dmz::ForgePluginPublish::on_prevPreviewButton_clicked () {
 }
 
 
-
 void
 dmz::ForgePluginPublish::_slot_publish () {
 
@@ -377,6 +380,10 @@ void
 dmz::ForgePluginPublish::_slot_reset () {
 
    _asset.reset ();
+   _state.cleanupMsg.send ();
+   _state.previews.clear ();
+   _state.previewIt.reset ();
+   _asset.previewInfoLabel->clear ();
 }
 
 
@@ -390,26 +397,29 @@ dmz::ForgePluginPublish::_update_preview () {
       _state.newPreviews = False;
    }
 
-   const QString Key = QString ("preview_%1").arg (_state.currentPreviewIndex);
+   if (_state.previews.get_count ()) {
 
-   QPixmap pixmap;
-   if (!QPixmapCache::find (Key, &pixmap)) {
+      const QString Key = QString ("preview_%1").arg (_state.currentPreviewIndex);
 
-      pixmap.load (_state.currentPreview.get_buffer ());
+      QPixmap pixmap;
+      if (!QPixmapCache::find (Key, &pixmap)) {
 
-      if ((pixmap.width () > 200) || (pixmap.height () > 200)) {
+         pixmap.load (_state.currentPreview.get_buffer ());
 
-         pixmap = pixmap.scaled (200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+         if ((pixmap.width () > 200) || (pixmap.height () > 200)) {
+
+            pixmap = pixmap.scaled (200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+         }
+
+         QPixmapCache::insert (Key, pixmap);
       }
 
-      QPixmapCache::insert (Key, pixmap);
+      _asset.previewLabel->setPixmap (pixmap);
+
+      _asset.previewInfoLabel->setText (
+         QString ("%1/%2").arg (_state.currentPreviewIndex)
+                          .arg (_state.previews.get_count ()));
    }
-
-   _asset.previewLabel->setPixmap (pixmap);
-
-   _asset.previewInfoLabel->setText (
-      QString ("%1/%2").arg (_state.currentPreviewIndex)
-                       .arg (_state.previews.get_count ()));
 }
 
 
@@ -470,6 +480,20 @@ dmz::ForgePluginPublish::_init (Config &local) {
       context);
 
     subscribe_to_message (_state.finishedCaptureMsg);
+
+    _state.cleanupMsg = config_create_message (
+       "cleanup-message.name",
+       local,
+       "CleanupObjectsMessage",
+       context);
+
+    _state.loadAssetMsg = config_create_message (
+       "load-asset-message.name",
+       local,
+       "Load_Asset_Message",
+       context);
+
+    subscribe_to_message (_state.loadAssetMsg);
 }
 
 

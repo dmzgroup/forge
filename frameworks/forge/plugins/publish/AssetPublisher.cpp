@@ -4,6 +4,10 @@
 #include <dmzQtUtil.h>
 #include <QtGui/QtGui>
 
+namespace {
+
+   static const QChar LocalKeywordDelimiter (' ');
+};
 
 dmz::AssetPublisher::AssetPublisher (const PluginInfo &Info) :
       ForgeObserver (Info),
@@ -47,6 +51,42 @@ dmz::AssetPublisher::set_forge_module (ForgeModule *forge) {
 
 
 void
+dmz::AssetPublisher::set_asset (const String &AssetId) {
+
+   if (AssetId && _forge) {
+
+      if (_assetId) { reset (); }
+
+      _assetId = AssetId;
+
+      String value;
+
+      _forge->lookup_name (_assetId, value);
+      nameLineEdit->setText (value.get_buffer ());
+
+      _forge->lookup_brief (_assetId, value);
+      briefLineEdit->setText (value.get_buffer ());
+
+      _forge->lookup_details (_assetId, value);
+      detailsTextEdit->clear ();
+      detailsTextEdit->appendPlainText (value.get_buffer ());
+
+      QStringList list;
+      StringContainer container;
+
+      _forge->lookup_keywords (_assetId, container);
+
+      to_qstringlist (container, list);
+
+      keywordLineEdit->setText (list.join (LocalKeywordDelimiter));
+
+      //_forge->lookup_previews (_assetId, container);
+
+   }
+}
+
+
+void
 dmz::AssetPublisher::add_media (const String &File) {
 
    _media.append (File);
@@ -70,7 +110,16 @@ dmz::AssetPublisher::publish () {
       String details (qPrintable (detailsTextEdit->toPlainText ()));
 
       StringContainer keywords;
-      to_dmz_string_container (keywordLineEdit->text ().split (" "), keywords);
+      QString value = keywordLineEdit->text ();
+      if (value.indexOf (LocalKeywordDelimiter) == -1) {
+
+         keywords.append (qPrintable (value));
+      }
+      else {
+
+         QStringList list = value.split (LocalKeywordDelimiter);
+         to_dmz_string_container (list, keywords);
+      }
 
       if (!_assetId) { _assetId = _forge->create_asset (); }
 
@@ -80,7 +129,8 @@ dmz::AssetPublisher::publish () {
       _forge->store_keywords (_assetId, keywords);
 
       _requestId = _forge->put_asset (_assetId, this);
-_log.warn << "AssetID: " << _assetId << " : " << _requestId << endl;
+
+      _log.info << "publish asset: " << _assetId << endl;
 
       _begin ();
    }
@@ -90,7 +140,7 @@ _log.warn << "AssetID: " << _assetId << " : " << _requestId << endl;
 void
 dmz::AssetPublisher::cancel () {
 
-   _log.warn << "Cancel upload" << endl;
+_log.warn << "Upload canceled" << endl;
    _deleteAsset = True;
    _end ();
 }
@@ -106,6 +156,8 @@ dmz::AssetPublisher::reset () {
    nameLineEdit->clear ();
    briefLineEdit->clear ();
    detailsTextEdit->clear ();
+   keywordLineEdit->clear ();
+   previewLabel->clear ();
 }
 
 
@@ -183,8 +235,6 @@ dmz::AssetPublisher::_publish_previews () {
    if (_previews.get_count ()) {
 
       if (_assetId && _forge) {
-
-_log.warn << "_publish_previews: " << _previews.get_count () << endl;
 
          _requestId = _forge->add_asset_preview (_assetId, _previews, this);
       }
