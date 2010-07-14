@@ -96,6 +96,10 @@ namespace dmz {
 
          virtual UInt64 get_asset_preview (
             const String &AssetId,
+            ForgeObserver *observer);
+
+         virtual UInt64 get_asset_preview (
+            const String &AssetId,
             const String &File,
             ForgeObserver *observer);
 

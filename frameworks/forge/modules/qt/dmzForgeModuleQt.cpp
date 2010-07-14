@@ -918,6 +918,29 @@ dmz::ForgeModuleQt::put_asset_media (
 dmz::UInt64
 dmz::ForgeModuleQt::get_asset_preview (
       const String &AssetId,
+      ForgeObserver *observer) {
+
+   UInt64 requestId (0);
+
+//   if (observer) {
+
+//      requestId = _state.requestCounter++;
+
+//      AssetStruct  *asset = _state.assetTable.lookup (AssetId);
+//      if (asset) {
+
+//         _state.obsTable.store (requestId, observer);
+//      }
+//      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview, observer); }
+//   }
+
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::ForgeModuleQt::get_asset_preview (
+      const String &AssetId,
       const String &File,
       ForgeObserver *observer) {
 
