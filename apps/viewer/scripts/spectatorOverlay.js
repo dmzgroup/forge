@@ -86,7 +86,7 @@ dmz.input.channel.observe(self, TetherChannel, channelState);
 dmz.input.channel.observe(self, OrbitChannel, channelState);
 
 
-dmz.messaging.subscribe("DMZ_Entity_Attach_Message", self,  function (data) {
+dmz.messaging.subscribe(self, "DMZ_Entity_Attach_Message", function (data) {
 
    objOverlay.text(text.obj + dmz.data.unwrapHandle(data));
 });
