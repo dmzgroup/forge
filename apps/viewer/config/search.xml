@@ -2,7 +2,7 @@
 <dmz>
 <plugin-list>
    <plugin name="dmzForgePluginSearch" unique="search"/>
-   <plugin name="dmzForgePluginAssetLoader"/>
+   <plugin name="dmzForgePluginAssetLoader" unique="loader"/>
 </plugin-list>
 <main-window>
    <!-- <menu-bar> -->
@@ -21,4 +21,7 @@
 </main-window>
 <search>
 </search>
+<loader>
+   <object-type name="node"/>
+</loader>
 </dmz>

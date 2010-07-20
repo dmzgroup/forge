@@ -1,7 +1,6 @@
 #ifndef DMZ_FORGE_MODULE_QT_DOT_H
 #define DMZ_FORGE_MODULE_QT_DOT_H
 
-#include <dmzForgeConsts.h>
 #include <dmzForgeModule.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
@@ -142,8 +141,13 @@ namespace dmz {
          void _handle_not_found (
             const String &AssetId,
             const UInt64 RequestId,
-            const Int32 RequestType,
-            ForgeObserver *observer);
+            const Int32 RequestType);
+
+         void _handle_ok (
+            const String &AssetId,
+            const String &AssetRevision,
+            const UInt64 RequestId,
+            const Int32 RequestType);
 
          void _handle_reply (
             const UInt64 RequestId,

@@ -1,6 +1,7 @@
 #ifndef DMZ_FORGE_MODULE_DOT_H
 #define DMZ_FORGE_MODULE_DOT_H
 
+#include <dmzForgeConsts.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeRTTI.h>
 #include <dmzTypesBase.h>

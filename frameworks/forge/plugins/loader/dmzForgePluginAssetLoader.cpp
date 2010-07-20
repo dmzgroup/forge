@@ -8,6 +8,7 @@
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzTypesStringContainer.h>
+#include <dmzTypesVector.h>
 
 
 dmz::ForgePluginAssetLoader::ForgePluginAssetLoader (
@@ -83,31 +84,15 @@ dmz::ForgePluginAssetLoader::handle_reply (
       const UInt64 RequestId,
       const Int32 ReqeustType,
       const Boolean Error,
-      const StringContainer &Results) {
+      const dmz::StringContainer &Results) {
 
    switch (ReqeustType) {
 
       case ForgeTypeSearch:
          break;
 
-      case ForgeTypeGetAsset: {
-
-         if (RequestId == _requestId) {
-
-            StringContainer container;
-            if (_forgeModule->lookup_asset_media (_assetId, container)) {
-
-_log.warn << "asset_media: " << container << endl;
-            }
-
-//            String preview;
-//            previews.get_first (preview);
-
-//            _requestId = _forgeModule->get_asset_media (_assetId, preview, this);
-         }
-
+      case ForgeTypeGetAsset:
          break;
-      }
 
       case ForgeTypePutAsset:
          break;
@@ -117,20 +102,23 @@ _log.warn << "asset_media: " << container << endl;
 
       case ForgeTypeGetAssetMedia: {
 
-//            ObjectModule *objMod = get_object_module ();
+_log.warn << "ForgeTypeGetAssetMedia: " << Results << endl;
 
-//            if (objMod) {
+         ObjectModule *objMod = get_object_module ();
 
-//               _objectHandle = objMod->create_object (_type, ObjectLocal);
+         if (objMod) {
 
-//               const String ModelFile (qPrintable (fi.absoluteFilePath ()));
+            _objectHandle = objMod->create_object (_type, ObjectLocal);
 
-//               objMod->store_text (_objectHandle, _modelAttrHandle, ModelFile);
+            String modelFile;
+            Results.get_first (modelFile);
 
-//               objMod->store_position (_objectHandle, _defaultAttrHandle, Vector ());
+            objMod->store_text (_objectHandle, _modelAttrHandle, modelFile);
 
-//               objMod->activate_object (_objectHandle);
-//            }
+            objMod->store_position (_objectHandle, _defaultAttrHandle, Vector ());
+
+            objMod->activate_object (_objectHandle);
+         }
 
          break;
       }
@@ -164,30 +152,16 @@ dmz::ForgePluginAssetLoader::receive_message (
 
       _assetId = _convert.to_string (InData);
 
-_log.warn << "recieved load asset message: " << _assetId << endl;
-
       if (_assetId && _forgeModule) {
 
-         _requestId = _forgeModule->get_asset (_assetId, this);
+         StringContainer container;
+         if (_forgeModule->lookup_asset_media (_assetId, container)) {
 
-//         Boolean lookup_previews (
-//                     const String &AssetId,
-//                     StringContainer &value);
+            String file;
+            container.get_first (file);
 
-//         StringContainer previews;
-//         _forgeModule->lo
-
-//         _forgeModule->get_asset_media (AssetId, this);
-
-//         _objectHandle = objMod->create_object (_type, ObjectLocal);
-
-//         const String ModelFile (qPrintable (fi.absoluteFilePath ()));
-
-//         objMod->store_text (_objectHandle, _modelAttrHandle, ModelFile);
-
-//         objMod->store_position (_objectHandle, _defaultAttrHandle, Vector ());
-
-//         objMod->activate_object (_objectHandle);
+            _requestId = _forgeModule->get_asset_media (_assetId, file, this);
+         }
       }
    }
 }

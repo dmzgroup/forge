@@ -7,10 +7,10 @@
 #include <dmzRuntimeDataConverterTypesBase.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
-#include <dmzTypesHashTableStringTemplate.h>
 #include <dmzTypesHashTableUInt64Template.h>
 #include <QtGui/QFrame>
-#include <ui_SearchForm.h>
+#include <QtGui/QStandardItemModel>
+#include "ui_SearchForm.h"
 
 class QListWidgetItem;
 
@@ -62,11 +62,7 @@ namespace dmz {
       protected Q_SLOTS:
          void on_searchButton_clicked ();
 
-         void on_itemListWidget_currentItemChanged (
-            QListWidgetItem *current,
-            QListWidgetItem *previous);
-
-         void on_itemListWidget_itemActivated (QListWidgetItem * item);
+         void on_listView_activated (const QModelIndex &);
 
       protected:
          void _handle_search (const StringContainer &Results);
@@ -81,9 +77,10 @@ namespace dmz {
          Ui::SearchForm _ui;
          ForgeModule *_forgeModule;
          String _forgeModuleName;
+         Message _cleanupMsg;
          Message _loadAssetMsg;
-         HashTableStringTemplate<ItemStruct> _itemTable;
-         HashTableUInt64Template<ItemStruct> _previewTable;
+         QStandardItemModel _model;
+         HashTableUInt64Template<QStandardItem> _itemTable;
 
       private:
          ForgePluginSearch ();

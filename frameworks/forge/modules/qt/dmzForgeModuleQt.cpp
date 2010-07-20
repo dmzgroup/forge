@@ -688,7 +688,20 @@ dmz::ForgeModuleQt::lookup_asset_media (const String &AssetId, StringContainer &
 
    Boolean retVal (False);
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) { value = asset->media; retVal = True; }
+   if (asset) {
+
+      value.clear ();
+      QMap<QString, String>::iterator it;
+
+      for (it = asset->current.begin (); it != asset->current.end (); ++it) {
+
+         value.append (it.value ());
+      }
+
+//      value = asset->media;
+      retVal = True;
+   }
+
    return retVal;
 }
 
@@ -757,11 +770,10 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
    if (_state.networkAccessManager && observer) {
 
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct *asset = _state.assetTable.lookup (AssetId);
       if (asset) {
-
-         _state.obsTable.store (requestId, observer);
 
          if (asset->dirty) {
 
@@ -770,25 +782,9 @@ dmz::ForgeModuleQt::put_asset (const String &AssetId, ForgeObserver *observer) {
             QNetworkReply *reply = _put_asset (AssetId, requestId, ForgeTypePutAsset);
             asset->dirty = False;
          }
-         else {
-
-            Config config ("global");
-            config.store_attribute ("ok", "true");
-            config.store_attribute (Local_Id, asset->Id);
-            config.store_attribute (Local_Rev, asset->revision);
-
-            String jsonData;
-            StreamString out (jsonData);
-
-            format_config_to_json (config, out, ConfigStripGlobal, &_state.log);
-
-            StringContainer container;
-            container.append (jsonData);
-
-            _handle_reply (requestId, ForgeTypePutAsset, container);
-         }
+         else { _handle_ok (asset->Id, asset->revision, requestId, ForgeTypePutAsset); }
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset); }
    }
 
    return requestId;
@@ -803,11 +799,10 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
    if (_state.networkAccessManager && observer) {
 
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct *asset = _state.assetTable.remove (AssetId);
       if (asset) {
-
-         _state.obsTable.store (requestId, observer);
 
          QUrl url (_state.baseUrl);
          QString path ("/%1/%2");
@@ -819,7 +814,7 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
 
          delete asset; asset = 0;
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypePutAsset); }
    }
 
    return requestId;
@@ -837,11 +832,10 @@ dmz::ForgeModuleQt::get_asset_media (
    if (observer) {
 
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct  *asset = _state.assetTable.lookup (AssetId);
       if (asset) {
-
-         _state.obsTable.store (requestId, observer);
 
          String targetFile = AssetId + "-" + File;
          targetFile = format_path (_state.cacheDir + targetFile);
@@ -868,7 +862,7 @@ dmz::ForgeModuleQt::get_asset_media (
             QTimer::singleShot (0, this, SLOT (_start_next_download ()));
          }
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetMedia, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetMedia); }
    }
 
    return requestId;
@@ -886,29 +880,28 @@ dmz::ForgeModuleQt::put_asset_media (
 
    if (observer) {
 
-      if (_is_media_unique (AssetId, File)) {
-
-      }
-
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct *asset = _state.assetTable.lookup (AssetId);
       if (asset) {
 
-         _state.obsTable.store (requestId, observer);
+         if (_is_media_unique (AssetId, File)) {
 
-         UploadStruct *us = new UploadStruct;
-         us->requestId = requestId;
-         us->requestType = LocalPutAssetMediaPhase1;
-         us->assetId = AssetId;
-         us->files.append (File);
-         us->mimeType = MimeType;
+            UploadStruct *us = new UploadStruct;
+            us->requestId = requestId;
+            us->requestType = LocalPutAssetMediaPhase1;
+            us->assetId = AssetId;
+            us->files.append (File);
+            us->mimeType = MimeType;
 
-         _state.uploadQueue.enqueue (us);
+            _state.uploadQueue.enqueue (us);
 
-         QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
+            QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
+         }
+         else { _handle_ok (asset->Id, asset->revision, requestId, ForgeTypePutAssetMedia); }
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypePutAssetMedia, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypePutAssetMedia); }
    }
 
    return requestId;
@@ -925,13 +918,13 @@ dmz::ForgeModuleQt::get_asset_preview (
 //   if (observer) {
 
 //      requestId = _state.requestCounter++;
+//      _state.obsTable.store (requestId, observer);
 
 //      AssetStruct  *asset = _state.assetTable.lookup (AssetId);
 //      if (asset) {
 
-//         _state.obsTable.store (requestId, observer);
 //      }
-//      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview, observer); }
+//      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview); }
 //   }
 
    return requestId;
@@ -949,11 +942,10 @@ dmz::ForgeModuleQt::get_asset_preview (
    if (observer) {
 
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct  *asset = _state.assetTable.lookup (AssetId);
       if (asset) {
-
-         _state.obsTable.store (requestId, observer);
 
          const String ETag (_state.get_etag (AssetId, File));
 
@@ -982,7 +974,7 @@ dmz::ForgeModuleQt::get_asset_preview (
             QTimer::singleShot (0, this, SLOT (_start_next_download ()));
          }
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeGetAssetPreview); }
    }
 
    return requestId;
@@ -1000,11 +992,10 @@ dmz::ForgeModuleQt::add_asset_preview (
    if (observer) {
 
       requestId = _state.requestCounter++;
+      _state.obsTable.store (requestId, observer);
 
       AssetStruct *asset = _state.assetTable.lookup (AssetId);
       if (asset) {
-
-         _state.obsTable.store (requestId, observer);
 
          UploadStruct *us = new UploadStruct;
          us->requestId = requestId;
@@ -1016,7 +1007,7 @@ dmz::ForgeModuleQt::add_asset_preview (
 
          QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
       }
-      else { _handle_not_found (AssetId, requestId, ForgeTypeAddAssetPreview, observer); }
+      else { _handle_not_found (AssetId, requestId, ForgeTypeAddAssetPreview); }
    }
 
    return requestId;
@@ -1034,13 +1025,12 @@ dmz::ForgeModuleQt::remove_asset_preview (
    // if (observer) {
    //
    //    requestId = _state.requestCounter++;
+   //    _state.obsTable.store (requestId, observer);
    //
    //    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    //    if (asset) {
    //
    //       asset->preview.append (Preview);
-   //
-   //       _state.obsTable.store (requestId, observer);
    //
    //       UploadStruct *us = new UploadStruct;
    //       us->requestId = requestId;
@@ -1051,7 +1041,7 @@ dmz::ForgeModuleQt::remove_asset_preview (
    //
    //       QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
    //    }
-   //    else { _handle_not_found (AssetId, requestId, ForgeTypeAddAssetPreview, observer); }
+   //    else { _handle_not_found (AssetId, requestId, ForgeTypeAddAssetPreview); }
    // }
 
    return requestId;
@@ -1744,6 +1734,7 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase2 (
       const String AssetId (config_to_string (Local_Id, global));
 
       _update_asset (AssetId, global);
+
       _put_asset (AssetId, RequestId, LocalPutAssetMediaPhase3);
    }
    else {
@@ -1919,18 +1910,36 @@ void
 dmz::ForgeModuleQt::_handle_not_found (
       const String &AssetId,
       const UInt64 RequestId,
-      const Int32 RequestType,
-      ForgeObserver *observer) {
+      const Int32 RequestType) {
 
-   if (observer) {
+   String msg ("Not found: ");
+   msg << AssetId;
 
-      _state.obsTable.store (RequestId, observer);
+   _handle_error (RequestId, RequestType, msg);
+}
 
-      String msg ("Not found: ");
-      msg << AssetId;
 
-      _handle_error (RequestId, RequestType, msg);
-   }
+void
+dmz::ForgeModuleQt::_handle_ok (
+      const String &AssetId,
+      const String &AssetRevision,
+      const UInt64 RequestId,
+      const Int32 RequestType) {
+
+   Config config ("global");
+   config.store_attribute ("ok", "true");
+   config.store_attribute (Local_Id, AssetId);
+   config.store_attribute (Local_Rev, AssetRevision);
+
+   String jsonData;
+   StreamString out (jsonData);
+
+   format_config_to_json (config, out, ConfigStripGlobal, &_state.log);
+
+   StringContainer container;
+   container.append (jsonData);
+
+   _handle_reply (RequestId, RequestType, container);
 }
 
 
@@ -2128,7 +2137,7 @@ dmz::ForgeModuleQt::_add_asset_media_file (const String &AssetId, const String &
 dmz::Boolean
 dmz::ForgeModuleQt::_is_media_unique (const String &AssetId, const String &File) {
 
-   Boolean unique (False);
+   Boolean unique (True);
 
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    if (asset) {
@@ -2143,7 +2152,7 @@ dmz::ForgeModuleQt::_is_media_unique (const String &AssetId, const String &File)
 
       const QString Current (asset->current.value (mimeType).get_buffer ());
 
-      if (!Current.contains (FileSHA)) { unique = True; }
+      if (Current.contains (FileSHA)) { unique = False; }
    }
 
    return unique;
@@ -2336,13 +2345,12 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
       if (AssetConfig.lookup_config (LocalCurrent, currentConfig)) {
 
          ConfigIterator it;
-         Config data;
+         String name, value;
 
-         while (currentConfig.get_next_config (it, data)) {
+         while (currentConfig.get_next_attribute (it, name, value)) {
 
-            QString mimeType (data.get_name ().get_buffer ());
-
-            asset->current.insert (mimeType, config_to_string (LocalValue, data));
+            QString mimeType (name.get_buffer ());
+            asset->current.insert (mimeType, value);
          }
       }
 

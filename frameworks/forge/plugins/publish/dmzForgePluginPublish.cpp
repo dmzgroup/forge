@@ -248,10 +248,10 @@ dmz::ForgePluginPublish::receive_message (
 
                _state.modelTarget = _state.targetBase;
                _state.modelTarget << "/" << qPrintable (fi.baseName ()) << ".ive";
+//               _state.modelTarget.replace_sub (" ", "_");
+
                _state.createTarget = True;
             }
-
-            _state.modelTarget.replace_sub (" ", "_");
          }
       }
    }
@@ -361,15 +361,18 @@ dmz::ForgePluginPublish::_slot_publish () {
 
    if (_state.createTarget) {
 
-      if (_dump_model (_state.modelTarget)) {
-
-         _asset.add_media (_state.modelTarget);
-         _state.createTarget = False;
-      }
+      if (_dump_model (_state.modelTarget)) { _state.createTarget = False; }
       else {
 
 _state.log.error << "Failed saving model to file: " << _state.modelTarget << endl;
+_state.modelTarget.flush ();
       }
+   }
+
+   if (_state.modelTarget) {
+
+      _asset.add_media (_state.modelTarget);
+      _state.modelTarget.flush ();
    }
 
    _asset.publish ();

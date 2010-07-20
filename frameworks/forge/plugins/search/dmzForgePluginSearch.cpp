@@ -8,21 +8,11 @@
 #include <QtGui/QtGui>
 
 
-struct dmz::ForgePluginSearch::ItemStruct {
+namespace {
 
-   const String AssetId;
-   UInt64 requestId;
-   QListWidgetItem *item;
-   QPixmap pixmap;
-
-   ItemStruct (const String &TheAssetId);
+   static const dmz::Int32 LocalItemIconWidth (200);
+   static const dmz::Int32 LocalItemIconHeight (150);
 };
-
-
-dmz::ForgePluginSearch::ItemStruct::ItemStruct (const String &TheAssetId) :
-      AssetId (TheAssetId),
-      requestId (0),
-      item (0) {;}
 
 
 dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local) :
@@ -37,15 +27,18 @@ dmz::ForgePluginSearch::ForgePluginSearch (const PluginInfo &Info, Config &local
 
    _ui.setupUi (this);
 
+   _ui.listView->setModel (&_model);
+   _ui.listView->setIconSize (QSize(LocalItemIconWidth, LocalItemIconHeight));
+   _ui.listView->setGridSize (QSize(LocalItemIconWidth + 20, LocalItemIconHeight + 25));
+
    _init (local);
 }
 
 
 dmz::ForgePluginSearch::~ForgePluginSearch () {
 
+   _model.clear ();
    _itemTable.clear ();
-   _previewTable.clear ();
-   _ui.itemListWidget->clear ();
 }
 
 
@@ -65,8 +58,6 @@ dmz::ForgePluginSearch::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-//      show ();
-      on_itemListWidget_currentItemChanged (0, 0);
    }
    else if (State == PluginStateStart) {
 
@@ -155,52 +146,28 @@ dmz::ForgePluginSearch::on_searchButton_clicked () {
 
       const QString SearchText (_ui.searchLineEdit->text ());
 
+      _model.clear ();
+      _itemTable.clear ();
+
       if (!SearchText.isEmpty ()) {
 
-         _itemTable.clear ();
-         _ui.itemListWidget->clear ();
-
-         UInt64 requestId = _forgeModule->search (qPrintable (SearchText), this);
+         _forgeModule->search (qPrintable (SearchText), this);
       }
    }
 }
 
 
 void
-dmz::ForgePluginSearch::on_itemListWidget_currentItemChanged (
-      QListWidgetItem *current,
-      QListWidgetItem *previous) {
+dmz::ForgePluginSearch::on_listView_activated (const QModelIndex &Index) {
 
-   if (current) {
-
-      const String AssetId (qPrintable (current->data (Qt::UserRole + 1).toString ()));
-      ItemStruct *is = _itemTable.lookup (AssetId);
-      if (is && _forgeModule) {
-
-         String data;
-         _forgeModule->lookup_name (is->AssetId, data);
-         _ui.nameLabel->setText (data.get_buffer ());
-
-         _ui.previewLabel->setPixmap (is->pixmap);
-      }
-   }
-   else {
-
-      _ui.nameLabel->clear ();
-      _ui.previewLabel->clear ();
-   }
-}
-
-
-void
-dmz::ForgePluginSearch::on_itemListWidget_itemActivated (QListWidgetItem * item) {
-
+   QStandardItem *item = _model.itemFromIndex (Index);
    if (item) {
 
-      const String AssetId (qPrintable (item->data (Qt::UserRole + 1).toString ()));
+      _cleanupMsg.send ();
+
+      const String AssetId (qPrintable (item->data ().toString ()));
 
       Data out = _convert.to_data (AssetId);
-
       _loadAssetMsg.send (&out);
    }
 }
@@ -209,27 +176,44 @@ dmz::ForgePluginSearch::on_itemListWidget_itemActivated (QListWidgetItem * item)
 void
 dmz::ForgePluginSearch::_handle_search (const StringContainer &Results) {
 
-   StringContainerIterator it;
-   String assetId;
-   while (Results.get_next (it, assetId)) {
+   QStandardItem *rootItem = _model.invisibleRootItem ();
 
-      String name;
-      _forgeModule->lookup_name (assetId, name);
+   if (_forgeModule && rootItem) {
 
-      ItemStruct *is = new ItemStruct (assetId);
-      is->item = new QListWidgetItem (name.get_buffer (), _ui.itemListWidget);
-      is->item->setData (Qt::UserRole + 1, QVariant (is->AssetId.get_buffer ()));
+      const QPixmap DefaultPixmap (":/search/default.png");
 
-      StringContainer previews;
-      _forgeModule->lookup_previews (assetId, previews);
+      const QIcon DefaultIcon (
+         DefaultPixmap.scaled (
+            LocalItemIconWidth,
+            LocalItemIconHeight,
+            Qt::IgnoreAspectRatio,
+            Qt::SmoothTransformation));
 
-      String image;
-      previews.get_first (image);
+      StringContainerIterator it;
+      String assetId;
 
-      is->requestId = _forgeModule->get_asset_preview (assetId, image, this);
+      while (Results.get_next (it, assetId)) {
 
-      _itemTable.store (is->AssetId, is);
-      _previewTable.store (is->requestId, is);
+         String name;
+         _forgeModule->lookup_name (assetId, name);
+
+         QStandardItem *item = new QStandardItem (DefaultIcon, name.get_buffer ());
+         item->setData (QVariant (assetId.get_buffer ()));
+
+         rootItem->appendRow (item);
+
+         StringContainer previews;
+         _forgeModule->lookup_previews (assetId, previews);
+
+         String image;
+         previews.get_first (image);
+
+         if (image) {
+
+            UInt64 requestId = _forgeModule->get_asset_preview (assetId, image, this);
+            if (requestId) { _itemTable.store (requestId, item); }
+         }
+      }
    }
 
    _ui.searchLineEdit->selectAll ();
@@ -242,11 +226,19 @@ dmz::ForgePluginSearch::_handle_get_preview (
       const UInt64 RequestId,
       const String &Preview) {
 
-   ItemStruct *is = _previewTable.lookup (RequestId);
-   if (is) {
+   QStandardItem *item = _itemTable.remove (RequestId);
+   if (item) {
 
-      QPixmap pixmap (Preview.get_buffer ());
-      is->pixmap = pixmap.scaled (200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+      const QPixmap PreviewPixmap (Preview.get_buffer ());
+
+      const QIcon PreviewIcon (
+         PreviewPixmap.scaled (
+            LocalItemIconWidth,
+            LocalItemIconHeight,
+            Qt::IgnoreAspectRatio,
+            Qt::SmoothTransformation));
+
+      item->setIcon (PreviewIcon);
    }
 }
 
@@ -261,6 +253,12 @@ dmz::ForgePluginSearch::_init (Config &local) {
    qframe_config_read ("frame", local, this);
 
    _forgeModuleName = config_to_string ("module.forge.name", local);
+
+   _cleanupMsg = config_create_message (
+      "cleanup-message.name",
+      local,
+      "CleanupObjectsMessage",
+      context);
 
    _loadAssetMsg = config_create_message (
       "load-asset-message.name",
