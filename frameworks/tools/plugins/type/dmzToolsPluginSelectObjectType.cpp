@@ -144,7 +144,7 @@ dmz::ToolsPluginSelectObjectType::_add_type (
 
    if (add) { _ui.typeList->addItem (Type.get_name ().get_buffer ()); }
 
-   ObjectTypeIterator it;
+   RuntimeIterator it;
    ObjectType next;
 
    while (Type.get_next_child (it, next)) { _add_type (next, add); }
