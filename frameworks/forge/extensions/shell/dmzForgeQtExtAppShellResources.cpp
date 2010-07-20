@@ -201,7 +201,7 @@ ForgeQtExtAppShellResources::State::update_resources () {
    while (rs) {
       
       log.debug << "Updating resource: " << rs->Name << endl;
-      updater.update_resource_config (rs->Name, rs->file);
+      updater.update_resource_file (rs->Name, rs->file);
       rs = resourceTable.get_next (it);
    }
 }
