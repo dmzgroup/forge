@@ -15,6 +15,7 @@ var dmz =
   , objOverlay = dmz.overlay.lookup("object")
   , posOverlay = dmz.overlay.lookup("position")
   , oriOverlay = dmz.overlay.lookup("orientation")
+  , switchOverlay = dmz.overlay.lookup("spectator")
   , text =
        { mode: modeOverlay.text()
        , obj: objOverlay.text()
@@ -89,4 +90,16 @@ dmz.input.channel.observe(self, OrbitChannel, channelState);
 dmz.messaging.subscribe(self, "DMZ_Entity_Attach_Message", function (data) {
 
    objOverlay.text(text.obj + dmz.data.unwrapHandle(data));
+});
+
+dmz.messaging.subscribe(self, "Start_Screen_Capture_Message", function (data) {
+
+   switchOverlay.setSwitchStateAll(false);
+});
+
+dmz.messaging.subscribe(self, "Finished_Screen_Capture_Message", function (data) {
+
+   dmz.time.setTimer (self, 0.5, function () {
+      switchOverlay.setSwitchStateAll(true);
+   });
 });

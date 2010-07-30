@@ -61,7 +61,6 @@ namespace dmz {
 
       protected Q_SLOTS:
          void on_searchButton_clicked ();
-
          void on_listView_activated (const QModelIndex &);
 
       protected:

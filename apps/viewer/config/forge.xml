@@ -6,6 +6,7 @@
 <forge-qt>
    <!-- <webservice host="localhost" port="5984" db="forge"> -->
    <webservice host="api.dmzforge.org" port="5984" db="forge">
+   <!-- <webservice host="dmzdev.couchone.com" port="80" db="forge"> -->
       <!-- <proxy host="localhost" port="8888"/> -->
    </webservice>
 </forge-qt>

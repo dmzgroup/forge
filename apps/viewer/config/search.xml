@@ -14,7 +14,7 @@
    <dock-windows>
       <group area="left">
          <widget name="search" title="Search" visible="true" floating="true">
-            <allowed-areas left="true" right="true"/>
+            <allowed-areas none="true"/>
          </widget>
       </group>
    </dock-windows>

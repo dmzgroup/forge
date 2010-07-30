@@ -15,35 +15,37 @@
    <auto-scale node="spectator info">
       <y type="simple" ratio=".2" size="200" min="100" max="200"/>
    </auto-scale>
-   <node type="transform" name="spectator info">
-      <position x="0" y="0"/>
-      <node type="text" name="mode">
-         <text value="Mode:"/>
-         <position x="0" y="100"/>
-         <font resource="font"/>
-         <height value="32"/>
-         <color name="text color"/>
-      </node>
-      <node type="text" name="object">
-         <text value="Obj :"/>
-         <position x="0" y="68"/>
-         <font resource="font"/>
-         <height value="32"/>
-         <color name="text color"/>
-      </node>
-      <node type="text" name="position">
-         <text value="POS :"/>
-         <position x="0" y="36"/>
-         <font resource="font"/>
-         <height value="32"/>
-         <color name="text color"/>
-      </node>
-      <node type="text" name="orientation">
-         <text value="ORI :"/>
-         <position x="0" y="4"/>
-         <font resource="font"/>
-         <height value="32"/>
-         <color name="text color"/>
+   <node type="switch" name="spectator">
+      <node type="transform" name="spectator info">
+         <position x="0" y="0"/>
+         <node type="text" name="mode">
+            <text value="Mode:"/>
+            <position x="0" y="100"/>
+            <font resource="font"/>
+            <height value="32"/>
+            <color name="text color"/>
+         </node>
+         <node type="text" name="object">
+            <text value="Obj :"/>
+            <position x="0" y="68"/>
+            <font resource="font"/>
+            <height value="32"/>
+            <color name="text color"/>
+         </node>
+         <node type="text" name="position">
+            <text value="POS :"/>
+            <position x="0" y="36"/>
+            <font resource="font"/>
+            <height value="32"/>
+            <color name="text color"/>
+         </node>
+         <node type="text" name="orientation">
+            <text value="ORI :"/>
+            <position x="0" y="4"/>
+            <font resource="font"/>
+            <height value="32"/>
+            <color name="text color"/>
+         </node>
       </node>
    </node>
 </overlay>

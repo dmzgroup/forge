@@ -13,6 +13,7 @@
 </plugin-list>
 <main-window>
    <!-- <showUnifiedTitleAndToolBar value="true"/> -->
+   <fixed-size x="800" y="600"/>
    <window title="DMZ Viewer"/>
    <central-widget name="viewer"/>
    <menu-bar>

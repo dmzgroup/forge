@@ -27,7 +27,7 @@
       <widget class="QLineEdit" name="searchLineEdit"/>
      </item>
      <item>
-      <widget class="QPushButton" name="searchButton">
+      <widget class="QToolButton" name="searchButton">
        <property name="text">
         <string>Search</string>
        </property>
@@ -72,22 +72,5 @@
   </layout>
  </widget>
  <resources/>
- <connections>
-  <connection>
-   <sender>searchLineEdit</sender>
-   <signal>returnPressed()</signal>
-   <receiver>searchButton</receiver>
-   <slot>click()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>147</x>
-     <y>28</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>283</x>
-     <y>39</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>
