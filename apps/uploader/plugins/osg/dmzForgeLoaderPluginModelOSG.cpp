@@ -89,7 +89,7 @@ dmz::ForgeLoaderPluginModelOSG::update_time_slice (const Float64 TimeDelta) {
       _set_portal ();
       String file (_fileRoot);
       file << _fileIndex << ".png";
-      _fileList.append (file);
+      _fileList.add (file);
       Data out = _convert.to_data (file);
       _doCaptureMsg.send (&out);
       _fileIndex++;

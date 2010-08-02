@@ -695,7 +695,7 @@ dmz::ForgeModuleQt::lookup_asset_media (const String &AssetId, StringContainer &
 
       for (it = asset->current.begin (); it != asset->current.end (); ++it) {
 
-         value.append (it.value ());
+         value.add (it.value ());
       }
 
 //      value = asset->media;
@@ -843,7 +843,7 @@ dmz::ForgeModuleQt::get_asset_media (
          if (is_valid_path (targetFile)) {
 
             StringContainer container;
-            container.append (targetFile);
+            container.add (targetFile);
 
             _handle_reply (requestId, ForgeTypeGetAssetMedia, container);
          }
@@ -892,7 +892,7 @@ dmz::ForgeModuleQt::put_asset_media (
             us->requestId = requestId;
             us->requestType = LocalPutAssetMediaPhase1;
             us->assetId = AssetId;
-            us->files.append (File);
+            us->files.add (File);
             us->mimeType = MimeType;
 
             _state.uploadQueue.enqueue (us);
@@ -955,7 +955,7 @@ dmz::ForgeModuleQt::get_asset_preview (
          if (is_valid_path (targetFile) && (ETag == asset->revision)) {
 
             StringContainer container;
-            container.append (targetFile);
+            container.add (targetFile);
 
             _handle_reply (requestId, ForgeTypeGetAssetPreview, container);
          }
@@ -1030,7 +1030,7 @@ dmz::ForgeModuleQt::remove_asset_preview (
    //    AssetStruct *asset = _state.assetTable.lookup (AssetId);
    //    if (asset) {
    //
-   //       asset->preview.append (Preview);
+   //       asset->preview.add (Preview);
    //
    //       UploadStruct *us = new UploadStruct;
    //       us->requestId = requestId;
@@ -1231,7 +1231,7 @@ dmz::ForgeModuleQt::_download_finished () {
             _state.update_etag (_state.download->assetId, _state.download->file);
 
             StringContainer container;
-            container.append (_state.download->targetFile);
+            container.add (_state.download->targetFile);
 
             _handle_reply (RequestId, RequestType, container);
          }
@@ -1471,7 +1471,7 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
             if (row.lookup_config ("doc", cd)) {
 
                const String AssetId (_config_to_asset (cd));
-               if (AssetId) { container.append (AssetId); }
+               if (AssetId) { container.add (AssetId); }
             }
          }
       }
@@ -1607,7 +1607,7 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
          _config_to_asset (global);
 
          StringContainer container;
-         container.append (JsonData);
+         container.add (JsonData);
 
          _handle_reply (RequestId, ForgeTypeGetAsset, container);
       }
@@ -1633,7 +1633,7 @@ dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &Jso
          _store_revision (AssetId, Revision);
 
          StringContainer container;
-         container.append (JsonData);
+         container.add (JsonData);
 
          _handle_reply (RequestId, ForgeTypePutAsset, container);
       }
@@ -1663,7 +1663,7 @@ dmz::ForgeModuleQt::_handle_delete_asset (const UInt64 RequestId, const String &
          _store_revision (AssetId, Revision);
 
          StringContainer container;
-         container.append (JsonData);
+         container.add (JsonData);
 
          _handle_reply (RequestId, ForgeTypePutAsset, container);
       }
@@ -1760,7 +1760,7 @@ dmz::ForgeModuleQt::_handle_put_asset_media_phase3 (
          _store_revision (AssetId, Revision);
 
          StringContainer container;
-         container.append (JsonData);
+         container.add (JsonData);
 
          _handle_reply (RequestId, ForgeTypePutAssetMedia, container);
       }
@@ -1859,7 +1859,7 @@ dmz::ForgeModuleQt::_handle_add_asset_preview_phase3 (
          _store_revision (AssetId, Revision);
 
          StringContainer container;
-         container.append (JsonData);
+         container.add (JsonData);
 
          _handle_reply (RequestId, ForgeTypeAddAssetPreview, container);
       }
@@ -1895,7 +1895,7 @@ dmz::ForgeModuleQt::_handle_get_uuids (const UInt64 RequestId, const String &Jso
          while (list.get_next_config (it, cd)) {
 
             String id = config_to_string ("value", cd);
-            if (id) { _state.uuids.append (id); }
+            if (id) { _state.uuids.add (id); }
          }
       }
    }
@@ -1937,7 +1937,7 @@ dmz::ForgeModuleQt::_handle_ok (
    format_config_to_json (config, out, ConfigStripGlobal, &_state.log);
 
    StringContainer container;
-   container.append (jsonData);
+   container.add (jsonData);
 
    _handle_reply (RequestId, RequestType, container);
 }
@@ -1963,7 +1963,7 @@ dmz::ForgeModuleQt::_handle_error (
       const String &Message) {
 
    StringContainer container;
-   container.append (Message);
+   container.add (Message);
 
    ReplyStruct *rs = new ReplyStruct (RequestId, RequestType, True, container);
    _state.replyQueue.enqueue (rs);
@@ -2168,7 +2168,7 @@ dmz::ForgeModuleQt::_add_asset_preview_file (const String &AssetId, const String
    const String Preview (name + ext);
 
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
-   if (asset) { asset->previews.append (Preview); }
+   if (asset) { asset->previews.add (Preview); }
 
    return Preview.get_buffer ();
 }
@@ -2332,7 +2332,7 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
          while (keywordList.get_next_config (it, word)) {
 
-            keywords.append (config_to_string (LocalValue, word));
+            keywords.add (config_to_string (LocalValue, word));
          }
       }
 
@@ -2386,7 +2386,7 @@ dmz::ForgeModuleQt::_config_to_asset (const Config &AssetConfig) {
 
             while (imageList.get_next_config (it, image)) {
 
-               asset->previews.append (config_to_string (LocalValue, image));
+               asset->previews.add (config_to_string (LocalValue, image));
             }
          }
       }

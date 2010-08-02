@@ -89,7 +89,7 @@ dmz::AssetPublisher::set_asset (const String &AssetId) {
 void
 dmz::AssetPublisher::add_media (const String &File) {
 
-   _media.append (File);
+   _media.add (File);
 }
 
 
@@ -113,7 +113,7 @@ dmz::AssetPublisher::publish () {
       QString value = keywordLineEdit->text ();
       if (value.indexOf (LocalKeywordDelimiter) == -1) {
 
-         keywords.append (qPrintable (value));
+         keywords.add (qPrintable (value));
       }
       else {
 
