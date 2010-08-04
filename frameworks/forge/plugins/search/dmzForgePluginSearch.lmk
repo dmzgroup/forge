@@ -8,7 +8,6 @@ lmk.add_files {"dmzForgePluginSearch.qrc",}
 lmk.add_files {"dmzForgePluginSearch.cpp",}
 
 lmk.add_libs {
-   "dmzQtSearchBox",
    "dmzQtUtil",
    "dmzKernel",
 }
