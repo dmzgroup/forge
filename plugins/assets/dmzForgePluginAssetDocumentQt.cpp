@@ -379,7 +379,7 @@ dmz::ForgePluginAssetDocumentQt::_init_ui (const String &FileName) {
 
                   const String Path = _currentConfigFile + ".tdb/" + File;
 
-                  list.append (Path);
+                  list.add (Path);
                }
 
                _update_thumbnails (list);

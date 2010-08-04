@@ -95,7 +95,7 @@ dmz::ForgePluginScreenCaptureMulti::update_time_slice (const Float64 TimeDelta) 
 
       String file (_fileRoot);
       file << count << ".png";
-      _fileList.append (file);
+      _fileList.add (file);
 
       Data out = _convertString.to_data (file);
       _doCaptureMsg.send (&out);
