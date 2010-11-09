@@ -216,7 +216,12 @@ struct dmz::ForgeModuleQt::State {
    Boolean init_cache_database ();
    Boolean exec (QSqlQuery &query);
    String get_etag (const String &AssetId, const String &Name);
-   Boolean store_etag (const String &AssetId, const String &Name, const Boolean Value = False);
+
+   Boolean store_etag (
+      const String &AssetId,
+      const String &Name,
+      const Boolean Value = False);
+
    Boolean update_etag (const String &AssetId, const String &Name);
 };
 
@@ -256,7 +261,10 @@ dmz::ForgeModuleQt::State::~State () {
 
    if (cacheDb.isValid () && cacheDb.isOpen ()) { cacheDb.close (); }
 
-   if (networkAccessManager) { networkAccessManager->deleteLater (); networkAccessManager = 0; }
+   if (networkAccessManager) {
+
+      networkAccessManager->deleteLater (); networkAccessManager = 0;
+   }
 
    while (!uploadQueue.isEmpty ()) { delete uploadQueue.takeFirst (); }
    while (!downloadQueue.isEmpty ()) { delete downloadQueue.takeFirst (); }
@@ -346,7 +354,9 @@ dmz::ForgeModuleQt::State::init_cache_database () {
 
          if (!cacheDb.commit ()) {
 
-            log.warn << "SQL Error: " << qPrintable (cacheDb.lastError ().text ()) << endl;
+            log.warn << "SQL Error: "
+                     << qPrintable (cacheDb.lastError ().text ())
+                     << endl;
          }
       }
       else {
@@ -406,11 +416,13 @@ dmz::ForgeModuleQt::State::store_etag (
 
    if (Update) {
 
-      query.prepare ("UPDATE previews SET etag = :etag WHERE asset = :asset AND name = :name");
+      query.prepare (
+         "UPDATE previews SET etag = :etag WHERE asset = :asset AND name = :name");
    }
    else {
 
-      query.prepare ("INSERT INTO previews (asset, name, etag) VALUES (:asset, :name, :etag)");
+      query.prepare (
+         "INSERT INTO previews (asset, name, etag) VALUES (:asset, :name, :etag)");
    }
 
    query.bindValue (":asset", AssetId.get_buffer ());
@@ -503,7 +515,11 @@ dmz::ForgeModuleQt::update_time_slice (const Float64 TimeDelta) {
       ForgeObserver *observer = _state.obsTable.remove (rs->RequestId);
       if (observer) {
 
-         observer->handle_reply (rs->RequestId, rs->RequestType, rs->Error, rs->Container);
+         observer->handle_reply (
+            rs->RequestId,
+            rs->RequestType,
+            rs->Error,
+            rs->Container);
       }
 
       delete rs; rs = 0;
@@ -654,7 +670,9 @@ dmz::ForgeModuleQt::lookup_details (const String &AssetId, String &value) {
 
 
 dmz::Boolean
-dmz::ForgeModuleQt::store_keywords (const String &AssetId, const StringContainer &Value) {
+dmz::ForgeModuleQt::store_keywords (
+      const String &AssetId,
+      const StringContainer &Value) {
 
    Boolean retVal (False);
    AssetStruct *asset = _state.assetTable.lookup (AssetId);
@@ -810,7 +828,8 @@ dmz::ForgeModuleQt::delete_asset (const String &AssetId, ForgeObserver *observer
 
          url.addQueryItem (LocalRev, asset->revision.get_buffer ());
 
-         QNetworkReply *reply = _request (LocalDelete, url, requestId, ForgeTypeDeleteAsset);
+         QNetworkReply *reply =
+            _request (LocalDelete, url, requestId, ForgeTypeDeleteAsset);
 
          delete asset; asset = 0;
       }
@@ -899,7 +918,10 @@ dmz::ForgeModuleQt::put_asset_media (
 
             QTimer::singleShot (0, this, SLOT (_start_next_upload ()));
          }
-         else { _handle_ok (asset->Id, asset->revision, requestId, ForgeTypePutAssetMedia); }
+         else {
+
+            _handle_ok (asset->Id, asset->revision, requestId, ForgeTypePutAssetMedia);
+         }
       }
       else { _handle_not_found (AssetId, requestId, ForgeTypePutAssetMedia); }
    }
@@ -1172,7 +1194,8 @@ dmz::ForgeModuleQt::_download_finished () {
    if (_state.download && _state.downloadReply && _state.downloadFile) {
 
       const Int32 StatusCode =
-         _state.downloadReply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
+         _state.downloadReply->attribute (
+            QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
       QNetworkRequest request = _state.downloadReply->request ();
 
@@ -1267,7 +1290,8 @@ dmz::ForgeModuleQt::_upload_progress (qint64 bytesSent, qint64 bytesTotal) {
 //
 //       QNetworkRequest request = _state.uploadReply->request ();
 //       const UInt64 Id = request.attribute (LocalAttrId).toULongLong ();
-// _state.log.error << "_upload_progress["  << Id  << "]: " << bytesSent << " of " << bytesTotal << endl;
+// _state.log.error << "_upload_progress["  << Id  << "]: "
+//                  << bytesSent << " of " << bytesTotal << endl;
 //    }
 }
 
@@ -1334,7 +1358,10 @@ dmz::ForgeModuleQt::_start_next_upload () {
             }
 
             QByteArray mimeType (LocalApplicationOctetStream);
-            if (_state.upload->mimeType) { mimeType = _state.upload->mimeType.get_buffer (); }
+            if (_state.upload->mimeType) {
+
+               mimeType = _state.upload->mimeType.get_buffer ();
+            }
             else if (localMimeTypes.contains (Ext)) { mimeType = localMimeTypes[Ext]; }
 
             QUrl url (_state.baseUrl);
@@ -1401,7 +1428,9 @@ dmz::ForgeModuleQt::_start_next_download () {
 
       if (_state.download && _state.networkAccessManager) {
 
-         _state.downloadFile = new QTemporaryFile (QDir::tempPath () + "/dmz_forge_download.XXXXXX");
+         _state.downloadFile =
+               new QTemporaryFile (QDir::tempPath () + "/dmz_forge_download.XXXXXX");
+
          if (_state.downloadFile->open ()) {
 
             QUrl url (_state.baseUrl);
@@ -1487,7 +1516,9 @@ dmz::ForgeModuleQt::_handle_search (const UInt64 RequestId, const String &JsonDa
 
 #if 0
 void
-dmz::ForgeModuleQt::_handle_search_phase1 (const UInt64 RequestId, const String &JsonData) {
+dmz::ForgeModuleQt::_handle_search_phase1 (
+      const UInt64 RequestId,
+      const String &JsonData) {
 
    Boolean error (False);
    String errorMsg;
@@ -1518,7 +1549,9 @@ dmz::ForgeModuleQt::_handle_search_phase1 (const UInt64 RequestId, const String 
 
       if (ss->container.get_count ()) {
 
-_state.log.warn << "search count: " << ss->updateCount << " : " << ss->container.get_count () << endl;
+_state.log.warn << "search count: "
+                << ss->updateCount << " : "
+                << ss->container.get_count () << endl;
 
          if (!_state.searchTable.store (RequestId, ss)) {
 
@@ -1546,7 +1579,9 @@ _state.log.warn << "search count: " << ss->updateCount << " : " << ss->container
 
 
 void
-dmz::ForgeModuleQt::_handle_search_phase2 (const UInt64 RequestId, const String &JsonData) {
+dmz::ForgeModuleQt::_handle_search_phase2 (
+      const UInt64 RequestId,
+      const String &JsonData) {
 
    Config global ("global");
 
@@ -1600,7 +1635,10 @@ dmz::ForgeModuleQt::_handle_get_asset (const UInt64 RequestId, const String &Jso
       String error = config_to_string ("error", global);
       if (error) {
 
-         _handle_error (RequestId, ForgeTypeGetAsset, config_to_string ("reason", global));
+         _handle_error (
+            RequestId,
+            ForgeTypeGetAsset,
+            config_to_string ("reason", global));
       }
       else {
 
@@ -1639,7 +1677,10 @@ dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &Jso
       }
       else {
 
-         _handle_error (RequestId, ForgeTypePutAsset, config_to_string ("reason", global));
+         _handle_error (
+            RequestId,
+            ForgeTypePutAsset,
+            config_to_string ("reason", global));
       }
    }
    else {
@@ -1650,7 +1691,9 @@ dmz::ForgeModuleQt::_handle_put_asset (const UInt64 RequestId, const String &Jso
 
 
 void
-dmz::ForgeModuleQt::_handle_delete_asset (const UInt64 RequestId, const String &JsonData) {
+dmz::ForgeModuleQt::_handle_delete_asset (
+      const UInt64 RequestId,
+      const String &JsonData) {
 
    Config global ("global");
 
@@ -1669,7 +1712,10 @@ dmz::ForgeModuleQt::_handle_delete_asset (const UInt64 RequestId, const String &
       }
       else {
 
-         _handle_error (RequestId, ForgeTypePutAsset, config_to_string ("reason", global));
+         _handle_error (
+            RequestId,
+            ForgeTypePutAsset,
+            config_to_string ("reason", global));
       }
    }
    else {
@@ -2026,7 +2072,9 @@ dmz::ForgeModuleQt::_request (
       }
       else {
 
-         _state.log.warn << "Unknown HTTP method requested: " << qPrintable (Method) << endl;
+         _state.log.warn << "Unknown HTTP method requested: "
+                         << qPrintable (Method) << endl;
+
          _state.log.warn << "with url: " << qPrintable (Url.toString ()) << endl;
       }
 
@@ -2234,7 +2282,9 @@ dmz::ForgeModuleQt::_asset_to_config (const String &AssetId, Config &assetConfig
       while (currentIt.hasNext()) {
 
          currentIt.next();
-         currentConfig.store_attribute (qPrintable (currentIt.key ()), currentIt.value ());
+
+         currentConfig.store_attribute (
+            qPrintable (currentIt.key ()), currentIt.value ());
       }
 
       assetConfig.overwrite_config (currentConfig);
