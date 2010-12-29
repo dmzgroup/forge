@@ -132,7 +132,7 @@ dmz::ViewerPluginMenu::on_openAction_triggered () {
       _mainWindowModule ? _mainWindowModule->get_qt_main_window () : 0,
       tr ("Load File"),
       _get_last_path (),
-      QString ("*.ive | *.dae"));
+      QString ("*.ive | *.dae | *.flt"));
 
    if (!FileName.isEmpty ()) { _open_file (FileName); }
 }
