@@ -17,7 +17,7 @@
 </plugin-list>
 <render>
    <osg-up value="z"/>
-   <visibility fov="60.0" near="1.0" far="32000.0"/>
+   <visibility fov="60.0" near="0.1" far="32000.0"/>
    <light value="0">
       <position x="1000" y="100" z="5000"/>
       <direction x="-0.5" y="0.5" z="-1.0"/>
