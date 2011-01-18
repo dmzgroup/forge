@@ -1,12 +1,20 @@
+#include <dmzArchiveModule.h>
+#include <dmzFoundationJSONUtil.h>
+#include <dmzObjectAttributeMasks.h>
+#include <dmzObjectModule.h>
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzRuntimeLog.h>
+#include <dmzRuntimeObjectType.h>
+#include <dmzTypesHandleContainer.h>
 #include <dmzTypesString.h>
 #include <dmzTypesStringContainer.h>
 #include <dmzTypesUUID.h>
-#include <dmzFoundationJSONUtil.h>
+#include <dmzSystemStreamString.h>
+#include <dmzWebServicesConsts.h>
 #include "dmzWebServicesModuleQt.h"
 #include <QtCore/QtCore>
 #include <QtNetwork/QtNetwork>
@@ -16,8 +24,10 @@ using namespace dmz;
 
 namespace {
    
-   static const char LocalApiEndpoint[] = "http://api.dmzforge.org:80";
-   static const char LocalUserAgentName[] = "dmzForgeModuleQt";
+   static const char LocalDatabaseEndpoint[] = "http://dmz.couchone.com:80";
+   static const char LocalUserAgentName[] = "dmzWebServicesModuleQt";
+   
+   static const String LocalJsonParseErrorMessage ("Error parsing json response.");
    
    static const String Local_Id ("_id");
    static const String Local_Rev ("_rev");
@@ -26,7 +36,22 @@ namespace {
    static const QString LocalGet ("get");
    static const QString LocalPut ("put");
    static const QString LocalDelete ("delete");
-//   static const QString LocalTimeStampFormat ("yyyy-M-d-h-m-s");
+   static const QString LocalTimeStampFormat ("yyyy-M-d-h-m-s");
+
+   static const char LocalId[] = "id";
+   static const char LocalRev[] = "rev";
+   static char LocalAccept[] = "Accept";
+   static char LocalApplicationJson[] = "application/json";
+   static char LocalApplicationOctetStream[] = "application/octet-stream";
+   static char LocalUserAgent[] = "User-Agent";
+   static char LocalETag[]= "ETag";
+   static char LocalIfNoneMatch[] = "If-None-Match";
+
+   static QNetworkRequest::Attribute LocalAttrType =
+      (QNetworkRequest::Attribute) (QNetworkRequest::User + 1);
+
+   static QNetworkRequest::Attribute LocalAttrId =
+      (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
 };
 
 
@@ -36,6 +61,13 @@ struct dmz::WebServicesModuleQt::State {
    QNetworkAccessManager *networkAccessManager;
    QUrl baseUrl;
    // HashTableUInt64Template<ForgeObserver> obsTable;
+   ArchiveModule *archiveMod;
+   Handle archiveHandle;
+   Handle revisionAttrHandle;
+   Handle publishAttrHandle;
+   ObjectTypeSet includeSet;
+   HandleContainer includeTable;
+   HandleContainer updateTable;
    
    State (const PluginInfo &Info);
    ~State ();
@@ -44,7 +76,10 @@ struct dmz::WebServicesModuleQt::State {
 
 dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       log (Info),
-      networkAccessManager (0) {
+      networkAccessManager (0),
+      baseUrl (LocalDatabaseEndpoint),
+      archiveMod (0),
+      archiveHandle (0) {
    
 }
 
@@ -109,9 +144,14 @@ dmz::WebServicesModuleQt::discover_plugin (
 
    if (Mode == PluginDiscoverAdd) {
 
+      if (!_state.archiveMod) { _state.archiveMod = ArchiveModule::cast (PluginPtr); }
    }
    else if (Mode == PluginDiscoverRemove) {
 
+      if (_state.archiveMod && (_state.archiveMod == ArchiveModule::cast (PluginPtr))) {
+
+         _state.archiveMod = 0;
+      }
    }
 }
 
@@ -149,6 +189,24 @@ dmz::WebServicesModuleQt::create_object (
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
 
+   if (_includeTable.contains_type (Type)) {
+   
+      _includeTable.add (ObjectHandle);
+      _updateTable.add (ObjectHandle);
+   }
+   
+   // if (_state.archiveMod) {
+   // 
+   //    Config config = _state.archiveMod->create_archive (_state.archiveHandle);
+   // 
+   //    String data;
+   //    StreamString out (data);
+   // 
+   //    if (format_config_to_json (config, out, ConfigStripGlobal|ConfigPrettyPrint, &_state.log)) {
+   // 
+   //       _state.log.warn << data << endl;
+   //    }
+   // }
 }
 
 
@@ -157,6 +215,10 @@ dmz::WebServicesModuleQt::destroy_object (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
+   if (_includeTable.contains (ObjectHandle)) {
+      
+      _includeTable.remove (ObjectHandle);
+   }
 }
 
 
@@ -166,6 +228,7 @@ dmz::WebServicesModuleQt::update_object_uuid (
       const UUID &Identity,
       const UUID &PrevIdentity) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -176,6 +239,7 @@ dmz::WebServicesModuleQt::remove_object_attribute (
       const Handle AttributeHandle,
       const Mask &AttrMask) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -198,6 +262,7 @@ dmz::WebServicesModuleQt::link_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -210,6 +275,7 @@ dmz::WebServicesModuleQt::unlink_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -226,6 +292,7 @@ dmz::WebServicesModuleQt::update_link_attribute_object (
       const UUID &PrevAttributeIdentity,
       const Handle PrevAttributeObjectHandle) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -237,6 +304,7 @@ dmz::WebServicesModuleQt::update_object_counter (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -248,6 +316,7 @@ dmz::WebServicesModuleQt::update_object_counter_minimum (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -259,6 +328,7 @@ dmz::WebServicesModuleQt::update_object_counter_maximum (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -270,6 +340,7 @@ dmz::WebServicesModuleQt::update_object_alternate_type (
       const ObjectType &Value,
       const ObjectType *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -281,6 +352,7 @@ dmz::WebServicesModuleQt::update_object_state (
       const Mask &Value,
       const Mask *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -292,6 +364,7 @@ dmz::WebServicesModuleQt::update_object_flag (
       const Boolean Value,
       const Boolean *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -303,6 +376,7 @@ dmz::WebServicesModuleQt::update_object_time_stamp (
       const Float64 Value,
       const Float64 *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -314,6 +388,7 @@ dmz::WebServicesModuleQt::update_object_position (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -325,6 +400,7 @@ dmz::WebServicesModuleQt::update_object_orientation (
       const Matrix &Value,
       const Matrix *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -336,6 +412,7 @@ dmz::WebServicesModuleQt::update_object_velocity (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -347,6 +424,7 @@ dmz::WebServicesModuleQt::update_object_acceleration (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -358,6 +436,7 @@ dmz::WebServicesModuleQt::update_object_scale (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -369,6 +448,7 @@ dmz::WebServicesModuleQt::update_object_vector (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -380,6 +460,7 @@ dmz::WebServicesModuleQt::update_object_scalar (
       const Float64 Value,
       const Float64 *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -391,6 +472,7 @@ dmz::WebServicesModuleQt::update_object_text (
       const String &Value,
       const String *PreviousValue) {
 
+   _add_update (ObjectHandle);
 }
 
 
@@ -402,6 +484,64 @@ dmz::WebServicesModuleQt::update_object_data (
       const Data &Value,
       const Data *PreviousValue) {
 
+   _add_update (ObjectHandle);
+}
+
+
+// WebServicesModule Interface
+
+dmz::UInt64
+dmz::WebServicesModuleQt::publish_object (
+      const Handle ObjectHandle,
+      WebServicesObserver *observer) {
+
+   // if (_state.archiveMod) {
+   //    
+   //    Config config = _state.archiveMod->create_archive (_state.archiveHandle);
+   //    
+   //    String data;
+   //    StreamString out (data);
+   // 
+   //    if (format_config_to_json (config, out, ConfigStripGlobal, &_state.log)) {
+   //    
+   //       _state.log.warn << data << endl;
+   //    }
+   // }
+
+#if 0
+   ObjectModule *objMod (get_object_module ());
+   if (objMod) {
+
+      Config objConfig ("object");
+
+      Boolean dumpObject (True);
+
+      const ObjectType Type (objMod->lookup_object_type (ObjectHandle));
+
+      if (Type) {
+
+      }
+      else { dumpObject = False; }
+      
+      if (dumpObject) {
+
+         objConfig.store_attribute ("type", Type.get_name ());
+
+         UUID uuid;
+
+         if (objMod->lookup_uuid (ObjectHandle, uuid)) {
+
+            objConfig.store_attribute ("uuid", uuid.to_string ());
+         }
+
+         // _currentConfig = result = tmp;
+
+         objMod->dump_all_object_attributes (ObjectHandle, *this);
+      }
+   }
+#endif
+
+   return 0;
 }
 
 
@@ -411,6 +551,30 @@ void
 dmz::WebServicesModuleQt::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
+   
+   Definitions defs (get_plugin_runtime_context ());
+   RuntimeContext *context (get_plugin_runtime_context ());
+
+   _state.archiveHandle = defs.create_named_handle (
+      config_to_string ("archive.name", local, WebServicesArchiveName));
+   
+   _state.publishAttrHandle = activate_object_attribute (
+      WebServicesPublishAttributeName,
+      ObjectFlagMask);
+
+   _state.revisionAttrHandle = defs.create_named_handle (WebServicesRevisionAttributeName);
+            
+   Config typeList;
+   if (local.lookup_all_config ("include.type", typeList)) {
+
+      ConfigIterator it;
+      Config type;
+
+      while (typeList.get_next_config (it, type)) {
+
+         _state.includeSet.add_object_type (config_to_string ("name", type), context);
+      }
+   }
    
    Config webservice;
    if (local.lookup_config ("webservice", webservice)) {
@@ -444,6 +608,9 @@ dmz::WebServicesModuleQt::_init (Config &local) {
       // 
       // _state.db = config_to_string ("db", webservice, "assets").get_buffer ();
    }
+   
+   // activate_default_object_attribute (ObjectCreateMask | ObjectDestroyMask);
+   activate_global_object_observer ();
 }
 
 

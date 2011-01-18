@@ -31,6 +31,18 @@ namespace dmz {
          //    const Boolean Error,
          //    const StringContainer &Results) = 0;
 
+         virtual void request_finished (
+            const UInt32 RequestId,
+            cosnt Config &Results);
+         
+         virtual void put_object_finished (
+            const UInt32 RequestId,
+            cosnt Config &Results);
+
+         virtual void get_object_finished (
+            const UInt32 RequestId,
+            cosnt Config &Results);
+
       protected:
          WebServicesObserver (const PluginInfo &Info);
          ~WebServicesObserver ();
