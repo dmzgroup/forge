@@ -1,3 +1,4 @@
+#include "dmzQtHttpClient.h"
 #include <dmzRuntimeConfig.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
@@ -33,10 +34,13 @@ namespace {
 struct dmz::WebServicesModuleQt::State {
 
    Log log;
+   QtHttpClient client;
    QNetworkAccessManager *networkAccessManager;
    QUrl baseUrl;
    // HashTableUInt64Template<ForgeObserver> obsTable;
-   
+
+   QMap<UInt32, QString> requestsPending;
+
    State (const PluginInfo &Info);
    ~State ();
 };
@@ -44,8 +48,9 @@ struct dmz::WebServicesModuleQt::State {
 
 dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       log (Info),
+      client (Info),
       networkAccessManager (0) {
-   
+
 }
 
 
@@ -92,6 +97,7 @@ dmz::WebServicesModuleQt::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
+      UInt64 requestId = _state.client.get (QUrl ("http://dmzdev.org"));
    }
    else if (State == PluginStateStop) {
 
