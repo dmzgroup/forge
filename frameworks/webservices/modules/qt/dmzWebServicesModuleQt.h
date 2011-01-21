@@ -40,7 +40,6 @@ namespace dmz {
             
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
-            
 
          // Object Observer Interface
          virtual void create_object (
@@ -207,9 +206,21 @@ namespace dmz {
             const Handle AttributeHandle,
             const Data &Value,
             const Data *PreviousValue);
+            
+         // WebServicesModule Interface
+            
+         virtual UInt64 put_object (
+            const UUID &Identity,
+            WebServicesObserver *observer);
+
+         virtual UInt64 get_object (
+            const UUID &Identity,
+            WebServicesObserver *observer);
+            
 
       protected Q_SLOTS:
          // void _reply_finsihed ();
+         // void _process_publish_object ();
       
       protected:
          // WebServicesModuleQt Interface

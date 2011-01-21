@@ -1,7 +1,6 @@
 require "lmkQt"
 lmkQt.set_name "dmzWebServicesModuleQt"
 lmk.set_type "plugin"
-
 lmk.add_files ({
    "dmzQtHttpClient.h",
    "dmzWebServicesModuleQt.h",
@@ -12,6 +11,15 @@ lmk.add_files {
    "dmzWebServicesModuleQt.cpp",
 }
 
-lmk.add_preqs {"dmzWebServicesFramework", "dmzObjectFramework",}
-lmk.add_libs {"dmzObjectUtil", "dmzFoundation","dmzKernel",}
+lmk.add_preqs {
+   "dmzWebServicesFramework",
+   "dmzArchiveFramework",
+   "dmzObjectFramework",
+}
+
+lmk.add_libs {
+   "dmzObjectUtil",
+   "dmzFoundation",
+   "dmzKernel",
+}
 lmkQt.add_libs {"QtCore", "QtNetwork",}

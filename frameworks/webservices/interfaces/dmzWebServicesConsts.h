@@ -17,9 +17,12 @@ namespace dmz {
 //! \addtogroup WebServices
 //! @{
 
-   const Int32 WebServiceTypeLogin             = 100;
-   const Int32 WebServiceTypeLogout            = 100;
-   const Int32 WebServiceTypeUser              = 1000;
+   const char WebServicesArchiveName[] = "WebServices_Archive";
+   const char WebServicesPublishAttributeName[] = "WebServices_Publish";
+   const char WebServicesRevisionAttributeName[] = "_rev";
+   
+   const Int32 WebServiceTypePublishObject   = 100;
+   const Int32 WebServiceTypeUser            = 1000;
 };
 
 

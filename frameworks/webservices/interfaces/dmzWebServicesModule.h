@@ -30,6 +30,14 @@ namespace dmz {
          // 
          // virtual UInt64 logout (WebServicesObserver *observer) = 0;
 
+         virtual UInt64 put_object  (
+            const UUID &Identity,
+            WebServicesObserver *observer) = 0;
+
+         virtual UInt64 get_object  (
+            const UUID &Identity,
+            WebServicesObserver *observer) = 0;
+            
       protected:
          WebServicesModule (const PluginInfo &Info);
          ~WebServicesModule ();
