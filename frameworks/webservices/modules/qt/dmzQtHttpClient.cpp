@@ -249,18 +249,25 @@ dmz::QtHttpClient::_reply_finished () {
    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
    if (reply) {
 
-      const Int32 StatusCode =
-         reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
+      // const Int32 StatusCode (reply->attribute (
+      //    QNetworkRequest::HttpStatusCodeAttribute).toInt());
 
-      const UInt64 RequestId = _get_request_id (reply);
-
-      if (!RequestId) {
-
-         _log.warn << "RequestId unknown: " << RequestId << endl;
-      }
-
+      const UInt64 RequestId (_get_request_id (reply));
       _replyMap.take (RequestId);
-      emit reply_finished (RequestId, reply);
+      
+      emit reply_finished (RequestId, reply);   
+      
+      // if (QNetworkReply::NoError == reply->error ()) {
+      //    
+      //    emit reply_finished (RequestId, reply);   
+      // }
+      // else if (QNetworkReply::OperationCanceledError == Error) {
+      // 
+      // }
+      // else {
+      //    
+      // }
+
       reply->deleteLater ();
    }
 }
@@ -269,25 +276,25 @@ dmz::QtHttpClient::_reply_finished () {
 void
 dmz::QtHttpClient::_reply_error () {
 
-   QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
-   if (reply) {
-   
-      const UInt64 RequestId = _get_request_id (reply);
-      const QString ErrorStr = reply->errorString ();
-      const QNetworkReply::NetworkError Error = reply->error ();
-
-      if (QNetworkReply::NoError == Error ||
-          QNetworkReply::OperationCanceledError == Error) {
-      
-         // no error to report -ss
-      }
-      else {
-         
-_log.warn << "QtHttpClient network error[" << RequestId << "]: " << (Int32)Error << " " << qPrintable (ErrorStr) << endl;
-
-         emit reply_error (RequestId, ErrorStr, Error);
-      }
-   }
+//    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
+//    if (reply) {
+//    
+//       const UInt64 RequestId = _get_request_id (reply);
+//       const QString ErrorStr = reply->errorString ();
+//       const QNetworkReply::NetworkError Error = reply->error ();
+// 
+//       if (QNetworkReply::NoError == Error ||
+//           QNetworkReply::OperationCanceledError == Error) {
+//       
+//          // no error to report -ss
+//       }
+//       else {
+//          
+// _log.warn << "QtHttpClient network error[" << RequestId << "]: " << (Int32)Error << " " << qPrintable (ErrorStr) << endl;
+// 
+//          emit reply_error (RequestId, ErrorStr, Error);
+//       }
+//    }
 }
 
 
@@ -309,8 +316,9 @@ dmz::QtHttpClient::_request (
 
    if (_manager) {
 
-_log.warn << "_request: " << qPrintable (Url.toString ()) << endl;
-
+_log.warn << "_request: " << qPrintable (Method) << " "
+          << qPrintable (Url.toString ()) << endl;
+      
       QNetworkRequest request (Url);
 
       request.setRawHeader (LocalUserAgent, LocalUserAgentName);
@@ -330,7 +338,7 @@ _log.warn << "_request: " << qPrintable (Url.toString ()) << endl;
          reply = _manager->put (request, Data);
       }
       else if (LocalPost == Method.toLower ()) {
-
+      
          reply = _manager->post (request, Data);
       }
       else if (LocalDelete == Method.toLower ()) {
@@ -347,11 +355,10 @@ _log.warn << "_request: " << qPrintable (Url.toString ()) << endl;
 
          connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
 
-         connect (
-            reply, SIGNAL (error (QNetworkReply::NetworkError)),
-            this, SLOT (_reply_error ()));
+         // connect (
+         //    reply, SIGNAL (error (QNetworkReply::NetworkError)),
+         //    this, SLOT (_reply_error ()));
          
-_log.warn << "reply send: " << RequestId << endl;
          _replyMap.insert (RequestId, reply);
       }
    }

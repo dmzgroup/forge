@@ -35,12 +35,7 @@ namespace dmz {
 
       Q_SIGNALS:
          void reply_aborted (const UInt64 RequestId);
-
-         void reply_error (
-            const UInt64 RequestId,
-            const QString &ErrorMessage,
-            const QNetworkReply::NetworkError Error);
-
+         void reply_error (const UInt64 RequestId, const QString &ErrorMessage);
          void reply_finished (const UInt64 RequestId, QNetworkReply *reply);
          
          void authentication_error (const UInt64 RequestId);

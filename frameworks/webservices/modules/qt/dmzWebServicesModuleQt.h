@@ -6,15 +6,18 @@
 #include <dmzRuntimeTimeSlice.h>
 #include <dmzWebServicesModule.h>
 #include <QtCore/QObject>
+#include <QtNetwork/QNetworkReply>
 
 class QByteArray;
-class QNetworkReply;
 class QNetworkRequest;
 class QString;
 class QUrl;
  
 
 namespace dmz {
+   
+   class Config;
+   
 
    class WebServicesModuleQt :
          public QObject,
@@ -218,7 +221,25 @@ namespace dmz {
             WebServicesObserver *observer);   
 
       protected Q_SLOTS:
+         void _reply_aborted (const UInt64 RequestId);
+      
          void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
+         
+         void _handle_reply (
+            const UInt64 RequestId,
+            const Int32 StatusCode,
+            const Config &Global);
+
+         // void _handle_error (
+         //    const UInt64 RequestId,
+         //    const Int32 StatusCode,
+         //    const QString &ErrorMessage);
+            
+         // void _reply_error (
+         //    const UInt64 RequestId,
+         //    const QString &ErrorMessage,
+         //    const QNetworkReply::NetworkError Error);
+            
          // void _process_publish_object ();
       
       protected:

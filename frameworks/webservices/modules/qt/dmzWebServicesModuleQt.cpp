@@ -71,6 +71,7 @@ struct dmz::WebServicesModuleQt::State {
    ObjectTypeSet includeSet;
    HandleContainer includeTable;
    HandleContainer updateTable;
+   QMap<QString, String> revisionMap;
    
    State (const PluginInfo &Info);
    ~State ();
@@ -106,12 +107,28 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
       _state (*(new State (Info))) {
 
    _state.client = new QtHttpClient (Info, this);
-   _state.client->update_username ("admin", "admin");
+   _state.client->update_username ("admin", "couch4me");
 
    connect (
       _state.client, SIGNAL (reply_finished (const UInt64, QNetworkReply *)),
       this, SLOT (_reply_finished (const UInt64, QNetworkReply *)));
 
+   connect (
+      _state.client, SIGNAL (reply_aborted (const UInt64)),
+      this, SLOT (_reply_aborted (const UInt64)));
+
+   // connect (
+   //    _state.client, SIGNAL (
+   //       reply_error (
+   //          const UInt64,
+   //          const QString &,
+   //          const QNetworkReply::NetworkError)),
+   //    this, SLOT (
+   //       _reply_error (
+   //          const UInt64,
+   //          const QString &,
+   //          const QNetworkReply::NetworkError)));
+      
    stop_time_slice ();
    
    _init (local);
@@ -135,10 +152,10 @@ dmz::WebServicesModuleQt::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      QUrl url (_state.baseUrl);
-      url.setPath ("/newdb");
-      
-      UInt64 requestId = _state.client->del (url);
+      // QUrl url (_state.baseUrl);
+      // url.setPath ("/test");
+      // 
+      // UInt64 requestId = _state.client->get (url);
    }
    else if (State == PluginStateStop) {
 
@@ -171,6 +188,84 @@ dmz::WebServicesModuleQt::discover_plugin (
 // TimeSlice Interface
 void
 dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
+
+   ObjectModule *objMod (get_object_module ());
+   // if (objMod) {
+   //    
+   //    HandleContainerIterator it;
+   //    Handle next;
+   // 
+   //    while (_state.updateTable.get_next (it, next)) {
+   // 
+   //       UUID uuid;
+   //       if (objMod->lookup_uuid (next, uuid)) {
+   //          
+   //          put_object (next);
+   //       }
+   // 
+   //       _state.updateTable.remove (next);
+   //    }
+   // }
+   
+
+   _state.updateTable.clear ();
+   if (_state.updateTable.get_count () == 0) { stop_time_slice (); }
+
+   if (_state.archiveMod && objMod) {
+      
+      Config archive = _state.archiveMod->create_archive (_state.archiveHandle);
+      Config objectList;
+      
+      if (archive.lookup_all_config ("archive.object", objectList)) {
+         
+         ConfigIterator it;
+         Config object;
+
+         while (objectList.get_next_config (it, object)) {
+         
+            _state.log.error << "------------------------------------" << endl;
+            UUID uuid = config_to_string ("uuid", object);
+            
+            String id = uuid.to_string ();
+            String rev = _state.revisionMap.value (id.get_buffer ());
+
+            Config doc ("global");
+            
+            doc.store_attribute ("_id", id);
+            
+            if (rev) { doc.store_attribute ("_rev", rev); }
+            
+            doc.add_config (object);
+            
+            String json;
+            StreamString out (json);
+                           
+            if (format_config_to_json (doc, out, ConfigStripGlobal|ConfigPrettyPrint, &_state.log)) {
+            
+               QUrl url (_state.baseUrl);
+               url.setPath (QString ("/test/%1").arg (id.get_buffer ()));
+            
+               QByteArray data (json.get_buffer ());
+            
+               const UInt64 RequestId (_state.client->put (url, data));
+
+               _state.log.warn << "put: " << RequestId << endl;
+            }
+            
+            _state.log.error << "------------------------------------" << endl;
+         }
+      }
+         
+         // QUrl url (_state.baseUrl);
+         // url.setPath (QString ("/test/%1").arg (next));
+         // 
+         // QByteArray data (json.get_buffer ());
+         // 
+         // const UInt64 RequestId (_state.client->put (url, data));
+         
+         // _state.requestMap.insert (RequestId, QLatin1String ("put_object"));
+      // }
+   }
 
    // while (!_state.replyQueue.isEmpty ()) {
    // 
@@ -501,7 +596,6 @@ dmz::WebServicesModuleQt::update_object_data (
 
 
 // WebServicesModule Interface
-
 dmz::UInt64
 dmz::WebServicesModuleQt::put_object (
       const UUID &Identity,
@@ -567,17 +661,88 @@ dmz::WebServicesModuleQt::get_object (
 
 
 void
+dmz::WebServicesModuleQt::_reply_aborted (const UInt64 RequestId) {
+
+   _state.log.warn << "_reply_aborted: " << RequestId << endl;
+}
+
+
+void
 dmz::WebServicesModuleQt::_reply_finished (const UInt64 RequestId, QNetworkReply *reply) {
 
-   if (RequestId && reply) {
+   if (reply) {
       
       const Int32 StatusCode =
          reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-      _state.log.warn << "_reply_finished[" << StatusCode << "]: " << RequestId << endl;
-      _state.log.error << qPrintable (QString (reply->readAll ())) << endl;
+      QByteArray data (reply->readAll ());
+      const String JsonData (data.constData ());
+      
+      if (JsonData) {
+         
+         Config global ("global");
+         if (json_string_to_config (JsonData, global)) {
+      
+            _handle_reply (RequestId, StatusCode, global);
+         }
+         else {
+      
+            String msg = "Error parsing json response";
+            _state.log.error << msg << endl;
+            // _handle_error (RequestId, StatusCode, msg);
+         }
+      }
+      else {
+         
+         String msg ("Network Error: ");
+         msg << qPrintable (reply->errorString ());
+         
+         _state.log.error << msg << endl;
+         // _handle_error (RequestId, StatusCode, msg);
+      }
    }
 }
+
+
+void
+dmz::WebServicesModuleQt::_handle_reply (
+      const UInt64 RequestId,
+      const Int32 StatusCode,
+      const Config &Global) {
+
+_state.log.warn << "_reply_finished[" << RequestId << "]: " << StatusCode << endl;
+
+   String error = config_to_string ("error", Global);
+   if (error) {
+
+      String msg = config_to_string ("reason", Global);
+      _state.log.error << msg << endl;
+   }
+   else {
+
+      String id = config_to_string ("id", Global);
+      String rev = config_to_string ("rev", Global);
+
+      if (id && rev) {
+      
+         _state.revisionMap.insert (id.get_buffer (), rev);
+      }
+      
+      _state.log.warn << " id: " << id << endl;
+      _state.log.warn << "rev: " << rev << endl;
+   }
+}
+
+
+// void
+// dmz::WebServicesModuleQt::_reply_error (
+//       const UInt64 RequestId,
+//       const QString &ErrorMessage,
+//       const QNetworkReply::NetworkError Error) {
+//          
+//    _state.log.error << "_reply_error[" << RequestId << "]: "
+//       << (Int32)Error << " - " << qPrintable (ErrorMessage) << endl;    
+// }
 
 
 // WebServicesModuleQt Interface
@@ -587,6 +752,8 @@ dmz::WebServicesModuleQt::_add_update (const Handle &ObjectHandle) {
    if (!_state.includeTable.contains (ObjectHandle)) {
 
       _state.updateTable.add (ObjectHandle);
+      
+      if (_state.updateTable.get_count () == 1) { start_time_slice (); }
    }
 }
 
