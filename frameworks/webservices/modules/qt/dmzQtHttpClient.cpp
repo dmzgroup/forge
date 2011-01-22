@@ -2,19 +2,26 @@
 #include <QtCore/QUrl>
 #include <QtNetwork/QNetworkAccessManager>
 
+#include <QtCore/QDebug>
+
 
 namespace {
 
    static const QString LocalGet ("get");
    static const QString LocalPut ("put");
+   static const QString LocalPost ("post");
    static const QString LocalDelete ("delete");   
 
-   static char LocalAccept[] = "Accept";
-   static char LocalApplicationJson[] = "application/json";
-   static char LocalApplicationOctetStream[] = "application/octet-stream";
-   static char LocalUserAgent[] = "User-Agent";
-   static char LocalETag[]= "ETag";
-   static char LocalIfNoneMatch[] = "If-None-Match";
+   static const char LocalUserAgentName[] = "dmz-qt-http-client/0.1";
+   static const char LocalAccept[] = "Accept";
+   static const char LocalApplicationJson[] = "application/json";
+   static const char LocalApplicationTextPlain[] = "text/plain; charset=utf-8";
+   static const char LocalApplicationFormUrlEncoded[] = "application/x-www-form-urlencoded";
+   static const char LocalApplicationOctetStream[] = "application/octet-stream";
+   static const char LocalContentType[] = "Content-Type";
+   static const char LocalUserAgent[] = "User-Agent";
+   static const char LocalETag[]= "ETag";
+   static const char LocalIfNoneMatch[] = "If-None-Match";
 
    static QNetworkRequest::Attribute LocalAttrId =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
@@ -29,10 +36,12 @@ dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
    _manager = new QNetworkAccessManager (this);
    
    connect (
+      _manager, SIGNAL (sslErrors (QNetworkReply *, const QList<QSslError> &)),
+      this, SLOT (_ssl_errors (QNetworkReply *, const QList<QSslError> &)));
+   
+   connect (
       _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
       this, SLOT (_authenticate (QNetworkReply *, QAuthenticator *)));
-      
-   _log.warn << "QtHttpClient ctor" << endl;
 }
 
 
@@ -40,7 +49,7 @@ dmz::QtHttpClient::~QtHttpClient () {
    
    if (_manager) {
 
-      // abort_all ();
+      abort_all ();
       _manager->deleteLater ();
       _manager = 0;
    }
@@ -78,6 +87,38 @@ dmz::QtHttpClient::get (const QUrl &Url) {
       requestId = _requestCounter++;
 
       QNetworkReply *reply = _request (LocalGet, Url, requestId);
+   }
+   
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::put (const QUrl &Url, const QByteArray &Data) {
+
+   UInt64 requestId (0);
+
+   if (Url.isValid ()) {
+      
+      requestId = _requestCounter++;
+
+      QNetworkReply *reply = _request (LocalPut, Url, requestId, Data);
+   }
+   
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::del (const QUrl &Url) {
+
+   UInt64 requestId (0);
+
+   if (Url.isValid ()) {
+      
+      requestId = _requestCounter++;
+
+      QNetworkReply *reply = _request (LocalDelete, Url, requestId);
    }
    
    return requestId;
@@ -124,14 +165,17 @@ dmz::QtHttpClient::update_username (const QString &Username, const QString &Pass
 void
 dmz::QtHttpClient::_authenticate (QNetworkReply *reply, QAuthenticator *authenticator) {
 
+_log.warn << "_authenticate requested ------------------------" << endl;
+
    if (reply && authenticator) {
       
       const UInt64 RequestId = _get_request_id (reply);
 
-_log.warn << "QtHttpClient authentication requested: " << RequestId << endl;
+_log.error << "QtHttpClient authentication requested: " << RequestId << endl;
       
-      authenticator->setUser (_auth.user ());
-      authenticator->setPassword (_auth.password ());
+      *authenticator = _auth;
+      // authenticator->setUser (_auth.user ());
+      // authenticator->setPassword (_auth.password ());
    }
 }
 
@@ -209,11 +253,11 @@ dmz::QtHttpClient::_reply_finished () {
          reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
       const UInt64 RequestId = _get_request_id (reply);
-      
-if (!RequestId) {
 
-   _log.warn << "RequestId unknown: " << RequestId << endl;
-}
+      if (!RequestId) {
+
+         _log.warn << "RequestId unknown: " << RequestId << endl;
+      }
 
       _replyMap.take (RequestId);
       emit reply_finished (RequestId, reply);
@@ -232,8 +276,6 @@ dmz::QtHttpClient::_reply_error () {
       const QString ErrorStr = reply->errorString ();
       const QNetworkReply::NetworkError Error = reply->error ();
 
-_log.warn << "QtHttpClient network error[" << RequestId << "]: " << qPrintable (ErrorStr) << endl;
-
       if (QNetworkReply::NoError == Error ||
           QNetworkReply::OperationCanceledError == Error) {
       
@@ -241,9 +283,18 @@ _log.warn << "QtHttpClient network error[" << RequestId << "]: " << qPrintable (
       }
       else {
          
+_log.warn << "QtHttpClient network error[" << RequestId << "]: " << (Int32)Error << " " << qPrintable (ErrorStr) << endl;
+
          emit reply_error (RequestId, ErrorStr, Error);
       }
    }
+}
+
+
+void
+dmz::QtHttpClient::_ssl_errors (QNetworkReply *reply, const QList<QSslError> &Errors) {
+
+_log.warn << "_ssl_errors" << endl;
 }
 
 
@@ -258,12 +309,17 @@ dmz::QtHttpClient::_request (
 
    if (_manager) {
 
+_log.warn << "_request: " << qPrintable (Url.toString ()) << endl;
+
       QNetworkRequest request (Url);
 
-      request.setRawHeader (LocalUserAgent, LocalUserAgent);
+      request.setRawHeader (LocalUserAgent, LocalUserAgentName);
       request.setRawHeader (LocalAccept, LocalApplicationJson);
-
+      // request.setRawHeader (LocalContentType, LocalApplicationJson);
+      
       request.setAttribute (LocalAttrId, RequestId);
+
+      _add_basic_auth_header (request);
 
       if (LocalGet == Method.toLower ()) {
 
@@ -272,6 +328,10 @@ dmz::QtHttpClient::_request (
       else if (LocalPut == Method.toLower ()) {
 
          reply = _manager->put (request, Data);
+      }
+      else if (LocalPost == Method.toLower ()) {
+
+         reply = _manager->post (request, Data);
       }
       else if (LocalDelete == Method.toLower ()) {
 
@@ -286,8 +346,12 @@ dmz::QtHttpClient::_request (
       if (reply) {
 
          connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
-         connect (reply, SIGNAL (error ()), this, SLOT (_reply_error ()));
+
+         connect (
+            reply, SIGNAL (error (QNetworkReply::NetworkError)),
+            this, SLOT (_reply_error ()));
          
+_log.warn << "reply send: " << RequestId << endl;
          _replyMap.insert (RequestId, reply);
       }
    }
@@ -309,3 +373,23 @@ dmz::QtHttpClient::_get_request_id (QNetworkReply *reply) const {
    return result;
 }
 
+
+dmz::Boolean
+dmz::QtHttpClient::_add_basic_auth_header (QNetworkRequest &request) {
+   
+   Boolean result (False);
+   
+   if (!_auth.user ().isEmpty () && !_auth.password ().isEmpty ()) {
+      
+      // HTTP Basic authentication header value: base64(username:password)
+      
+      QString credentials = _auth.user () + ":" + _auth.password ();
+      QByteArray authData = credentials.toAscii ().toBase64 ();
+      authData.prepend ("Basic ");
+
+      request.setRawHeader ("Authorization", authData);
+      result = True;
+   }
+
+   return result;
+}

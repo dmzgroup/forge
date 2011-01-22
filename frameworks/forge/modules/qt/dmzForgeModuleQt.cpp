@@ -1442,7 +1442,7 @@ dmz::ForgeModuleQt::_start_next_download () {
                    .arg (_state.download->file.get_buffer ()));
 
             QNetworkRequest request (url);
-            request.setRawHeader (LocalUserAgent, LocalUserAgent);
+            request.setRawHeader (LocalUserAgent, LocalUserAgentName);
             // request.setRawHeader (LocalAccept, LocalApplicationJson);
             // request.setHeader (QNetworkRequest::ContentTypeHeader, mimeType);
             request.setAttribute (LocalAttrId, _state.download->requestId);
@@ -2052,7 +2052,7 @@ dmz::ForgeModuleQt::_request (
 
       QNetworkRequest request (Url);
 
-      request.setRawHeader (LocalUserAgent, LocalUserAgent);
+      request.setRawHeader (LocalUserAgent, LocalUserAgentName);
       request.setRawHeader (LocalAccept, LocalApplicationJson);
 
       request.setAttribute (LocalAttrId, RequestId);

@@ -215,15 +215,17 @@ namespace dmz {
 
          virtual UInt64 get_object (
             const UUID &Identity,
-            WebServicesObserver *observer);
-            
+            WebServicesObserver *observer);   
 
       protected Q_SLOTS:
-         // void _reply_finsihed ();
+         void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
          // void _process_publish_object ();
       
       protected:
          // WebServicesModuleQt Interface
+         void _add_update (const Handle &ObjectHandle);
+         void _add_request (const UInt64 RequestId, const QString &Type);
+         void _remove_request (const UInt64 RequestId);
          void _init (Config &local);
 
       protected:

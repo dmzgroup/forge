@@ -8,6 +8,7 @@
 #include <QtNetwork/QAuthenticator>
 #include <QtNetwork/QNetworkReply>
 
+class QByteArray;
 class QNetworkAccessManager;
 class QUrl;
 
@@ -29,6 +30,8 @@ namespace dmz {
          virtual QString get_password() const;
 
          virtual UInt64 get (const QUrl &Url);
+         virtual UInt64 put (const QUrl &Url, const QByteArray &Data = "");
+         virtual UInt64 del (const QUrl &Url);
 
       Q_SIGNALS:
          void reply_aborted (const UInt64 RequestId);
@@ -48,9 +51,10 @@ namespace dmz {
          void abort_all ();
 
       protected Q_SLOTS:
-         void _authenticate (QNetworkReply  *reply, QAuthenticator *authenticator);
+         void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
          void _reply_finished ();
          void _reply_error ();
+         void _ssl_errors (QNetworkReply *reply, const QList<QSslError> &Errors);
 
       protected:
          QNetworkReply *_request (
@@ -60,6 +64,8 @@ namespace dmz {
                const QByteArray &Data = "");
          
          UInt64 _get_request_id (QNetworkReply *reply) const;
+         
+         Boolean _add_basic_auth_header (QNetworkRequest &request);
          
       protected:
          Log _log;

@@ -25,7 +25,8 @@ using namespace dmz;
 
 namespace {
    
-   static const char LocalDatabaseEndpoint[] = "http://dmz.couchone.com:80";
+   // static const char LocalDatabaseEndpoint[] = "http://dmz.couchone.com:80";
+   static const char LocalDatabaseEndpoint[] = "http://localhost:5984";
    static const char LocalUserAgentName[] = "dmzWebServicesModuleQt";
    
    static const String LocalJsonParseErrorMessage ("Error parsing json response.");
@@ -59,11 +60,10 @@ namespace {
 struct dmz::WebServicesModuleQt::State {
 
    Log log;
-   QtHttpClient client;
-   QNetworkAccessManager *networkAccessManager;
+   QtHttpClient *client;
    QUrl baseUrl;
    // HashTableUInt64Template<ForgeObserver> obsTable;
-   QMap<UInt32, QString> requestsPending;
+   QMap<UInt64, QString> requestMap;
    ArchiveModule *archiveMod;
    Handle archiveHandle;
    Handle revisionAttrHandle;
@@ -79,21 +79,20 @@ struct dmz::WebServicesModuleQt::State {
 
 dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       log (Info),
-	  client (Info),
-      networkAccessManager (0),
+      client (0),
       baseUrl (LocalDatabaseEndpoint),
       archiveMod (0),
       archiveHandle (0) {
-   
+
 }
 
 
 dmz::WebServicesModuleQt::State::~State () {
 
-   if (networkAccessManager) {
+   if (client) {
 
-      networkAccessManager->deleteLater ();
-      networkAccessManager = 0;
+      client->deleteLater ();
+      client = 0;
    }
 }
 
@@ -106,7 +105,12 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
       WebServicesModule (Info),
       _state (*(new State (Info))) {
 
-   _state.networkAccessManager = new QNetworkAccessManager (this);
+   _state.client = new QtHttpClient (Info, this);
+   _state.client->update_username ("admin", "admin");
+
+   connect (
+      _state.client, SIGNAL (reply_finished (const UInt64, QNetworkReply *)),
+      this, SLOT (_reply_finished (const UInt64, QNetworkReply *)));
 
    stop_time_slice ();
    
@@ -131,7 +135,10 @@ dmz::WebServicesModuleQt::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      UInt64 requestId = _state.client.get (QUrl ("http://dmzdev.org"));
+      QUrl url (_state.baseUrl);
+      url.setPath ("/newdb");
+      
+      UInt64 requestId = _state.client->del (url);
    }
    else if (State == PluginStateStop) {
 
@@ -194,10 +201,10 @@ dmz::WebServicesModuleQt::create_object (
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
 
-   if (_includeTable.contains_type (Type)) {
+   if (_state.includeSet.contains_type (Type)) {
    
-      _includeTable.add (ObjectHandle);
-      _updateTable.add (ObjectHandle);
+      _state.includeTable.add (ObjectHandle);
+      _state.updateTable.add (ObjectHandle);
    }
    
    // if (_state.archiveMod) {
@@ -220,9 +227,9 @@ dmz::WebServicesModuleQt::destroy_object (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
-   if (_includeTable.contains (ObjectHandle)) {
+   if (_state.includeTable.contains (ObjectHandle)) {
       
-      _includeTable.remove (ObjectHandle);
+      _state.includeTable.remove (ObjectHandle);
    }
 }
 
@@ -267,7 +274,7 @@ dmz::WebServicesModuleQt::link_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
-   _add_update (ObjectHandle);
+   // _add_update (SuperHandle);
 }
 
 
@@ -280,7 +287,7 @@ dmz::WebServicesModuleQt::unlink_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
-   _add_update (ObjectHandle);
+   // _add_update (SuperHandle);
 }
 
 
@@ -297,7 +304,7 @@ dmz::WebServicesModuleQt::update_link_attribute_object (
       const UUID &PrevAttributeIdentity,
       const Handle PrevAttributeObjectHandle) {
 
-   _add_update (ObjectHandle);
+   // _add_update (SuperHandle);
 }
 
 
@@ -496,8 +503,8 @@ dmz::WebServicesModuleQt::update_object_data (
 // WebServicesModule Interface
 
 dmz::UInt64
-dmz::WebServicesModuleQt::publish_object (
-      const Handle ObjectHandle,
+dmz::WebServicesModuleQt::put_object (
+      const UUID &Identity,
       WebServicesObserver *observer) {
 
    // if (_state.archiveMod) {
@@ -550,7 +557,39 @@ dmz::WebServicesModuleQt::publish_object (
 }
 
 
+dmz::UInt64
+dmz::WebServicesModuleQt::get_object (
+      const UUID &Identity,
+      WebServicesObserver *observer) {
+
+   return 0;
+}
+
+
+void
+dmz::WebServicesModuleQt::_reply_finished (const UInt64 RequestId, QNetworkReply *reply) {
+
+   if (RequestId && reply) {
+      
+      const Int32 StatusCode =
+         reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+      _state.log.warn << "_reply_finished[" << StatusCode << "]: " << RequestId << endl;
+      _state.log.error << qPrintable (QString (reply->readAll ())) << endl;
+   }
+}
+
+
 // WebServicesModuleQt Interface
+void
+dmz::WebServicesModuleQt::_add_update (const Handle &ObjectHandle) {
+   
+   if (!_state.includeTable.contains (ObjectHandle)) {
+
+      _state.updateTable.add (ObjectHandle);
+   }
+}
+
 
 void
 dmz::WebServicesModuleQt::_init (Config &local) {
