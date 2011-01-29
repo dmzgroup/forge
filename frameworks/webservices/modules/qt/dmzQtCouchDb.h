@@ -24,9 +24,11 @@ namespace dmz {
             
          virtual ~QtCouchDb ();
          
-         virtual UInt64 add_document (const String &Id, const Config &Data);
+         virtual UInt64 validate_user (const String &User, const String &Password);
          
-         virtual UInt64 get_document (const String &Id);
+         virtual UInt64 publish_document (const String &Id, const Config &Data);
+         
+         virtual UInt64 fetch_document (const String &Id);
          
          virtual UInt64 delete_document (const String &Id, const String &Rev);
          
@@ -39,12 +41,14 @@ namespace dmz {
          void busy ();
          void done ();
          
+         void authentication_valid (const UInt64 RequestId, const Boolean Value);
+         
          // void handle_error (
          //    const UInt64 RequestId,
          //    const Int32 StatusCode,
          //    const String &Message);
          
-         void handle_get_document (
+         void handle_document (
             const UInt64 RequestId,
             const String &Id,
             const String &Rev,

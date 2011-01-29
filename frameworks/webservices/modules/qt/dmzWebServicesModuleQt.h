@@ -23,6 +23,7 @@ namespace dmz {
          public QObject,
          public Plugin,
          public TimeSlice,
+         public ArchiveObserverUtil,
          public ObjectObserverUtil,
          public WebServicesModule {
             
@@ -43,6 +44,21 @@ namespace dmz {
             
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
+
+         // ArchiveObserver Interface
+         virtual void pre_process_archive (
+            const Handle ArchiveHandle,
+            const Int32 Version);
+
+         virtual void process_archive (
+            const Handle ArchiveHandle,
+            const Int32 Version,
+            Config &local,
+            Config &global);
+
+         virtual void post_process_archive (
+            const Handle ArchiveHandle,
+            const Int32 Version);
 
          // Object Observer Interface
          virtual void create_object (
@@ -218,8 +234,8 @@ namespace dmz {
 
          virtual UInt64 get_object (
             const UUID &Identity,
-            WebServicesObserver *observer);   
-
+            WebServicesObserver *observer);
+            
       protected Q_SLOTS:
          void _reply_aborted (const UInt64 RequestId);
       
@@ -229,7 +245,7 @@ namespace dmz {
             const UInt64 RequestId,
             const Int32 StatusCode,
             const Config &Global);
-
+            
          // void _handle_error (
          //    const UInt64 RequestId,
          //    const Int32 StatusCode,
@@ -244,9 +260,16 @@ namespace dmz {
       
       protected:
          // WebServicesModuleQt Interface
+         UInt64 _publish_document (const String &Id, const Config &Data);
+         
+         UInt64 _fetch_document (const String &Id);
+         UInt64 _fetch_changes (const Int32 Since);
+            
+         void _handle_archive (const UInt64 RequestId, const Config &Archive);
+         void _handle_changes (const UInt64 RequestId, const Config &Global);
+         
          void _add_update (const Handle &ObjectHandle);
-         void _add_request (const UInt64 RequestId, const QString &Type);
-         void _remove_request (const UInt64 RequestId);
+         
          void _init (Config &local);
 
       protected:

@@ -316,9 +316,6 @@ dmz::QtHttpClient::_request (
 
    if (_manager) {
 
-_log.warn << "_request: " << qPrintable (Method) << " "
-          << qPrintable (Url.toString ()) << endl;
-      
       QNetworkRequest request (Url);
 
       request.setRawHeader (LocalUserAgent, LocalUserAgentName);
