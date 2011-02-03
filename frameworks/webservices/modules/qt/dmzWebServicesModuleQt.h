@@ -1,6 +1,7 @@
 #ifndef DMZ_WEB_SERVICES_MODULE_QT_DOT_H
 #define DMZ_WEB_SERVICES_MODULE_QT_DOT_H
 
+#include <dmzArchiveObserverUtil.h>
 #include <dmzObjectObserverUtil.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
@@ -12,12 +13,12 @@ class QByteArray;
 class QNetworkRequest;
 class QString;
 class QUrl;
- 
+
 
 namespace dmz {
-   
+
    class Config;
-   
+
 
    class WebServicesModuleQt :
          public QObject,
@@ -26,7 +27,7 @@ namespace dmz {
          public ArchiveObserverUtil,
          public ObjectObserverUtil,
          public WebServicesModule {
-            
+
       Q_OBJECT
 
       public:
@@ -41,7 +42,7 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
-            
+
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
 
@@ -225,9 +226,9 @@ namespace dmz {
             const Handle AttributeHandle,
             const Data &Value,
             const Data *PreviousValue);
-            
+
          // WebServicesModule Interface
-            
+
          virtual UInt64 put_object (
             const UUID &Identity,
             WebServicesObserver *observer);
@@ -235,41 +236,41 @@ namespace dmz {
          virtual UInt64 get_object (
             const UUID &Identity,
             WebServicesObserver *observer);
-            
+
       protected Q_SLOTS:
          void _reply_aborted (const UInt64 RequestId);
-      
+
          void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
-         
+
          void _handle_reply (
             const UInt64 RequestId,
             const Int32 StatusCode,
             const Config &Global);
-            
+
          // void _handle_error (
          //    const UInt64 RequestId,
          //    const Int32 StatusCode,
          //    const QString &ErrorMessage);
-            
+
          // void _reply_error (
          //    const UInt64 RequestId,
          //    const QString &ErrorMessage,
          //    const QNetworkReply::NetworkError Error);
-            
+
          // void _process_publish_object ();
-      
+
       protected:
          // WebServicesModuleQt Interface
          UInt64 _publish_document (const String &Id, const Config &Data);
-         
+
          UInt64 _fetch_document (const String &Id);
          UInt64 _fetch_changes (const Int32 Since);
-            
+
          void _handle_archive (const UInt64 RequestId, const Config &Archive);
          void _handle_changes (const UInt64 RequestId, const Config &Global);
-         
+
          void _add_update (const Handle &ObjectHandle);
-         
+
          void _init (Config &local);
 
       protected:

@@ -26,17 +26,18 @@ using namespace dmz;
 
 
 namespace {
-   
+
    // static const char LocalDatabaseEndpoint[] = "http://dmz.couchone.com:80";
-   static const char LocalDatabaseEndpoint[] = "http://localhost:5984";
+//   static const char LocalDatabaseEndpoint[] = "http://localhost:5984";
+   static const char LocalDatabaseEndpoint[] = "https://games.chds.us:443";
    static const char LocalUserAgentName[] = "dmzWebServicesModuleQt";
-   
+
    static const String LocalJsonParseErrorMessage ("Error parsing json response.");
-   
+
    static const String Local_Id ("_id");
    static const String Local_Rev ("_rev");
    static const String Local_Attachments ("_attachments");
-   
+
    static const QString LocalGet ("get");
    static const QString LocalPut ("put");
    static const QString LocalDelete ("delete");
@@ -56,9 +57,9 @@ namespace {
 
    static QNetworkRequest::Attribute LocalAttrId =
       (QNetworkRequest::Attribute) (QNetworkRequest::User + 2);
-   
+
    static const Float64 LocalFetchChangesInterval (30.0);
-   
+
    struct PendingStruct {
 
       String docId;
@@ -89,10 +90,10 @@ struct dmz::WebServicesModuleQt::State {
    StringContainer fetchTable;
    Int32 lastSeq;
    Float64 fetchChangesDelta;
-   
+
    State (const PluginInfo &Info);
    ~State ();
-   
+
    PendingStruct *get_pending (const UInt64 RequestId);
    Boolean is_object_pending (const Handle ObjectHandle);
 };
@@ -113,7 +114,7 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
 dmz::WebServicesModuleQt::State::~State () {
 
    pendingTable.empty ();
-   
+
    if (client) {
 
       client->deleteLater ();
@@ -128,13 +129,13 @@ dmz::WebServicesModuleQt::State::get_pending (const UInt64 RequestId) {
    PendingStruct *ps (pendingTable.lookup (RequestId));
 
    if (!ps && RequestId) {
-      
+
       ps = new PendingStruct;
       ps->requestId = RequestId;
 
       if (!pendingTable.store (RequestId, ps)) { delete ps; ps = 0; }
    }
-   
+
    return ps;
 }
 
@@ -143,16 +144,16 @@ dmz::Boolean
 dmz::WebServicesModuleQt::State::is_object_pending (const Handle ObjectHandle) {
 
    Boolean result (False);
-   
+
    HashTableUInt64Iterator it;
    PendingStruct *ps = pendingTable.get_first (it);
-   
+
    while (ps && !result) {
 
       if (ObjectHandle == ps->objectHandle) { result = True; }
       else { ps = pendingTable.get_next (it); }
    }
-   
+
    return result;
 }
 
@@ -161,6 +162,7 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
       QObject (0),
       Plugin (Info),
       TimeSlice (Info),
+      ArchiveObserverUtil (Info, local),
       ObjectObserverUtil (Info, local),
       WebServicesModule (Info),
       _state (*(new State (Info))) {
@@ -187,13 +189,13 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
    //          const UInt64,
    //          const QString &,
    //          const QNetworkReply::NetworkError)));
-   
+
    // connect (
    //    &_state.syncTimer, SIGNAL (timeout ()),
    //    this, SLOT (_fetch_changes ()));
-   // 
+   //
    // _state.syncTimer.start (1000);
-   
+
    _init (local);
 }
 
@@ -218,7 +220,7 @@ dmz::WebServicesModuleQt::update_plugin_state (
 
       // QUrl url (_state.baseUrl);
       // url.setPath ("/test");
-      // 
+      //
       // UInt64 requestId = _state.client->get (url);
    }
    else if (State == PluginStateStop) {
@@ -256,36 +258,36 @@ dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
    ObjectModule *objMod (get_object_module ());
 
    if (objMod && _state.archiveMod && _state.updateTable.get_count ()) {
-      
+
       Config global = _state.archiveMod->create_archive (_state.archiveHandle);
       Config objectList;
-      
+
       if (global.lookup_all_config ("archive.object", objectList)) {
-         
+
          ConfigIterator it;
          Config object;
 
          while (objectList.get_next_config (it, object)) {
-         
+
             UUID uuid = config_to_string ("uuid", object);
             String docId = uuid.to_string ();
-            
+
             Handle objHandle = objMod->lookup_handle_from_uuid (docId);
-            
+
             if (_state.updateTable.contains (objHandle)) {
-               
+
                if (!_state.is_object_pending (objHandle)) {
-               
+
                   Config archive ("archive");
                   archive.add_config (object);
-               
+
                   UInt64 requestId = _publish_document (docId, archive);
                   if (requestId) {
-                  
+
                      PendingStruct *ps = _state.get_pending (requestId);
                      if (ps) { ps->objectHandle = objHandle; }
                   }
-                  
+
                   _state.updateTable.remove (objHandle);
                }
             }
@@ -299,10 +301,10 @@ dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
       _state.fetchTable.remove (id);
       _fetch_document (id);
    }
-   
+
    _state.fetchChangesDelta += TimeDelta;
    if (_state.fetchChangesDelta > LocalFetchChangesInterval) {
-      
+
       _state.fetchChangesDelta = 0;
       _fetch_changes (_state.lastSeq);
    }
@@ -314,7 +316,7 @@ void
 dmz::WebServicesModuleQt::pre_process_archive (
       const Handle ArchiveHandle,
       const Int32 Version) {
-      
+
 }
 
 
@@ -324,7 +326,7 @@ dmz::WebServicesModuleQt::process_archive (
       const Int32 Version,
       Config &local,
       Config &global) {
-         
+
 }
 
 
@@ -332,10 +334,10 @@ void
 dmz::WebServicesModuleQt::post_process_archive (
       const Handle ArchiveHandle,
       const Int32 Version) {
-         
+
 }
 
-   
+
 // Object Observer Interface
 void
 dmz::WebServicesModuleQt::create_object (
@@ -345,9 +347,9 @@ dmz::WebServicesModuleQt::create_object (
       const ObjectLocalityEnum Locality) {
 
    if (_state.includeSet.contains_type (Type)) {
-   
+
       _state.includeTable.add (ObjectHandle);
-      
+
       _add_update (ObjectHandle);
    }
 }
@@ -359,7 +361,7 @@ dmz::WebServicesModuleQt::destroy_object (
       const Handle ObjectHandle) {
 
    if (_state.includeTable.contains (ObjectHandle)) {
-      
+
       _state.includeTable.remove (ObjectHandle);
    }
 }
@@ -401,7 +403,7 @@ dmz::WebServicesModuleQt::update_object_locality (
          _state.includeTable.remove (ObjectHandle);
       }
       else {
-         
+
       }
    }
 }
@@ -675,32 +677,32 @@ void
 dmz::WebServicesModuleQt::_reply_finished (const UInt64 RequestId, QNetworkReply *reply) {
 
    if (reply) {
-      
+
       const Int32 StatusCode =
          reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
       QByteArray data (reply->readAll ());
       const String JsonData (data.constData ());
-      
+
       if (JsonData) {
-         
+
          Config global ("global");
          if (json_string_to_config (JsonData, global)) {
-      
+
             _handle_reply (RequestId, StatusCode, global);
          }
          else {
-      
+
             String msg = "Error parsing json response";
             _state.log.error << msg << endl;
             // _handle_error (RequestId, StatusCode, msg);
          }
       }
       else {
-         
+
          String msg ("Network Error: ");
          msg << qPrintable (reply->errorString ());
-         
+
          _state.log.error << msg << endl;
          // _handle_error (RequestId, StatusCode, msg);
       }
@@ -717,7 +719,7 @@ dmz::WebServicesModuleQt::_handle_reply (
 _state.log.error << "---------- _handle_reply[" << RequestId << "][" << StatusCode << "] ----------" << endl;
 
    PendingStruct *ps = _state.pendingTable.lookup (RequestId);
-   
+
    String error = config_to_string ("error", Global);
    if (error) {
 
@@ -728,23 +730,23 @@ _state.log.error << "_handle_reply error: " << msg << endl;
 
       String docId;
       String docRev;
-      
+
       if (ps->requestType == "fetchChanges") {
-      
+
          _handle_changes (RequestId, Global);
       }
       else if (ps->requestType == "fetchDocument") {
-         
+
          docId = config_to_string ("_id", Global);
          docRev = config_to_string ("_rev", Global);
 
          String docType = config_to_string ("type", Global);
-         
+
          Config data;
          Global.lookup_config (docType, data);
-            
+
          if (docType == "archive") {
-         
+
             _handle_archive (RequestId, data);
          }
          else {
@@ -753,11 +755,11 @@ _state.log.error << "_handle_reply error: doc type unknown: " << docType << endl
          }
       }
       else {
-         
+
          docId = config_to_string ("id", Global);
          docRev = config_to_string ("rev", Global);
       }
-      
+
       if (docId && docRev) {
 
          _state.revisionMap.insert (docId.get_buffer (), docRev);
@@ -766,7 +768,7 @@ _state.log.warn << " docId: " << docId << endl;
 _state.log.warn << "docRev: " << docRev << endl;
       }
    }
-   
+
    ps = _state.pendingTable.remove (RequestId);
    if (ps) { delete ps; ps = 0; }
 }
@@ -777,9 +779,9 @@ _state.log.warn << "docRev: " << docRev << endl;
 //       const UInt64 RequestId,
 //       const QString &ErrorMessage,
 //       const QNetworkReply::NetworkError Error) {
-//          
+//
 //    _state.log.error << "_reply_error[" << RequestId << "]: "
-//       << (Int32)Error << " - " << qPrintable (ErrorMessage) << endl;    
+//       << (Int32)Error << " - " << qPrintable (ErrorMessage) << endl;
 // }
 
 
@@ -788,9 +790,9 @@ dmz::UInt64
 dmz::WebServicesModuleQt::_publish_document (const String &Id, const Config &Data) {
 
    UInt64 requestId (0);
-   
+
    if (Id && _state.client) {
-      
+
       Config doc ("global");
 
       doc.store_attribute ("_id", Id);
@@ -808,24 +810,24 @@ dmz::WebServicesModuleQt::_publish_document (const String &Id, const Config &Dat
       if (format_config_to_json (doc, out, ConfigStripGlobal, &_state.log)) {
 
          QUrl url (_state.baseUrl);
-         url.setPath (QString ("/test/%1").arg (Id.get_buffer ()));
+         url.setPath (QString ("/db/test/%1").arg (Id.get_buffer ()));
 
          QByteArray data (json.get_buffer ());
 
          requestId = _state.client->put (url, data);
-         
+
          if (requestId) {
-            
+
             PendingStruct *ps = _state.get_pending (requestId);
             if (ps) {
 
                ps->docId = Id;
                ps->requestType = "publishDocument";
             }
-         }   
+         }
       }
    }
-   
+
    return requestId;
 }
 
@@ -835,16 +837,16 @@ dmz::WebServicesModuleQt::_fetch_document (const String &Id) {
 
    UInt64 requestId (0);
    ObjectModule *objMod (get_object_module ());
-   
+
    if (Id && _state.client && objMod) {
-      
+
       QUrl url (_state.baseUrl);
-      url.setPath (QString ("/test/%1").arg (Id.get_buffer ()));
-      
+      url.setPath (QString ("/db/test/%1").arg (Id.get_buffer ()));
+
       requestId = _state.client->get (url);
-      
+
       if (requestId) {
-         
+
          PendingStruct *ps = _state.get_pending (requestId);
          if (ps) {
 
@@ -856,7 +858,7 @@ dmz::WebServicesModuleQt::_fetch_document (const String &Id) {
          }
       }
    }
-   
+
    return requestId;
 }
 
@@ -865,22 +867,22 @@ dmz::UInt64
 dmz::WebServicesModuleQt::_fetch_changes (const Int32 Since) {
 
    UInt64 requestId (0);
-   
+
    if (_state.client) {
-      
+
       QUrl url (_state.baseUrl);
-      url.setPath ("/test/_changes");
+      url.setPath ("/db/test/_changes");
       url.addQueryItem ("since", QString::number (Since));
 
       requestId = _state.client->get (url);
-      
+
       if (requestId) {
-         
+
          PendingStruct *ps = _state.get_pending (requestId);
          if (ps) { ps->requestType = "fetchChanges"; }
       }
    }
-   
+
    return requestId;
 }
 
@@ -894,10 +896,10 @@ _state.log.error << "---------- _handle_archive[" << RequestId << "] ----------"
 _state.log.warn << "archiveHandle: " << _state.archiveHandle << endl;
 
    if (RequestId && _state.archiveMod) {
-      
+
       Config global ("dmz");
       global.add_config (Archive);
-      
+
        _state.archiveMod->process_archive (_state.archiveHandle, global);
    }
 }
@@ -909,10 +911,10 @@ dmz::WebServicesModuleQt::_handle_changes (const UInt64 RequestId, const Config 
 _state.log.error << "---------- _handle_changes[" << RequestId << "] ----------" << endl;
 
    _state.lastSeq = config_to_int32 ("last_seq", Global);
-   
+
    ConfigIterator it;
    Config data;
-      
+
    while (Global.get_next_config (it, data)) {
 
       String id = config_to_string ("id", data);
@@ -924,7 +926,7 @@ _state.log.error << "---------- _handle_changes[" << RequestId << "] ----------"
 
 void
 dmz::WebServicesModuleQt::_add_update (const Handle &ObjectHandle) {
-   
+
    if (_state.includeTable.contains (ObjectHandle)) {
 
 _state.log.error << "_add_update: " << ObjectHandle << endl;
@@ -937,22 +939,22 @@ void
 dmz::WebServicesModuleQt::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
-   
+
    Definitions defs (get_plugin_runtime_context ());
    RuntimeContext *context (get_plugin_runtime_context ());
 
    _state.archiveHandle = defs.create_named_handle (
       config_to_string ("archive.name", local, WebServicesArchiveName));
-   
+
    // _state.defaultArchiveHandle = defs.create_named_handle (
    //    config_to_string ("archive.name", local, ArchiveDefaultName));
-   
+
    _state.publishAttrHandle = activate_object_attribute (
       WebServicesPublishAttributeName,
       ObjectFlagMask);
 
    _state.revisionAttrHandle = defs.create_named_handle (WebServicesRevisionAttributeName);
-            
+
    Config typeList;
    if (local.lookup_all_config ("include.type", typeList)) {
 
@@ -964,40 +966,40 @@ dmz::WebServicesModuleQt::_init (Config &local) {
          _state.includeSet.add_object_type (config_to_string ("name", type), context);
       }
    }
-   
+
    Config webservice;
    if (local.lookup_config ("webservice", webservice)) {
 
       // Config proxy;
       // if (webservice.lookup_config ("proxy", proxy)) {
-      // 
+      //
       //    String host = config_to_string ("host", proxy, "localhost");
       //    Int32 port = config_to_int32 ("port", proxy, 8888);
-      // 
+      //
       //    QNetworkProxy proxy;
       //    proxy.setType (QNetworkProxy::HttpProxy);
       //    proxy.setHostName (host.get_buffer ());
       //    proxy.setPort (port);
-      // 
+      //
       //    QNetworkProxy::setApplicationProxy(proxy);
-      // 
+      //
       //    _state.log.info << "Using proxy: " << host << ":" << port << endl;
       // }
-      // 
+      //
       // String host = qPrintable (_state.baseUrl.host ());
       // host =  config_to_string ("host", webservice, host);
       // _state.baseUrl.setHost (host.get_buffer ());
-      // 
+      //
       // Int32 port = _state.baseUrl.port ();
       // port = config_to_int32 ("port", webservice, port);
       // _state.baseUrl.setPort (port);
-      // 
+      //
       // _state.log.info
       //    << "Using API endpoint: " << qPrintable (_state.baseUrl.toString ()) << endl;
-      // 
+      //
       // _state.db = config_to_string ("db", webservice, "assets").get_buffer ();
    }
-   
+
    // activate_default_object_attribute (ObjectCreateMask | ObjectDestroyMask);
    activate_global_object_observer ();
 }

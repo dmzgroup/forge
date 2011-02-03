@@ -21,6 +21,7 @@ lmk.add_preqs {
 }
 
 lmk.add_libs {
+   "dmzArchiveUtil",
    "dmzObjectUtil",
    "dmzFoundation",
    "dmzKernel",
