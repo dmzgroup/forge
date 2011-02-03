@@ -9,6 +9,7 @@
 
 namespace dmz {
 
+   class Message;
    class WebServicesObserver;
 
    class WebServicesModule {
@@ -23,6 +24,9 @@ namespace dmz {
 
          // WebServicesModule Interface
 
+         // virtual Boolean register_webservices_observer (WebServicesObserver &observer) = 0;
+         // virtual Boolean release_webservices_observer (WebServicesObserver &observer) = 0;
+
          // virtual UInt64 login (
          //    const String &UserName,
          //    const String &Password
@@ -30,7 +34,6 @@ namespace dmz {
          //
          // virtual UInt64 logout (WebServicesObserver *observer) = 0;
 
-#if 0
          virtual Boolean is_recording () const = 0;
 
          virtual Handle start_session (const String &Name) = 0;
@@ -42,20 +45,11 @@ namespace dmz {
 
          virtual Boolean store_record (const Message &Type, const Data *Record) {
 
-            return store_action (Type, 0, Record);
+            return store_record (Type, 0, Record);
          }
 
          virtual Boolean stop_session (const Handle SessionHandle) = 0;
          virtual Boolean abort_session (const Handle SessionHandle) = 0;
-#endif
-
-         virtual UInt64 put_object  (
-            const UUID &Identity,
-            WebServicesObserver *observer) = 0;
-
-         virtual UInt64 get_object  (
-            const UUID &Identity,
-            WebServicesObserver *observer) = 0;
 
       protected:
          WebServicesModule (const PluginInfo &Info);
