@@ -44,6 +44,10 @@ namespace dmz {
          virtual void update_time_slice (const Float64 TimeDelta);
 
          // WebServicesModuleQt Interface
+
+         virtual Boolean register_webservices_observer (WebServicesObserver &observer);
+         virtual Boolean release_webservices_observer (WebServicesObserver &observer);
+
          virtual Boolean is_recording () const;
 
          virtual Handle start_session (const String &Name);
@@ -79,6 +83,8 @@ namespace dmz {
          // void _process_publish_object ();
 
       protected:
+         UInt64 _publish_session (const Handle SessionHandle);
+
          UInt64 _publish_document (const String &Id, const Config &Data);
 
          UInt64 _fetch_document (const String &Id);
@@ -89,7 +95,7 @@ namespace dmz {
          void _handle_changes (const UInt64 RequestId, const Config &Global);
 
          QUrl _get_url (const String &EndPoint) const;
-         
+
          void _init (Config &local);
 
       protected:

@@ -11,7 +11,7 @@
 #include <dmzTypesMatrix.h>
 #include <dmzTypesVector.h>
 #include <dmzTypesUUID.h>
-
+#include <dmzWebServicesModule.h>
 
 using namespace dmz;
 
@@ -46,11 +46,12 @@ local_attr_name_to_handle (
 
 dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, Config &local) :
       Plugin (Info),
+      WebServicesObserver (Info),
       MessageObserver (Info),
       ObjectObserverUtil (Info, local),
-      UndoObserver (Info),
       _log (Info),
       _defs (Info.get_context ()),
+      _webservices (0),
       _recording (False),
       _inDump (False),
       _defaultAttrHandle (0),
@@ -97,10 +98,37 @@ dmz::ObjectPluginWebServices::discover_plugin (
 
    if (Mode == PluginDiscoverAdd) {
 
+      if (!_webservices) {
+
+         _webservices = WebServicesModule::cast (PluginPtr, _webservicesName);
+         if (_webservices) { _webservices->register_webservices_observer (*this); }
+      }
    }
    else if (Mode == PluginDiscoverRemove) {
 
+      if (_webservices && (_webservices == WebServicesModule::cast (PluginPtr))) {
+
+         _webservices->release_webservices_observer (*this);
+         _webservices = 0;
+      }
    }
+}
+
+
+// WebServicesObserver Interface
+void
+dmz::ObjectPluginWebServices::start_session () {
+
+   _recording = True;
+   _log.warn << "_start_session" << endl;
+}
+
+
+void
+dmz::ObjectPluginWebServices::stop_session () {
+
+   _recording = False;
+   _log.warn << "_stop_session" << endl;
 }
 
 
@@ -124,7 +152,7 @@ dmz::ObjectPluginWebServices::receive_message (
 
          String typeName;
          InData->lookup_string (_stringHandle, 0, typeName);
-         
+
          ObjectType type;
          _defs.lookup_object_type (typeName, type);
 
@@ -354,27 +382,32 @@ dmz::ObjectPluginWebServices::create_object (
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
 
-//    if (_recording) {
-// 
-//       if (!_inDump) {
-// 
-//          Data data;
-//          data.store_uuid (_uuidHandle, 0, Identity);
-// 
-//          _undo.store_action (_destroyObject, get_plugin_handle (), &data);
-//       }
-//       else {
-// 
-// #if 0
-//          Data data;
-//          data.store_uuid (_uuidHandle, 0, Identity);
-//          const String TypeName (Type.get_name ());
-//          data.store_string (_stringHandle, 0, TypeName);
-// 
-//          _undo.store_action (_createObject, get_plugin_handle (), &data);
-// #endif
-//       }
-//    }
+    if (_webservices && _recording) {
+
+       if (!_inDump) {
+
+          Data data;
+          data.store_uuid (_uuidHandle, 0, Identity);
+          const String TypeName (Type.get_name ());
+          data.store_string (_stringHandle, 0, TypeName);
+          _webservices->store_record (_createObject, get_plugin_handle (), &data);
+
+          data.clear ();
+          data.store_uuid (_uuidHandle, 0, Identity);
+          _webservices->store_record (_activateObject, get_plugin_handle (), &data);
+       }
+       else {
+
+ #if 0
+          Data data;
+          data.store_uuid (_uuidHandle, 0, Identity);
+          const String TypeName (Type.get_name ());
+          data.store_string (_stringHandle, 0, TypeName);
+
+          _undo.store_action (_createObject, get_plugin_handle (), &data);
+ #endif
+       }
+    }
 }
 
 
@@ -384,21 +417,21 @@ dmz::ObjectPluginWebServices::destroy_object (
       const Handle ObjectHandle) {
 
    // ObjectModule *objMod (get_object_module ());
-   // 
+   //
    // if (!_inDump && _recording && objMod) {
-   // 
+   //
    //    _inDump = True;
-   // 
+   //
    //    Data data;
    //    data.store_uuid (_uuidHandle, 0, Identity);
    //    _undo.store_action (_activateObject, get_plugin_handle (), &data);
    //    objMod->dump_all_object_attributes (ObjectHandle, *this);
-   // 
+   //
    //    const String TypeName (objMod->lookup_object_type (ObjectHandle).get_name ());
    //    data.store_string (_stringHandle, 0, TypeName);
-   // 
+   //
    //    _undo.store_action (_createObject, get_plugin_handle (), &data);
-   // 
+   //
    //    _inDump = False;
    // }
 }
@@ -649,40 +682,11 @@ dmz::ObjectPluginWebServices::update_object_data (
 }
 
 
-// UndoObserver Interface
-void
-dmz::ObjectPluginWebServices::update_recording_state (
-      const UndoRecordingStateEnum State,
-      const UndoRecordingTypeEnum RecordingType,
-      const UndoTypeEnum Type) {
-
-   if (State == UndoRecordingStateStart) {
-      
-      // _recording = True;
-      
-      // if (_ws) { _ws->start_session (); }
-   }
-   else if (State == UndoRecordingStateStop) {
-      
-      // _recording = False;
-      
-      // if (_ws) { _ws->stop_session (); }
-   }
-}
-
-
-void
-dmz::ObjectPluginWebServices::update_current_undo_names (
-      const String *NextUndoName,
-      const String *NextRedoName) {
-
-   // if (NextUndoName) { _sessionName = *NextUndoName; }
-}
-
-
 // ObjectPluginWebServices Interface
 void
 dmz::ObjectPluginWebServices::_init (Config &local) {
+
+   _webservicesName = config_to_string ("module-name.web-services", local);
 
    _defaultAttrHandle = _defs.create_named_handle (ObjectAttributeDefaultName);
 

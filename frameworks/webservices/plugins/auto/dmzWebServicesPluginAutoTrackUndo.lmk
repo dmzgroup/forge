@@ -1,0 +1,9 @@
+lmk.set_name "dmzWebServicesPluginAutoTrackUndo"
+lmk.set_type "plugin"
+lmk.add_files {"dmzWebServicesPluginAutoTrackUndo.cpp",}
+lmk.add_libs {
+   "dmzKernel",
+}
+lmk.add_preqs {
+   "dmzWebServicesFramework",
+}

@@ -23,9 +23,11 @@ namespace dmz {
          Handle get_webservices_module_handle () const;
 
          // WebServicesModule Interface
+          virtual Boolean register_webservices_observer (
+            WebServicesObserver &observer) = 0;
 
-         // virtual Boolean register_webservices_observer (WebServicesObserver &observer) = 0;
-         // virtual Boolean release_webservices_observer (WebServicesObserver &observer) = 0;
+          virtual Boolean release_webservices_observer (
+            WebServicesObserver &observer) = 0;
 
          // virtual UInt64 login (
          //    const String &UserName,

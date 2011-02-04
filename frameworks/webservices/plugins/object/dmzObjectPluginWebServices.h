@@ -6,16 +6,17 @@
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
-#include <dmzRuntimeUndo.h>
-
+#include <dmzWebServicesObserver.h>
 
 namespace dmz {
 
+   class WebServicesModule;
+
    class ObjectPluginWebServices :
          public Plugin,
+         public WebServicesObserver,
          public MessageObserver,
-         public ObjectObserverUtil,
-         public UndoObserver {
+         public ObjectObserverUtil {
 
       public:
          ObjectPluginWebServices (const PluginInfo &Info, Config &local);
@@ -29,6 +30,10 @@ namespace dmz {
          virtual void discover_plugin (
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
+
+         // WebServicesObserver Interface
+         virtual void start_session ();
+         virtual void stop_session ();
 
          // Message Observer Interface
          virtual void receive_message (
@@ -204,26 +209,18 @@ namespace dmz {
             const Data &Value,
             const Data *PreviousValue);
 
-         // UndoObserver Interface
-         virtual void update_recording_state (
-            const UndoRecordingStateEnum State,
-            const UndoRecordingTypeEnum RecordingType,
-            const UndoTypeEnum Type);
-
-         virtual void update_current_undo_names (
-            const String *NextUndoName,
-            const String *NextRedoName);
-
       protected:
-         // ObjectPluginWebServices Interface
          void _init (Config &local);
 
          Log _log;
          Definitions _defs;
-         
+
+         WebServicesModule *_webservices;
+         String _webservicesName;
+
          Boolean _recording;
          Boolean _inDump;
-         
+
          Handle _defaultAttrHandle;
 
          Handle _handleHandle;

@@ -25,30 +25,12 @@ namespace dmz {
          Handle get_webservices_observer_handle ();
          String get_webservices_observer_name ();
 
-         // virtual void handle_reply (
-         //    const UInt64 RequestId,
-         //    const Int32 RequestType,
-         //    const Boolean Error,
-         //    const StringContainer &Results) = 0;
-
-//         virtual void request_finished (
-//            const UInt32 RequestId,
-//            cosnt Config &Results);
-
-//         virtual void put_object_finished (
-//            const UInt32 RequestId,
-//            cosnt Config &Results);
-
-//         virtual void get_object_finished (
-//            const UInt32 RequestId,
-//            cosnt Config &Results);
-
-//         virtual void start_session ();
-//         virtual void stop_session ();
+         // WebServicesObserver Interface
+         virtual void start_session () = 0;
+         virtual void stop_session () = 0;
 
 //         virtual void fetch_changes (const Int32 Since = 0);
 //         virtual void process_record (const Int32 Seq);
-//         virtual void stop_session ();
 
       protected:
          WebServicesObserver (const PluginInfo &Info);

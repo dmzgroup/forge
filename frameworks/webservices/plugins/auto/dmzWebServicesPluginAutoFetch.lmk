@@ -1,0 +1,6 @@
+lmk.set_name "dmzWebServicesPluginAutoFetch"
+lmk.set_type "plugin"
+lmk.add_files {"dmzWebServicesPluginAutoFetch.cpp",}
+lmk.add_libs {
+   "dmzKernel",
+}
