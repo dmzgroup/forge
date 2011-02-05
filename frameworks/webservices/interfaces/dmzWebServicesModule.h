@@ -29,12 +29,13 @@ namespace dmz {
           virtual Boolean release_webservices_observer (
             WebServicesObserver &observer) = 0;
 
-         // virtual UInt64 login (
-         //    const String &UserName,
-         //    const String &Password
-         //    WebServicesObserver *observer) = 0;
-         //
-         // virtual UInt64 logout (WebServicesObserver *observer) = 0;
+//         virtual void login (const String &UserName, const String &Password) = 0;
+//         virtual void logout ();
+
+//         virtual Boolean is_logged_in () const = 0;
+
+//         virtual String get_user_name () const = 0;
+//         virtual StringContainer get_user_roles () const = 0;
 
          virtual Boolean is_recording () const = 0;
 

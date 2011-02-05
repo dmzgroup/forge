@@ -61,7 +61,15 @@ namespace dmz {
          virtual Boolean abort_session (const Handle SessionHandle);
 
       protected Q_SLOTS:
+         void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
+
          void _reply_aborted (const UInt64 RequestId);
+
+         void _reply_download_progress (
+            const UInt64 RequestId,
+            QNetworkReply *reply,
+            qint64 bytesReceived,
+            qint64 bytesTotal);
 
          void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
 
@@ -88,13 +96,16 @@ namespace dmz {
          UInt64 _publish_document (const String &Id, const Config &Data);
 
          UInt64 _fetch_document (const String &Id);
-         UInt64 _fetch_changes (const Int32 Since);
+         UInt64 _fetch_changes (const Int32 Since, const Boolean Continuous = False);
 
          void _handle_archive (const UInt64 RequestId, const Config &Archive);
          void _handle_session (const UInt64 RequestId, const Config &Session);
          void _handle_changes (const UInt64 RequestId, const Config &Global);
 
+         Boolean _continuous_feed (const Config &Feed);
+
          QUrl _get_url (const String &EndPoint) const;
+         QUrl _get_root_url (const String &EndPoint) const;
 
          void _init (Config &local);
 

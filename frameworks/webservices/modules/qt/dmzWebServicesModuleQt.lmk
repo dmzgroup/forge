@@ -27,4 +27,4 @@ lmk.add_libs {
    "dmzKernel",
 }
 
-lmkQt.add_libs {"QtCore", "QtNetwork",}
+lmkQt.add_libs {"QtCore", "QtGui","QtNetwork",}

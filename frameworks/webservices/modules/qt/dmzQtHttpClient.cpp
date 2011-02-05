@@ -2,7 +2,6 @@
 #include <QtCore/QUrl>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QSslError>
-
 #include <QtCore/QDebug>
 
 
@@ -19,7 +18,6 @@ namespace {
    static const char LocalApplicationTextPlain[] = "text/plain; charset=utf-8";
    static const char LocalApplicationFormUrlEncoded[] = "application/x-www-form-urlencoded";
    static const char LocalApplicationOctetStream[] = "application/octet-stream";
-   static const char LocalContentType[] = "Content-Type";
    static const char LocalUserAgent[] = "User-Agent";
    static const char LocalETag[]= "ETag";
    static const char LocalIfNoneMatch[] = "If-None-Match";
@@ -37,12 +35,16 @@ dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
    _manager = new QNetworkAccessManager (this);
 
    connect (
+      _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
+      this, SIGNAL (authentication_required (QNetworkReply *, QAuthenticator *)));
+
+   connect (
       _manager, SIGNAL (sslErrors (QNetworkReply *, const QList<QSslError> &)),
       this, SLOT (_ssl_errors (QNetworkReply *, const QList<QSslError> &)));
 
-   connect (
-      _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
-      this, SLOT (_authenticate (QNetworkReply *, QAuthenticator *)));
+//   connect (
+//      _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
+//      this, SLOT (_authenticate (QNetworkReply *, QAuthenticator *)));
 }
 
 
@@ -64,17 +66,10 @@ dmz::QtHttpClient::is_request_pending (const UInt64 RequestId) const {
 }
 
 
-QString
-dmz::QtHttpClient::get_username () const {
+QNetworkReply *
+dmz::QtHttpClient::get_reply (const UInt64 RequestId) const {
 
-   return _auth.user ();
-}
-
-
-QString
-dmz::QtHttpClient::get_password () const {
-
-   return _auth.password ();
+   return _replyMap.value (RequestId);
 }
 
 
@@ -104,6 +99,38 @@ dmz::QtHttpClient::put (const QUrl &Url, const QByteArray &Data) {
       requestId = _requestCounter++;
 
       QNetworkReply *reply = _request (LocalPut, Url, requestId, Data);
+   }
+
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (const QUrl &Url, const QMap<QString, QString> &Params) {
+
+   QUrl postData;
+   QMapIterator<QString, QString> it (Params);
+
+   while (it.hasNext ()) {
+
+      it.next();
+      postData.addQueryItem (it.key (), it.value ());
+   }
+
+   return post (Url, postData.encodedQuery());
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (const QUrl &Url, const QByteArray &Data) {
+
+   UInt64 requestId (0);
+
+   if (Url.isValid ()) {
+
+      requestId = _requestCounter++;
+
+      QNetworkReply *reply = _request (LocalPost, Url, requestId, Data);
    }
 
    return requestId;
@@ -155,30 +182,27 @@ dmz::QtHttpClient::abort_all () {
 }
 
 
-void
-dmz::QtHttpClient::update_username (const QString &Username, const QString &Password) {
+//void
+//dmz::QtHttpClient::update_username (const QString &Username, const QString &Password) {
 
-   _auth.setUser (Username);
-   _auth.setPassword (Password);
-}
+//   _auth.setUser (Username);
+//   _auth.setPassword (Password);
+//}
 
 
-void
-dmz::QtHttpClient::_authenticate (QNetworkReply *reply, QAuthenticator *authenticator) {
+//void
+//dmz::QtHttpClient::_authenticate (QNetworkReply *reply, QAuthenticator *authenticator) {
 
-_log.warn << "_authenticate requested ------------------------" << endl;
+//   if (reply && authenticator) {
 
-   if (reply && authenticator) {
+//      const UInt64 RequestId = _get_request_id (reply);
 
-      const UInt64 RequestId = _get_request_id (reply);
+//_log.error << "_____QtHttpClient authentication requested: " << RequestId << "_____"<< endl;
 
-_log.error << "QtHttpClient authentication requested: " << RequestId << endl;
-
-      *authenticator = _auth;
-      // authenticator->setUser (_auth.user ());
-      // authenticator->setPassword (_auth.password ());
-   }
-}
+//       authenticator->setUser (_auth.user ());
+//       authenticator->setPassword (_auth.password ());
+//   }
+//}
 
 
 // QUrl
@@ -242,6 +266,18 @@ _log.error << "QtHttpClient authentication requested: " << RequestId << endl;
 //
 //    return result;
 // }
+
+
+void
+dmz::QtHttpClient::_reply_download_progress (qint64 bytesReceived, qint64 bytesTotal) {
+
+   QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
+   if (reply) {
+
+      const UInt64 RequestId (_get_request_id (reply));
+      emit reply_download_progress (RequestId, reply, bytesReceived, bytesTotal);
+   }
+}
 
 
 void
@@ -332,11 +368,9 @@ dmz::QtHttpClient::_request (
 
       request.setRawHeader (LocalUserAgent, LocalUserAgentName);
       request.setRawHeader (LocalAccept, LocalApplicationJson);
-      // request.setRawHeader (LocalContentType, LocalApplicationJson);
+      // request.setHeader (QNetworkRequest::ContentTypeHeader, LocalApplicationJson);
 
       request.setAttribute (LocalAttrId, RequestId);
-
-      _add_basic_auth_header (request);
 
       if (LocalGet == Method.toLower ()) {
 
@@ -347,6 +381,10 @@ dmz::QtHttpClient::_request (
          reply = _manager->put (request, Data);
       }
       else if (LocalPost == Method.toLower ()) {
+
+         request.setHeader (
+            QNetworkRequest::ContentTypeHeader,
+            LocalApplicationFormUrlEncoded);
 
          reply = _manager->post (request, Data);
       }
@@ -361,6 +399,10 @@ dmz::QtHttpClient::_request (
       }
 
       if (reply) {
+
+         connect (
+            reply, SIGNAL (downloadProgress (qint64, qint64)),
+            this, SLOT (_reply_download_progress (qint64, qint64)));
 
          connect (reply, SIGNAL (finished ()), this, SLOT (_reply_finished ()));
 
@@ -384,27 +426,6 @@ dmz::QtHttpClient::_get_request_id (QNetworkReply *reply) const {
 
       QNetworkRequest request = reply->request ();
       result = request.attribute (LocalAttrId).toULongLong ();
-   }
-
-   return result;
-}
-
-
-dmz::Boolean
-dmz::QtHttpClient::_add_basic_auth_header (QNetworkRequest &request) {
-
-   Boolean result (False);
-
-   if (!_auth.user ().isEmpty () && !_auth.password ().isEmpty ()) {
-
-      // HTTP Basic authentication header value: base64(username:password)
-
-      QString credentials = _auth.user () + ":" + _auth.password ();
-      QByteArray authData = credentials.toAscii ().toBase64 ();
-      authData.prepend ("Basic ");
-
-      request.setRawHeader ("Authorization", authData);
-      result = True;
    }
 
    return result;

@@ -15,7 +15,6 @@ class QUrl;
 
 namespace dmz {
 
-
    class QtHttpClient: public QObject {
       
       Q_OBJECT
@@ -26,27 +25,38 @@ namespace dmz {
 
          virtual Boolean is_request_pending (const UInt64 RequestId) const;
 
-         virtual QString get_username() const;
-         virtual QString get_password() const;
+         virtual QNetworkReply *get_reply (const UInt64 RequestId) const;
 
          virtual UInt64 get (const QUrl &Url);
          virtual UInt64 put (const QUrl &Url, const QByteArray &Data = "");
          virtual UInt64 del (const QUrl &Url);
 
-      Q_SIGNALS:
+         virtual UInt64 post (const QUrl &Url, const QMap<QString, QString> &Params);
+         virtual UInt64 post (const QUrl &Url, const QByteArray &Data = "");
+
+   Q_SIGNALS:
          void reply_aborted (const UInt64 RequestId);
          void reply_error (const UInt64 RequestId, const QString &ErrorMessage);
          void reply_finished (const UInt64 RequestId, QNetworkReply *reply);
-         
+
+         void reply_download_progress (
+            const UInt64 RequestId,
+            QNetworkReply *reply,
+            qint64 bytesReceived,
+            qint64 bytesTotal);
+
+         void authentication_required (
+            QNetworkReply *reply,
+            QAuthenticator *authenticator);
+
          void authentication_error (const UInt64 RequestId);
 
       public Q_SLOTS:
-         void update_username (const QString &UserName, const QString &Password);
          void abort (const UInt64 RequestId);
          void abort_all ();
 
       protected Q_SLOTS:
-         void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
+         void _reply_download_progress (qint64 bytesReceived, qint64 bytesTotal);
          void _reply_finished ();
          void _reply_error ();
          void _ssl_errors (QNetworkReply *reply, const QList<QSslError> &Errors);
@@ -60,12 +70,9 @@ namespace dmz {
          
          UInt64 _get_request_id (QNetworkReply *reply) const;
          
-         Boolean _add_basic_auth_header (QNetworkRequest &request);
-         
       protected:
          Log _log;
          QNetworkAccessManager *_manager;
-         QAuthenticator _auth;
          
          UInt64 _requestCounter;
          QMap<UInt64, QNetworkReply *> _replyMap;

@@ -26,6 +26,10 @@ namespace dmz {
          String get_webservices_observer_name ();
 
          // WebServicesObserver Interface
+//         virtual Boolean authentication_required (String &user, String &password) = 0;
+//         virtual void login_successfull () = 0;
+//         virtual void login_failed () = 0;
+
          virtual void start_session () = 0;
          virtual void stop_session () = 0;
 
