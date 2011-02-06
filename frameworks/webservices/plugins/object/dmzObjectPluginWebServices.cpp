@@ -147,6 +147,7 @@ dmz::ObjectPluginWebServices::receive_message (
 
       if (Msg == _createObject) {
 
+_log.error << "---------create object -----------------------" << endl;
          UUID uuid;
          InData->lookup_uuid (_uuidHandle, 0, uuid);
 
@@ -156,12 +157,29 @@ dmz::ObjectPluginWebServices::receive_message (
          ObjectType type;
          _defs.lookup_object_type (typeName, type);
 
+_log.warn << "type: " << type.get_name () << endl;
+
          const Handle ObjectHandle (objMod->create_object (type, ObjectLocal));
 
-         if (ObjectHandle) { objMod->store_uuid (ObjectHandle, uuid); }
+
+         if (ObjectHandle) {
+
+            if (objMod->store_uuid (ObjectHandle, uuid)) {
+
+               _log.warn << "uuid: " << uuid.to_string () << endl;
+            }
+
+//            objMod->activate_object (ObjectHandle);
+         }
       }
       else if (Msg == _activateObject) {
 
+_log.error << "--------------------------------" << endl;
+UUID uuid;
+InData->lookup_uuid (_uuidHandle, 0, uuid);
+_log.warn << "uuid: " << uuid.to_string () << endl;
+_log.info << "activate_object: " << local_uuid_to_handle (*InData, _uuidHandle, *objMod) << endl;
+_log.error << "--------------------------------" << endl;
          objMod->activate_object (local_uuid_to_handle (*InData, _uuidHandle, *objMod));
       }
       else if (Msg == _destroyObject) {
@@ -173,7 +191,7 @@ dmz::ObjectPluginWebServices::receive_message (
          const Handle ObjectHandle (local_uuid_to_handle (*InData, _uuidHandle, *objMod));
 
          UUID uuid;
-         InData->lookup_uuid (_uuidHandle, 1, uuid);
+         InData->lookup_uuid (_uuidHandle, 0, uuid);
 
          objMod->store_uuid (ObjectHandle, uuid);
       }
@@ -382,31 +400,24 @@ dmz::ObjectPluginWebServices::create_object (
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
 
-    if (_webservices && _recording) {
+   ObjectModule *objMod (get_object_module ());
 
-       if (!_inDump) {
+    if (!_inDump && _recording && _webservices && objMod) {
 
-          Data data;
-          data.store_uuid (_uuidHandle, 0, Identity);
-          const String TypeName (Type.get_name ());
-          data.store_string (_stringHandle, 0, TypeName);
-          _webservices->store_record (_createObject, get_plugin_handle (), &data);
+       _inDump = True;
 
-          data.clear ();
-          data.store_uuid (_uuidHandle, 0, Identity);
-          _webservices->store_record (_activateObject, get_plugin_handle (), &data);
-       }
-       else {
+       Data data;
+       data.store_uuid (_uuidHandle, 0, Identity);
+       data.store_string (_stringHandle, 0, Type.get_name ());
+       _webservices->store_record (_createObject, get_plugin_handle (), &data);
 
- #if 0
-          Data data;
-          data.store_uuid (_uuidHandle, 0, Identity);
-          const String TypeName (Type.get_name ());
-          data.store_string (_stringHandle, 0, TypeName);
+//       objMod->dump_all_object_attributes (ObjectHandle, *this);
 
-          _undo.store_action (_createObject, get_plugin_handle (), &data);
- #endif
-       }
+       data.clear ();
+       data.store_uuid (_uuidHandle, 0, Identity);
+       _webservices->store_record (_activateObject, get_plugin_handle (), &data);
+
+       _inDump = False;
     }
 }
 
@@ -416,24 +427,12 @@ dmz::ObjectPluginWebServices::destroy_object (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
-   // ObjectModule *objMod (get_object_module ());
-   //
-   // if (!_inDump && _recording && objMod) {
-   //
-   //    _inDump = True;
-   //
-   //    Data data;
-   //    data.store_uuid (_uuidHandle, 0, Identity);
-   //    _undo.store_action (_activateObject, get_plugin_handle (), &data);
-   //    objMod->dump_all_object_attributes (ObjectHandle, *this);
-   //
-   //    const String TypeName (objMod->lookup_object_type (ObjectHandle).get_name ());
-   //    data.store_string (_stringHandle, 0, TypeName);
-   //
-   //    _undo.store_action (_createObject, get_plugin_handle (), &data);
-   //
-   //    _inDump = False;
-   // }
+    if (_recording && _webservices) {
+
+       Data data;
+       data.store_uuid (_uuidHandle, 0, Identity);
+       _webservices->store_record (_destroyObject, get_plugin_handle (), &data);
+    }
 }
 
 
@@ -443,6 +442,14 @@ dmz::ObjectPluginWebServices::update_object_uuid (
       const UUID &Identity,
       const UUID &PrevIdentity) {
 
+_log.info << "update_object_uuid: " << ObjectHandle << " : " << Identity.to_string () << endl;
+
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      _webservices->store_record (_storeUUID, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -453,6 +460,14 @@ dmz::ObjectPluginWebServices::remove_object_attribute (
       const Handle AttributeHandle,
       const Mask &AttrMask) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      data.store_string (_handleHandle, 0, _defs.lookup_named_handle_name (AttributeHandle));
+      data.store_mask (_maskHandle, AttrMask);
+      _webservices->store_record (_removeAttribute, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -463,6 +478,9 @@ dmz::ObjectPluginWebServices::update_object_locality (
       const ObjectLocalityEnum Locality,
       const ObjectLocalityEnum PrevLocality) {
 
+   if (_recording) {
+
+   }
 }
 
 
@@ -475,6 +493,15 @@ dmz::ObjectPluginWebServices::link_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
+   if (_recording && _webservices)  {
+
+      Data data;
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_uuid (_uuidHandle, 0, SuperIdentity);
+      data.store_uuid (_uuidHandle, 1, SubIdentity);
+      _webservices->store_record (_linkObjects, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -487,6 +514,15 @@ dmz::ObjectPluginWebServices::unlink_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
+   if (_recording && _webservices)  {
+
+      Data data;
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_uuid (_uuidHandle, 0, SuperIdentity);
+      data.store_uuid (_uuidHandle, 1, SubIdentity);
+      _webservices->store_record (_unlinkObjects, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -503,6 +539,16 @@ dmz::ObjectPluginWebServices::update_link_attribute_object (
       const UUID &PrevAttributeIdentity,
       const Handle PrevAttributeObjectHandle) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_uuid (_uuidHandle, 0, AttributeIdentity);
+      data.store_uuid (_uuidHandle, 1, SuperIdentity);
+      data.store_uuid (_uuidHandle, 2, SubIdentity);
+      _webservices->store_record (_storeLinkAttributeObject, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -514,6 +560,15 @@ dmz::ObjectPluginWebServices::update_object_counter (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_int64 (_valueHandle, 0, Value);
+      _webservices->store_record (_storeCounter, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -525,6 +580,15 @@ dmz::ObjectPluginWebServices::update_object_counter_minimum (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_int64 (_valueHandle, 0, Value);
+      _webservices->store_record (_storeCounterMin, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -536,6 +600,15 @@ dmz::ObjectPluginWebServices::update_object_counter_maximum (
       const Int64 Value,
       const Int64 *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_int64 (_valueHandle, 0, Value);
+      _webservices->store_record (_storeCounterMax, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -547,6 +620,15 @@ dmz::ObjectPluginWebServices::update_object_alternate_type (
       const ObjectType &Value,
       const ObjectType *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_string (_valueHandle, 0, Value.get_name ());
+      _webservices->store_record (_storeType, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -558,6 +640,15 @@ dmz::ObjectPluginWebServices::update_object_state (
       const Mask &Value,
       const Mask *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_mask (_valueHandle, Value);
+      _webservices->store_record (_storeState, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -569,6 +660,15 @@ dmz::ObjectPluginWebServices::update_object_flag (
       const Boolean Value,
       const Boolean *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_int32 (_valueHandle, 0, Value);
+      _webservices->store_record (_storeState, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -580,6 +680,15 @@ dmz::ObjectPluginWebServices::update_object_time_stamp (
       const Float64 Value,
       const Float64 *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_float64(_valueHandle, 0, Value);
+      _webservices->store_record (_storeTimeStamp, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -591,6 +700,15 @@ dmz::ObjectPluginWebServices::update_object_position (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_vector (_valueHandle, 0, Value);
+      _webservices->store_record (_storePosition, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -602,6 +720,15 @@ dmz::ObjectPluginWebServices::update_object_orientation (
       const Matrix &Value,
       const Matrix *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_matrix (_valueHandle, 0, Value);
+      _webservices->store_record (_storeOrientation, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -613,6 +740,15 @@ dmz::ObjectPluginWebServices::update_object_velocity (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_vector (_valueHandle, 0, Value);
+      _webservices->store_record (_storeVelocity, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -624,6 +760,15 @@ dmz::ObjectPluginWebServices::update_object_acceleration (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_vector (_valueHandle, 0, Value);
+      _webservices->store_record (_storeAcceleration, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -635,6 +780,15 @@ dmz::ObjectPluginWebServices::update_object_scale (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_vector (_valueHandle, 0, Value);
+      _webservices->store_record (_storeScale, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -646,6 +800,15 @@ dmz::ObjectPluginWebServices::update_object_vector (
       const Vector &Value,
       const Vector *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_vector (_valueHandle, 0, Value);
+      _webservices->store_record (_storeVector, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -657,6 +820,15 @@ dmz::ObjectPluginWebServices::update_object_scalar (
       const Float64 Value,
       const Float64 *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_float64 (_valueHandle, 0, Value);
+      _webservices->store_record (_storeScalar, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -668,6 +840,15 @@ dmz::ObjectPluginWebServices::update_object_text (
       const String &Value,
       const String *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_string (_valueHandle, 0, Value);
+      _webservices->store_record (_storeText, get_plugin_handle (), &data);
+   }
 }
 
 
@@ -679,6 +860,18 @@ dmz::ObjectPluginWebServices::update_object_data (
       const Data &Value,
       const Data *PreviousValue) {
 
+   if (_recording && _webservices) {
+
+      // Convert Data object to string here!
+      const String StrValue ("Not Implemented Yet"); // Data.to_string ();
+
+      Data data;
+      data.store_uuid (_uuidHandle, 0, Identity);
+      const String AttrName (_defs.lookup_named_handle_name (AttributeHandle));
+      data.store_string (_handleHandle, 0, AttrName);
+      data.store_string (_valueHandle, 0, StrValue);
+      _webservices->store_record (_storeData, get_plugin_handle (), &data);
+   }
 }
 
 

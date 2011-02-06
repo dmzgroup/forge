@@ -144,6 +144,7 @@ struct dmz::WebServicesModuleQt::State {
    Float64 fetchChangesDelta;
    Boolean loggedIn;
    UInt64 continuousFeedId;
+   UInt64 currentRequestId;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -169,7 +170,8 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       fetchChangesDelta (0),
       lastSeq (0) ,
       loggedIn (False),
-      continuousFeedId (0) {
+      continuousFeedId (0),
+      currentRequestId (0) {
 
 }
 
@@ -412,11 +414,14 @@ dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
 
 #endif
 
-   String id;
-   if (_state.fetchTable.get_first (id)) {
+   if (!_state.currentRequestId) {
 
-      _state.fetchTable.remove (id);
-      _fetch_document (id);
+      String id;
+      if (_state.fetchTable.get_first (id)) {
+
+         _state.fetchTable.remove (id);
+         _state.currentRequestId = _fetch_document (id);
+      }
    }
 
    _state.fetchChangesDelta += TimeDelta;
@@ -749,6 +754,8 @@ _state.log.warn << "RequestType: " << ps->requestType << endl;
 
    _state.log.error << "_handle_reply error: doc type unknown: " << docType << endl;
          }
+
+         _state.currentRequestId = 0;
       }
       else if (ps->requestType == "publishDocument") {
 
@@ -920,7 +927,8 @@ dmz::WebServicesModuleQt::_fetch_changes (const Int32 Since, const Boolean Conti
          PendingStruct *ps = _state.get_pending (requestId);
          if (ps) {
 
-            ps->requestType = Continuous ? "fetchChangesContinuous" : "fetchChanges";
+            ps->requestType = "fetchChanges";
+            if (Continuous) { ps->requestType << "Continuous"; }
          }
       }
    }
@@ -953,7 +961,35 @@ _state.log.error << "---------- _handle_session[" << RequestId << "] ----------"
 
    if (RequestId) {
 
-//_state.log.warn << Session << endl;
+      const String DocId (config_to_string ("uuid", Session));
+      const String Name  (config_to_string ("name", Session, "Unknown Action"));
+
+      Config actionList;
+      if (Session.lookup_all_config ("action", actionList)) {
+
+         RuntimeContext *context (get_plugin_runtime_context ());
+
+         ConfigIterator it;
+         Config action;
+
+         while (Session.get_next_config (it, action)) {
+
+            const Message Type (
+               config_create_message ("message", action, "", context, &_state.log));
+
+            const Handle Target (config_to_named_handle ("target", action, "", context));
+
+            Data value;
+            const Boolean DataCreated (
+               config_to_data ("data", action, context, value, &_state.log));
+
+            if (Type) {
+
+_state.log.warn << "sent message: " << Type.get_name () << " to: " << Target << endl;
+               Type.send (Target, DataCreated ? &value : 0, 0);
+            }
+         }
+      }
    }
 }
 
