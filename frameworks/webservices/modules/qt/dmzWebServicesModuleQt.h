@@ -6,6 +6,7 @@
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
 #include <dmzWebServicesModule.h>
+#include <dmzWebServicesObserver.h>
 #include <QtCore/QObject>
 #include <QtNetwork/QNetworkReply>
 
@@ -23,7 +24,8 @@ namespace dmz {
          public QObject,
          public Plugin,
          public TimeSlice,
-         public WebServicesModule {
+         public WebServicesModule,
+         public WebServicesObserver {
 
       Q_OBJECT
 
@@ -43,22 +45,24 @@ namespace dmz {
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
 
-         // WebServicesModuleQt Interface
+         // WebServicesModule Interface
+         virtual Boolean publish_config (
+            const String &Id,
+            const Config &Data,
+            WebServicesObserver &obs);
 
-         virtual Boolean register_webservices_observer (WebServicesObserver &observer);
-         virtual Boolean release_webservices_observer (WebServicesObserver &observer);
+         virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs);
 
-         virtual Boolean is_recording () const;
+         // WebServicesObserver Interface
+         virtual void config_published (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data);
 
-         virtual Handle start_session (const String &Name);
-
-         virtual Boolean store_record (
-            const Message &Type,
-            const Handle Target,
-            const Data *Record);
-
-         virtual Boolean stop_session (const Handle SessionHandle);
-         virtual Boolean abort_session (const Handle SessionHandle);
+         virtual void config_fetched (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data);
 
       protected Q_SLOTS:
          void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
@@ -73,36 +77,36 @@ namespace dmz {
 
          void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
 
-         void _handle_reply (
-            const UInt64 RequestId,
-            const Int32 StatusCode,
-            const Config &Global);
-
-         // void _handle_error (
-         //    const UInt64 RequestId,
-         //    const Int32 StatusCode,
-         //    const QString &ErrorMessage);
-
-         // void _reply_error (
-         //    const UInt64 RequestId,
-         //    const QString &ErrorMessage,
-         //    const QNetworkReply::NetworkError Error);
-
-         // void _process_publish_object ();
-
       protected:
-         UInt64 _publish_session (const Handle SessionHandle);
+         struct DocStruct;
+         struct RequestStruct;
 
-         UInt64 _publish_document (const String &Id, const Config &Data);
+         void _handle_reply (RequestStruct &request);
 
-         UInt64 _fetch_document (const String &Id);
-         UInt64 _fetch_changes (const Int32 Since, const Boolean Continuous = False);
+//          void _handle_error (
+//             const UInt64 RequestId,
+//             const Int32 StatusCode,
+//             const QString &ErrorMessage);
 
-         void _handle_archive (const UInt64 RequestId, const Config &Archive);
-         void _handle_session (const UInt64 RequestId, const Config &Session);
-         void _handle_changes (const UInt64 RequestId, const Config &Global);
+         RequestStruct *_publish_session (const Handle SessionHandle);
 
-         Boolean _continuous_feed (const Config &Feed);
+         RequestStruct *_publish_document (
+            const String &Id,
+            const Config &Data,
+            WebServicesObserver &obs);
+
+         RequestStruct *_fetch_document (const String &Id, WebServicesObserver &obs);
+
+         RequestStruct *_fetch_changes (
+            const Int32 Since,
+            const Boolean Continuous = False);
+
+         void _document_published (RequestStruct &request);
+         void _document_fetched (RequestStruct &request);
+
+         void _changes_fetched (RequestStruct &request);
+
+         Boolean _handle_continuous_feed (RequestStruct &request);
 
          QUrl _get_url (const String &EndPoint) const;
          QUrl _get_root_url (const String &EndPoint) const;

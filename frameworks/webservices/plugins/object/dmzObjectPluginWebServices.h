@@ -35,6 +35,16 @@ namespace dmz {
          virtual void start_session ();
          virtual void stop_session ();
 
+         virtual void config_published (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data);
+
+         virtual void config_fetched (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data);
+
          // Message Observer Interface
          virtual void receive_message (
             const Message &Type,

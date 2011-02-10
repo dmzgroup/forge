@@ -9,6 +9,7 @@
 
 namespace dmz {
 
+   class Data;
    class Message;
    class WebServicesObserver;
 
@@ -23,36 +24,12 @@ namespace dmz {
          Handle get_webservices_module_handle () const;
 
          // WebServicesModule Interface
-          virtual Boolean register_webservices_observer (
-            WebServicesObserver &observer) = 0;
+         virtual Boolean publish_config (
+            const String &Id,
+            const Config &Data,
+            WebServicesObserver &obs) = 0;
 
-          virtual Boolean release_webservices_observer (
-            WebServicesObserver &observer) = 0;
-
-//         virtual void login (const String &UserName, const String &Password) = 0;
-//         virtual void logout ();
-
-//         virtual Boolean is_logged_in () const = 0;
-
-//         virtual String get_user_name () const = 0;
-//         virtual StringContainer get_user_roles () const = 0;
-
-         virtual Boolean is_recording () const = 0;
-
-         virtual Handle start_session (const String &Name) = 0;
-
-         virtual Boolean store_record (
-            const Message &Type,
-            const Handle Target,
-            const Data *Record) = 0;
-
-         virtual Boolean store_record (const Message &Type, const Data *Record) {
-
-            return store_record (Type, 0, Record);
-         }
-
-         virtual Boolean stop_session (const Handle SessionHandle) = 0;
-         virtual Boolean abort_session (const Handle SessionHandle) = 0;
+         virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs) = 0;
 
       protected:
          WebServicesModule (const PluginInfo &Info);
