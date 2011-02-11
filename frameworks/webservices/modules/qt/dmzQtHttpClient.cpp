@@ -45,6 +45,10 @@ dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
 //   connect (
 //      _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
 //      this, SLOT (_authenticate (QNetworkReply *, QAuthenticator *)));
+
+   _defaultHeaders.insert ("User-Agent", LocalUserAgentName);
+   _defaultHeaders.insert ("Accept", LocalApplicationJson);
+   _defaultHeaders.insert ("Content-Type", LocalApplicationJson);
 }
 
 
@@ -56,6 +60,16 @@ dmz::QtHttpClient::~QtHttpClient () {
       _manager->deleteLater ();
       _manager = 0;
    }
+}
+
+
+QNetworkRequest
+dmz::QtHttpClient::get_next_request (const QUrl &Url) {
+
+   QNetworkRequest request (Url);
+   _add_headers (request, _defaultHeaders);
+   request.setAttribute (LocalAttrId, _requestCounter++);
+   return request;
 }
 
 
@@ -80,12 +94,19 @@ dmz::QtHttpClient::get (const QUrl &Url) {
 
    if (Url.isValid ()) {
 
-      requestId = _requestCounter++;
-
-      QNetworkReply *reply = _request (LocalGet, Url, requestId);
+      QNetworkRequest request = get_next_request (Url);
+      requestId = get (request);
    }
 
    return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::get (const QNetworkRequest &Request) {
+
+   QNetworkReply *reply = _do_request (LocalGet, Request);
+   return _get_request_id (reply);
 }
 
 
@@ -96,9 +117,8 @@ dmz::QtHttpClient::put (const QUrl &Url, const QByteArray &Data) {
 
    if (Url.isValid ()) {
 
-      requestId = _requestCounter++;
-
-      QNetworkReply *reply = _request (LocalPut, Url, requestId, Data);
+      QNetworkRequest request = get_next_request (Url);
+      requestId = put (request, Data);
    }
 
    return requestId;
@@ -106,34 +126,10 @@ dmz::QtHttpClient::put (const QUrl &Url, const QByteArray &Data) {
 
 
 dmz::UInt64
-dmz::QtHttpClient::post (const QUrl &Url, const QMap<QString, QString> &Params) {
+dmz::QtHttpClient::put (const QNetworkRequest &Request, const QByteArray &Data) {
 
-   QUrl postData;
-   QMapIterator<QString, QString> it (Params);
-
-   while (it.hasNext ()) {
-
-      it.next();
-      postData.addQueryItem (it.key (), it.value ());
-   }
-
-   return post (Url, postData.encodedQuery());
-}
-
-
-dmz::UInt64
-dmz::QtHttpClient::post (const QUrl &Url, const QByteArray &Data) {
-
-   UInt64 requestId (0);
-
-   if (Url.isValid ()) {
-
-      requestId = _requestCounter++;
-
-      QNetworkReply *reply = _request (LocalPost, Url, requestId, Data);
-   }
-
-   return requestId;
+   QNetworkReply *reply = _do_request (LocalPut, Request, Data);
+   return _get_request_id (reply);
 }
 
 
@@ -144,12 +140,75 @@ dmz::QtHttpClient::del (const QUrl &Url) {
 
    if (Url.isValid ()) {
 
-      requestId = _requestCounter++;
-
-      QNetworkReply *reply = _request (LocalDelete, Url, requestId);
+      QNetworkRequest request = get_next_request (Url);
+      requestId = del (request);
    }
 
    return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::del (const QNetworkRequest &Request) {
+
+   QNetworkReply *reply = _do_request (LocalDelete, Request);
+   return _get_request_id (reply);
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (const QUrl &Url, const QMap<QString, QString> &Params) {
+
+   UInt64 requestId (0);
+
+   if (Url.isValid ()) {
+
+      QNetworkRequest request = get_next_request (Url);
+      requestId = post (request, Params);
+   }
+
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (
+      const QNetworkRequest &Request,
+      const QMap<QString, QString> &Params) {
+
+   QUrl postData;
+   QMapIterator<QString, QString> it (Params);
+
+   while (it.hasNext ()) {
+
+      it.next();
+      postData.addQueryItem (it.key (), it.value ());
+   }
+
+   return post (Request, postData.encodedQuery());
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (const QUrl &Url, const QByteArray &Data) {
+
+   UInt64 requestId (0);
+
+   if (Url.isValid ()) {
+
+      QNetworkRequest request = get_next_request (Url);
+      requestId = post (request, Data);
+   }
+
+   return requestId;
+}
+
+
+dmz::UInt64
+dmz::QtHttpClient::post (const QNetworkRequest &Request, const QByteArray &Data) {
+
+   QNetworkReply *reply = _do_request (LocalPost, Request, Data);
+   return _get_request_id (reply);
 }
 
 
@@ -286,24 +345,14 @@ dmz::QtHttpClient::_reply_finished () {
    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender ());
    if (reply) {
 
-      // const Int32 StatusCode (reply->attribute (
-      //    QNetworkRequest::HttpStatusCodeAttribute).toInt());
-
       const UInt64 RequestId (_get_request_id (reply));
-      _replyMap.take (RequestId);
 
-      emit reply_finished (RequestId, reply);
+      if (RequestId) {
 
-      // if (QNetworkReply::NoError == reply->error ()) {
-      //
-      //    emit reply_finished (RequestId, reply);
-      // }
-      // else if (QNetworkReply::OperationCanceledError == Error) {
-      //
-      // }
-      // else {
-      //
-      // }
+         _replyMap.take (RequestId);
+
+         emit reply_finished (RequestId, reply);
+      }
 
       reply->deleteLater ();
    }
@@ -352,50 +401,40 @@ dmz::QtHttpClient::_ssl_errors (QNetworkReply *reply, const QList<QSslError> &Er
    }
 }
 
-
 QNetworkReply *
-dmz::QtHttpClient::_request (
+dmz::QtHttpClient::_do_request (
       const QString &Method,
-      const QUrl &Url,
-      const UInt64 RequestId,
+      const QNetworkRequest &Request,
       const QByteArray &Data) {
 
    QNetworkReply *reply (0);
 
    if (_manager) {
 
-      QNetworkRequest request (Url);
-
-      request.setRawHeader (LocalUserAgent, LocalUserAgentName);
-      request.setRawHeader (LocalAccept, LocalApplicationJson);
-      // request.setHeader (QNetworkRequest::ContentTypeHeader, LocalApplicationJson);
-
-      request.setAttribute (LocalAttrId, RequestId);
-
       if (LocalGet == Method.toLower ()) {
 
-         reply = _manager->get (request);
+         reply = _manager->get (Request);
       }
       else if (LocalPut == Method.toLower ()) {
 
-         reply = _manager->put (request, Data);
+         reply = _manager->put (Request, Data);
       }
       else if (LocalPost == Method.toLower ()) {
 
-         request.setHeader (
-            QNetworkRequest::ContentTypeHeader,
-            LocalApplicationFormUrlEncoded);
+//         request.setHeader (
+//            QNetworkRequest::ContentTypeHeader,
+//            LocalApplicationFormUrlEncoded);
 
-         reply = _manager->post (request, Data);
+         reply = _manager->post (Request, Data);
       }
       else if (LocalDelete == Method.toLower ()) {
 
-         reply = _manager->deleteResource (request);
+         reply = _manager->deleteResource (Request);
       }
       else {
 
          _log.warn << "Unknown HTTP method requested: " << qPrintable (Method) << endl;
-         _log.warn << "with url: " << qPrintable (Url.toString ()) << endl;
+         _log.warn << "with url: " << qPrintable (Request.url ().toString ()) << endl;
       }
 
       if (reply) {
@@ -410,11 +449,30 @@ dmz::QtHttpClient::_request (
          //    reply, SIGNAL (error (QNetworkReply::NetworkError)),
          //    this, SLOT (_reply_error ()));
 
-         _replyMap.insert (RequestId, reply);
+         UInt64 requestId = _get_request_id (reply);
+         if (requestId) { _replyMap.insert (requestId, reply); }
       }
    }
 
    return reply;
+}
+
+
+void
+dmz::QtHttpClient::_add_headers (
+      QNetworkRequest &request,
+      const QMap<QByteArray, QByteArray> &Headers) {
+
+   if (!Headers.isEmpty ()) {
+
+      QMapIterator<QByteArray, QByteArray> it (Headers);
+
+      while (it.hasNext ()) {
+
+         it.next();
+         request.setRawHeader (it.key (), it.value ());
+      }
+   }
 }
 
 

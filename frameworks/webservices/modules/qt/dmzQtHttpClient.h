@@ -16,23 +16,41 @@ class QUrl;
 namespace dmz {
 
    class QtHttpClient: public QObject {
-      
+
       Q_OBJECT
-            
+
       public:
          QtHttpClient (const PluginInfo &Info, QObject *parent = 0);
          virtual ~QtHttpClient();
+
+         QNetworkRequest get_next_request (const QUrl &Url);
 
          virtual Boolean is_request_pending (const UInt64 RequestId) const;
 
          virtual QNetworkReply *get_reply (const UInt64 RequestId) const;
 
          virtual UInt64 get (const QUrl &Url);
-         virtual UInt64 put (const QUrl &Url, const QByteArray &Data = "");
-         virtual UInt64 del (const QUrl &Url);
+         virtual UInt64 get (const QNetworkRequest &Request);
 
-         virtual UInt64 post (const QUrl &Url, const QMap<QString, QString> &Params);
+         virtual UInt64 put (const QUrl &Url, const QByteArray &Data = "");
+         virtual UInt64 put (const QNetworkRequest &Request, const QByteArray &Data);
+
+         virtual UInt64 del (const QUrl &Url);
+         virtual UInt64 del (const QNetworkRequest &Request);
+
+         virtual UInt64 post (
+            const QUrl &Url,
+            const QMap<QString, QString> &Params);
+
+         virtual UInt64 post (
+            const QNetworkRequest &Request,
+            const QMap<QString, QString> &Params);
+
          virtual UInt64 post (const QUrl &Url, const QByteArray &Data = "");
+
+         virtual UInt64 post (
+            const QNetworkRequest &Request,
+            const QByteArray &Data);
 
    Q_SIGNALS:
          void reply_aborted (const UInt64 RequestId);
@@ -62,20 +80,26 @@ namespace dmz {
          void _ssl_errors (QNetworkReply *reply, const QList<QSslError> &Errors);
 
       protected:
-         QNetworkReply *_request (
+         typedef QMap<QString, QString> StringMap;
+
+         QNetworkReply *_do_request (
                const QString &Method,
-               const QUrl &Url,
-               const UInt64 RequestId,
+               const QNetworkRequest &request,
                const QByteArray &Data = "");
-         
+
+         void _add_headers (
+            QNetworkRequest &request,
+            const QMap<QByteArray, QByteArray> &Headers);
+
          UInt64 _get_request_id (QNetworkReply *reply) const;
-         
+
       protected:
          Log _log;
          QNetworkAccessManager *_manager;
-         
+
          UInt64 _requestCounter;
          QMap<UInt64, QNetworkReply *> _replyMap;
+         QMap<QByteArray, QByteArray> _defaultHeaders;
    };
 };
 

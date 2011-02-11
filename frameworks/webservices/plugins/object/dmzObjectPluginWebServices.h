@@ -6,14 +6,18 @@
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
+#include <dmzRuntimeTimeSlice.h>
+#include <dmzTypesStringContainer.h>
 #include <dmzWebServicesObserver.h>
 
 namespace dmz {
 
+   class ArchiveModule;
    class WebServicesModule;
 
    class ObjectPluginWebServices :
          public Plugin,
+         public TimeSlice,
          public WebServicesObserver,
          public MessageObserver,
          public ObjectObserverUtil {
@@ -31,16 +35,21 @@ namespace dmz {
             const PluginDiscoverEnum Mode,
             const Plugin *PluginPtr);
 
-         // WebServicesObserver Interface
-         virtual void start_session ();
-         virtual void stop_session ();
+         // TimeSlice Interface
+         virtual void update_time_slice (const Float64 TimeDelta);
 
+         // WebServicesObserver Interface
          virtual void config_published (
             const String &Id,
             const Boolean Error,
             const Config &Data);
 
          virtual void config_fetched (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data);
+
+         virtual void config_deleted (
             const String &Id,
             const Boolean Error,
             const Config &Data);
@@ -220,50 +229,25 @@ namespace dmz {
             const Data *PreviousValue);
 
       protected:
+         void _update (const UUID &Identity, const Handle ObjectHandle);
+
          void _init (Config &local);
 
          Log _log;
          Definitions _defs;
 
+         ArchiveModule *_archiveModule;
+         String _archiveModuleName;
+
          WebServicesModule *_webservices;
          String _webservicesName;
 
-         Boolean _recording;
-         Boolean _inDump;
-
+         Handle _archiveHandle;
          Handle _defaultAttrHandle;
-
-         Handle _handleHandle;
-         Handle _stringHandle;
-         Handle _uuidHandle;
-         Handle _valueHandle;
-         Handle _maskHandle;
-
-         Message _createObject;
-         Message _activateObject;
-         Message _destroyObject;
-         Message _storeUUID;
-         Message _removeAttribute;
-         Message _storeLocality;
-         Message _linkObjects;
-         Message _unlinkObjects;
-         Message _storeLinkAttributeObject;
-         Message _storeCounter;
-         Message _storeCounterMin;
-         Message _storeCounterMax;
-         Message _storeType;
-         Message _storeState;
-         Message _storeFlag;
-         Message _storeTimeStamp;
-         Message _storePosition;
-         Message _storeOrientation;
-         Message _storeVelocity;
-         Message _storeAcceleration;
-         Message _storeScale;
-         Message _storeVector;
-         Message _storeScalar;
-         Message _storeText;
-         Message _storeData;
+         HandleContainer _activeTable;
+         StringContainer _updateTable;
+         StringContainer _deleteTable;
+         StringContainer _pendingTable;
 
       private:
          ObjectPluginWebServices ();

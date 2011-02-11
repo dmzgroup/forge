@@ -36,6 +36,11 @@ namespace dmz {
             const Boolean Error,
             const Config &Data) = 0;
 
+         virtual void config_deleted (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data) = 0;
+
       protected:
          WebServicesObserver (const PluginInfo &Info);
          ~WebServicesObserver ();

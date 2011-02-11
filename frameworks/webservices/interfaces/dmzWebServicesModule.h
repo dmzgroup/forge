@@ -6,6 +6,8 @@
 #include <dmzRuntimeRTTI.h>
 #include <dmzTypesBase.h>
 #include <dmzTypesString.h>
+#include <dmzTypesStringContainer.h>
+
 
 namespace dmz {
 
@@ -30,6 +32,16 @@ namespace dmz {
             WebServicesObserver &obs) = 0;
 
          virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs) = 0;
+
+         virtual Boolean fetch_configs (
+            const StringContainer &IdList,
+            WebServicesObserver &obs) = 0;
+
+         virtual Boolean delete_config (const String &Id, WebServicesObserver &obs) = 0;
+
+         virtual Boolean delete_configs (
+            const StringContainer &IdList,
+            WebServicesObserver &obs) = 0;
 
       protected:
          WebServicesModule (const PluginInfo &Info);

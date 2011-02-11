@@ -53,16 +53,31 @@ namespace dmz {
 
          virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs);
 
+         virtual Boolean fetch_configs (
+            const StringContainer &IdList,
+            WebServicesObserver &obs);
+
+         virtual Boolean delete_config (const String  &Id, WebServicesObserver &obs);
+
+         virtual Boolean delete_configs (
+            const StringContainer &IdList,
+            WebServicesObserver &obs);
+
          // WebServicesObserver Interface
          virtual void config_published (
             const String &Id,
             const Boolean Error,
-            const Config &Data);
+            const Config &Data) {;}
 
          virtual void config_fetched (
             const String &Id,
             const Boolean Error,
-            const Config &Data);
+            const Config &Data) {;}
+
+         virtual void config_deleted (
+            const String &Id,
+            const Boolean Error,
+            const Config &Data) {;}
 
       protected Q_SLOTS:
          void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
@@ -96,6 +111,7 @@ namespace dmz {
             WebServicesObserver &obs);
 
          RequestStruct *_fetch_document (const String &Id, WebServicesObserver &obs);
+         RequestStruct *_delete_document (const String &Id, WebServicesObserver &obs);
 
          RequestStruct *_fetch_changes (
             const Int32 Since,
@@ -103,6 +119,7 @@ namespace dmz {
 
          void _document_published (RequestStruct &request);
          void _document_fetched (RequestStruct &request);
+         void _document_deleted (RequestStruct &request);
 
          void _changes_fetched (RequestStruct &request);
 

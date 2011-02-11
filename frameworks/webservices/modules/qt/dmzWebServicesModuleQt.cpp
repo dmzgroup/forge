@@ -16,12 +16,10 @@
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeObjectType.h>
 #include <dmzRuntimeUUID.h>
-#include <dmzTypesHandleContainer.h>
 #include <dmzTypesHashTableHandleTemplate.h>
 #include <dmzTypesHashTableStringTemplate.h>
 #include <dmzTypesHashTableUInt64Template.h>
 #include <dmzTypesString.h>
-#include <dmzTypesStringContainer.h>
 #include <dmzTypesUUID.h>
 #include <dmzSystem.h>
 #include <dmzSystemStreamString.h>
@@ -271,7 +269,13 @@ dmz::WebServicesModuleQt::update_plugin_state (
          params.insert ("name", "bordergame");
          params.insert ("password", "couch4me");
 
-         UInt64 requestId = _state.client->post (url, params);
+         QNetworkRequest request = _state.client->get_next_request (url);
+
+         request.setHeader (
+            QNetworkRequest::ContentTypeHeader,
+            "application/x-www-form-urlencoded");
+
+         UInt64 requestId = _state.client->post (request, params);
          if (requestId) {
 
             _state.get_request (requestId, "postSession", DocId, *this);
@@ -376,6 +380,7 @@ dmz::WebServicesModuleQt::publish_config (
       const Config &Data,
       WebServicesObserver &obs) {
 
+   _state.log.warn << "publish: " << Id << endl;
    return _publish_document (Id, Data, obs) ? True : False;
 }
 
@@ -383,22 +388,55 @@ dmz::WebServicesModuleQt::publish_config (
 dmz::Boolean
 dmz::WebServicesModuleQt::fetch_config (const String &Id, WebServicesObserver &obs) {
 
+   _state.log.warn << "fetch: " << Id << endl;
    return _fetch_document (Id, obs) ? True : False;
 }
 
 
-void
-dmz::WebServicesModuleQt::config_published (
-      const String &Id,
-      const Boolean Error,
-      const Config &Data) {;} // do nothing
+dmz::Boolean
+dmz::WebServicesModuleQt::fetch_configs (
+      const StringContainer &IdList,
+      WebServicesObserver &obs) {
+
+   Boolean error (False);
+
+   String id;
+   StringContainerIterator it;
+
+   while (IdList.get_next (it, id)) {
+
+      if (!_fetch_document (id, obs)) { error = True; }
+   }
+
+   return !error;
+}
 
 
-void
-dmz::WebServicesModuleQt::config_fetched (
-   const String &Id,
-   const Boolean Error,
-   const Config &Data) {;}  // do nothing
+dmz::Boolean
+dmz::WebServicesModuleQt::delete_config (const String &Id, WebServicesObserver &obs) {
+
+   _state.log.warn << "delete: " << Id << endl;
+   return _delete_document (Id, obs) ? True : False;
+}
+
+
+dmz::Boolean
+dmz::WebServicesModuleQt::delete_configs (
+      const StringContainer &IdList,
+      WebServicesObserver &obs) {
+
+   Boolean error (False);
+
+   String id;
+   StringContainerIterator it;
+
+   while (IdList.get_next (it, id)) {
+
+      if (!_delete_document (id, obs)) { error = True; }
+   }
+
+   return !error;
+}
 
 
 void
@@ -560,6 +598,10 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
        _document_fetched (request);
    }
+   else if (request.Type == "deleteDocument") {
+
+      _document_deleted (request);
+   }
    else if (request.Type == "publishDocument") {
 
       _document_published (request);
@@ -643,6 +685,31 @@ dmz::WebServicesModuleQt::_fetch_document (const String &Id, WebServicesObserver
 
 
 dmz::WebServicesModuleQt::RequestStruct *
+dmz::WebServicesModuleQt::_delete_document (const String &Id, WebServicesObserver &obs) {
+
+   RequestStruct *request;
+
+   if (Id && _state.client) {
+
+      DocStruct *doc = _state.get_doc (Id);
+      if (doc && doc->rev) {
+
+         QUrl url = _get_url (Id);
+         url.addQueryItem ("rev", doc->rev.get_buffer ());
+
+         UInt64 requestId = _state.client->del (url);
+         if (requestId) {
+
+            request = _state.get_request (requestId, "deleteDocument", Id, obs);
+         }
+      }
+   }
+
+   return request;
+}
+
+
+dmz::WebServicesModuleQt::RequestStruct *
 dmz::WebServicesModuleQt::_fetch_changes (const Int32 Since, const Boolean Continuous) {
 
    RequestStruct *request;
@@ -709,6 +776,27 @@ dmz::WebServicesModuleQt::_document_fetched (RequestStruct &request) {
 
       request.obs.config_fetched (request.DocId, False, data);
    }
+}
+
+
+void
+dmz::WebServicesModuleQt::_document_deleted (RequestStruct &request) {
+
+//   if (config_to_boolean ("ok", request.data)) {
+
+//   }
+
+   if (!request.error) {
+
+      String docId = config_to_string ("id", request.data);
+
+      if (request.DocId == docId) {
+
+         request.docRev = config_to_string ("rev", request.data);
+      }
+   }
+
+   request.obs.config_deleted (request.DocId, request.error, request.data);
 }
 
 
