@@ -7,8 +7,10 @@
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
-#include <dmzTypesStringContainer.h>
+#include <dmzTypesHashTableHandleTemplate.h>
+#include <dmzTypesHashTableStringTemplate.h>
 #include <dmzWebServicesObserver.h>
+
 
 namespace dmz {
 
@@ -53,6 +55,16 @@ namespace dmz {
             const String &Id,
             const Boolean Error,
             const Config &Data);
+
+         virtual void config_updated (
+            const String &Id,
+            const Boolean Deleted,
+            const Int32 Sequence);
+
+         virtual void config_updated (
+            const StringContainer &UpdatedIdList,
+            const StringContainer &DeletedIdList,
+            const Int32 LastSequence);
 
          // Message Observer Interface
          virtual void receive_message (
@@ -229,6 +241,51 @@ namespace dmz {
             const Data *PreviousValue);
 
       protected:
+         struct ObjectStruct {
+
+            String name;
+            Handle handle;
+            HashTableStringTemplate<ObjectStruct> links;
+
+            ObjectStruct () {;}
+            ~ObjectStruct () { links.clear (); }
+         };
+
+         struct LinkStruct {
+
+            ObjectStruct super;
+            ObjectStruct sub;
+            String super;
+            Handle superHandle;
+            String sub;
+            Handle subHandle;
+            String attrName;
+            Handle attrHandle;
+            String attrObjectName;
+            Handle attrObjectHandle;
+
+            LinkStruct (const String &TheName, const Handle TheHandle) :
+               SubName (TheName),
+               LinkHandle (TheHandle),
+               subHandle (0),
+               attrObjectHandle (0) {;}
+         };
+
+         struct ObjectLinkStruct {
+
+            const Handle ObjectHandle;
+            HashTableStringTemplate<LinkStruct> table;
+
+            ObjectLinkStruct (const Handle TheHandle) : ObjectHandle (TheHandle) {;}
+            ~ObjectLinkStruct () { table.empty (); }
+         };
+
+         void _configs_deleted (const StringContainer &DeleteIdList);
+
+         void _config_to_object (const Config &Data);
+
+         void _store_object_attributes (const Handle ObjectHandle, Config &attrData);
+
          void _update (const UUID &Identity, const Handle ObjectHandle);
 
          void _init (Config &local);
@@ -246,8 +303,15 @@ namespace dmz {
          Handle _defaultAttrHandle;
          HandleContainer _activeTable;
          StringContainer _updateTable;
+         StringContainer _fetchTable;
          StringContainer _deleteTable;
          StringContainer _pendingTable;
+
+         HashTableStringTemplate<ObjectStruct> _objectTable;
+         HashTableHandleTemplate<ObjectLinkStruct> _linkTable;
+
+         Int32 _lastSeq;
+         Boolean _inUpdate;
 
       private:
          ObjectPluginWebServices ();

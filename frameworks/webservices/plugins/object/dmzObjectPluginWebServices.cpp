@@ -4,6 +4,10 @@
 #include <dmzObjectModule.h>
 #include "dmzObjectPluginWebServices.h"
 #include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzRuntimeConfigToMatrix.h>
+//#include <dmzRuntimeConfigToStringContainer.h>
+#include <dmzRuntimeConfigToVector.h>
+//#include <dmzRuntimeConfigWrite.h>
 #include <dmzRuntimeData.h>
 #include <dmzRuntimeObjectType.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
@@ -18,29 +22,29 @@ using namespace dmz;
 
 namespace {
 
-static inline Handle
-local_uuid_to_handle (
-      const Data &InData,
-      const Handle AttrHandle,
-      ObjectModule &module,
-      const Int32 Offset = 0) {
+//static inline Handle
+//local_uuid_to_handle (
+//      const Data &InData,
+//      const Handle AttrHandle,
+//      ObjectModule &module,
+//      const Int32 Offset = 0) {
 
-   UUID uuid;
-   InData.lookup_uuid (AttrHandle, Offset, uuid);
-   return module.lookup_handle_from_uuid (uuid);
-}
+//   UUID uuid;
+//   InData.lookup_uuid (AttrHandle, Offset, uuid);
+//   return module.lookup_handle_from_uuid (uuid);
+//}
 
-static inline Handle
-local_attr_name_to_handle (
-      const Data &InData,
-      const Handle AttrHandle,
-      Definitions &defs,
-      const Int32 Offset = 0) {
+//static inline Handle
+//local_attr_name_to_handle (
+//      const Data &InData,
+//      const Handle AttrHandle,
+//      Definitions &defs,
+//      const Int32 Offset = 0) {
 
-   String attrName;
-   InData.lookup_string (AttrHandle, Offset, attrName);
-   return defs.create_named_handle (attrName);
-}
+//   String attrName;
+//   InData.lookup_string (AttrHandle, Offset, attrName);
+//   return defs.create_named_handle (attrName);
+//}
 
 };
 
@@ -56,7 +60,9 @@ dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, C
       _archiveModule (0),
       _webservices (0),
       _archiveHandle (0),
-      _defaultAttrHandle (0) {
+      _defaultAttrHandle (0),
+      _lastSeq (0),
+      _inUpdate (False) {
 
    _init (local);
 }
@@ -64,6 +70,7 @@ dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, C
 
 dmz::ObjectPluginWebServices::~ObjectPluginWebServices () {
 
+   _linkTable.empty ();
 }
 
 
@@ -78,6 +85,7 @@ dmz::ObjectPluginWebServices::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
+      _webservices->start_realtime_updates (*this);
    }
    else if (State == PluginStateStop) {
 
@@ -162,6 +170,47 @@ dmz::ObjectPluginWebServices::update_time_slice (const Float64 TimeDelta) {
             }
          }
       }
+
+      if (_fetchTable.get_count ()) {
+
+      }
+
+      ObjectModule *objMod (get_object_module ());
+      if (_linkTable.get_count () && objMod) {
+
+         HashTableHandleIterator it;
+         ObjectLinkStruct *links = _linkTable.get_first (it);
+
+         while (links) {
+
+            HashTableStringIterator linkIt;
+            LinkStruct *ls = links->table.get_first (linkIt);
+
+            while (ls) {
+
+               if (links->ObjectHandle && ls->subHandle && ls->LinkHandle) {
+
+                  const Handle LinkHandle (objMod->link_objects (
+                     ls->LinkHandle,
+                     links->ObjectHandle,
+                     ls->subHandle));
+
+                  if (LinkHandle) {
+
+                     _log.warn << "LinkHandle: " << LinkHandle << endl;
+                  }
+
+//                  if (link->attrObjectId) {
+
+//                  }
+               }
+
+               ls = links->table.get_next (linkIt);
+            }
+
+            links = _linkTable.get_next (it);
+         }
+      }
    }
 }
 
@@ -199,10 +248,72 @@ dmz::ObjectPluginWebServices::config_fetched (
    }
    else {
 
-      if (_webservices) {
+      Config object ("object");
+      Data.lookup_config ("object", object);
 
-//         _webservices->publish_config (Id, Data, *this);
+      _inUpdate = True;
+
+      _config_to_object (object);
+
+#if 0
+      ObjectModule *objMod (get_object_module ());
+      if (objMod) {
+
+         HashTableStringIterator objIt;
+         ObjectLinkStruct *current (_linkTable.get_first (objIt));
+         while (current) {
+
+            HashTableHandleIterator linkIt;
+            LinkGroupStruct *ls (current->table.get_first (linkIt));
+            while (ls) {
+
+               HashTableStringIterator subIt;
+               LinkStruct *link (ls->table.get_first (subIt));
+               while (link) {
+
+                  Handle subHandle = objMod->lookup_handle_from_uuid (link->name);
+                  if (subHandle) {
+
+                     const Handle LinkHandle (objMod->link_objects (
+                        ls->LinkHandle,
+                        current->ObjectHandle,
+                        subHandle));
+
+                     if (link->attr) {
+
+                        ObjectLinkStruct *attr (_linkTable.lookup (link->attr));
+
+                        if (attr) {
+
+                           objMod->store_link_attribute_object (
+                              LinkHandle,
+                              attr->ObjectHandle);
+                        }
+                     }
+                  }
+
+                  link = ls->table.get_next (subIt);
+               }
+
+               ls = current->table.get_next (linkIt);
+            }
+
+            current = _linkTable.get_next (objIt);
+         }
       }
+
+      _linkTable.empty ();
+#endif
+
+      _inUpdate = False;
+
+//      if (_archiveModule && _archiveHandle) {
+
+//         Config global ("dmz");
+//         global.add_config (Data);
+
+//         _archiveModule->process_archive (_archiveHandle, global);
+//      }
    }
 }
 
@@ -218,11 +329,51 @@ dmz::ObjectPluginWebServices::config_deleted (
    }
    else {
 
-      if (_webservices) {
+      StringContainer container;
+      container.add (Id);
 
-//         _webservices->publish_config (Id, Data, *this);
-      }
+      _configs_deleted (container);
    }
+}
+
+
+void
+dmz::ObjectPluginWebServices::config_updated (
+      const String &Id,
+      const Boolean Deleted,
+      const Int32 Sequence) {
+
+   if (Deleted) {
+
+      StringContainer container;
+      container.add (Id);
+
+      _configs_deleted (container);
+   }
+   else if (_webservices) {
+
+      _webservices->fetch_config (Id, *this);
+   }
+
+   _lastSeq = Sequence;
+   _log.warn << " lasSeq: " << _lastSeq << endl;
+}
+
+
+void
+dmz::ObjectPluginWebServices::config_updated (
+      const StringContainer &UpdatedIdList,
+      const StringContainer &DeletedIdList,
+      const Int32 LastSequence) {
+
+   _configs_deleted (DeletedIdList);
+
+   if (_webservices && UpdatedIdList.get_count ()) {
+
+      _webservices->fetch_configs (UpdatedIdList, *this);
+   }
+
+   _lastSeq = LastSequence;
 }
 
 
@@ -253,7 +404,7 @@ dmz::ObjectPluginWebServices::create_object (
 
    if (_activeTable.add (ObjectHandle)) {
 
-      _updateTable.add (Identity.to_string ());
+      if (!_inUpdate) { _updateTable.add (Identity.to_string ()); }
    }
 }
 
@@ -267,7 +418,9 @@ dmz::ObjectPluginWebServices::destroy_object (
 
       const String Id (Identity.to_string ());
       _updateTable.remove (Id);
-      _deleteTable.add (Id);
+
+      if (_inUpdate) { _deleteTable.remove (Id); }
+      else { _deleteTable.add (Id); }
    }
 }
 
@@ -554,11 +707,306 @@ dmz::ObjectPluginWebServices::update_object_data (
 
 // ObjectPluginWebServices Interface
 void
+dmz::ObjectPluginWebServices::_configs_deleted (const StringContainer &DeleteIdList) {
+
+   ObjectModule *objMod (get_object_module ());
+   if(objMod) {
+
+      String id;
+      StringContainerIterator it;
+
+      while (DeleteIdList.get_next (it, id)) {
+
+         Handle objectHandle = objMod->lookup_handle_from_uuid (UUID (id));
+         if (objectHandle) {
+
+            _inUpdate = True;
+            objMod->destroy_object (objectHandle);
+            _inUpdate = False;
+
+            _activeTable.remove (objectHandle);
+            _pendingTable.remove (id);
+            _deleteTable.remove (id);
+         }
+      }
+   }
+}
+
+void
+dmz::ObjectPluginWebServices::_config_to_object (const Config &Data) {
+
+   ObjectModule *objMod (get_object_module ());
+
+   if (objMod) {
+
+      const UUID ObjUUID (config_to_string ("uuid", Data));
+      String objectName (config_to_string ("name", Data));
+      if (!objectName) { objectName = ObjUUID.to_string (); }
+
+      const String TypeName (config_to_string ("type", Data));
+      const ObjectType Type (TypeName, get_plugin_runtime_context ());
+
+      if (Type) {
+
+         Handle objectHandle (0);
+
+         if (ObjUUID) { objectHandle = objMod->lookup_handle_from_uuid (ObjUUID); }
+
+         if (!objectHandle) { objectHandle = objMod->create_object (Type, ObjectLocal); }
+
+         if (objectHandle) {
+
+            if (ObjUUID) { objMod->store_uuid (objectHandle, ObjUUID); }
+
+            Config attrList;
+
+            if (Data.lookup_all_config ("attributes", attrList)) {
+
+               ConfigIterator it;
+
+               Config attrData;
+
+               Boolean found (attrList.get_first_config (it, attrData));
+
+               while (found) {
+
+                  _store_object_attributes (objectHandle, attrData);
+                  found = attrList.get_next_config (it, attrData);
+               }
+            }
+
+            objMod->activate_object (objectHandle);
+         }
+         else {
+
+            _log.error << "Unable to create object of type: " << TypeName << endl;
+         }
+      }
+      else if (!Type) {
+
+         _log.error << "Unable to create object of unknown type: " << TypeName << endl;
+      }
+      else {
+
+         _log.info << "Filtering object with type: " << TypeName << endl;
+      }
+   }
+}
+
+
+void
+dmz::ObjectPluginWebServices::_store_object_attributes (
+      const Handle ObjectHandle,
+      Config &attrData) {
+
+   ObjectModule *objMod (get_object_module ());
+   if (objMod) {
+
+      const String AttributeName (
+         config_to_string ("name", attrData, ObjectAttributeDefaultName));
+
+      const Handle AttrHandle (_defs.create_named_handle (AttributeName));
+
+      Config data;
+      ConfigIterator it;
+
+      Boolean found (attrData.get_first_config (it, data));
+
+      while (found) {
+
+         const String DataName (data.get_name ().to_lower ());
+
+         if (DataName == "links") {
+
+            StringContainer fetchTable;
+
+            ObjectLinkStruct *links = new ObjectLinkStruct (ObjectHandle);
+
+            if (links && !_linkTable.store (ObjectHandle, links)) {
+
+               delete links; links = 0;
+            }
+
+            if (links) {
+
+               Config linkList;
+
+               data.lookup_all_config ("object", linkList);
+
+               Config obj;
+               ConfigIterator it;
+
+               Boolean found (linkList.get_first_config (it, obj));
+
+               while (found) {
+
+                  const String Name (config_to_string ("name", obj));
+
+                  LinkStruct *ls = new LinkStruct (Name, AttrHandle);
+                  if (ls && Name) {
+
+                     ls->subHandle = objMod->lookup_handle_from_uuid (UUID (Name));
+
+                     if (!ls->subHandle) { fetchTable.add (Name); }
+
+                     if (links->table.store (Name, ls)) {
+
+                        const String AttrName (config_to_string ("attribute", obj));
+
+                        if (AttrName) {
+
+                           ls->attrObjectId = AttrName;
+
+                           ls->attrObjectHandle =
+                                 objMod->lookup_handle_from_uuid (UUID (AttrName));
+
+                           if (!ls->attrObjectHandle) { fetchTable.add (AttrName); }
+                        }
+                     }
+                     else { delete ls; ls = 0; }
+                  }
+
+                  found = linkList.get_next_config (it, obj);
+               }
+
+               if (fetchTable.get_count () && _webservices) {
+
+                  _webservices->fetch_configs (fetchTable, *this);
+               }
+            }
+         }
+         else if (DataName == "counter") {
+
+            String valueStr;
+            if (data.lookup_attribute ("minimum", valueStr)) {
+
+               objMod->store_counter_minimum (
+                  ObjectHandle,
+                  AttrHandle,
+                  string_to_int64 (valueStr));
+            }
+
+            if (data.lookup_attribute ("maximum", valueStr)) {
+
+               objMod->store_counter_maximum (
+                  ObjectHandle,
+                  AttrHandle,
+                  string_to_int64 (valueStr));
+            }
+
+            if (data.lookup_attribute ("value", valueStr)) {
+
+                objMod->store_counter (
+                   ObjectHandle,
+                   AttrHandle,
+                   string_to_int64 (valueStr));
+
+                objMod->store_counter_rollover (
+                   ObjectHandle,
+                   AttrHandle,
+                   config_to_boolean ("rollover", data, False));
+             }
+         }
+         else if (DataName == "alttype") {
+
+            const ObjectType Type (
+               config_to_string ("value", data),
+               get_plugin_runtime_context ());
+
+            objMod->store_alternate_object_type (ObjectHandle, AttrHandle, Type);
+         }
+         else if (DataName == "state") {
+
+            Mask value;
+            _defs.lookup_state (config_to_string ("value", data), value);
+
+            objMod->store_state (ObjectHandle, AttrHandle, value);
+         }
+         else if (DataName == "flag") {
+
+            objMod->store_flag (
+               ObjectHandle,
+               AttrHandle,
+               config_to_boolean ("value", data));
+         }
+         else if (DataName == "timestamp") {
+
+            objMod->store_time_stamp (
+               ObjectHandle,
+               AttrHandle,
+               config_to_float64 (data));
+         }
+         else if (DataName == "position") {
+
+            objMod->store_position (ObjectHandle, AttrHandle, config_to_vector (data));
+         }
+         else if (DataName == "orientation") {
+
+            objMod->store_orientation (
+               ObjectHandle,
+               AttrHandle,
+               config_to_matrix (data));
+         }
+         else if (DataName == "euler") {
+
+            const Vector Euler (config_to_vector (data));
+            const Matrix Value (Euler.get_x (), Euler.get_y (), Euler.get_z ());
+
+            objMod->store_orientation (ObjectHandle, AttrHandle, Value);
+         }
+         else if (DataName == "velocity") {
+
+            objMod->store_velocity (ObjectHandle, AttrHandle, config_to_vector (data));
+         }
+         else if (DataName == "acceleration") {
+
+            objMod->store_acceleration (
+               ObjectHandle,
+               AttrHandle,
+               config_to_vector (data));
+         }
+         else if (DataName == "scale") {
+
+            objMod->store_scale (ObjectHandle, AttrHandle, config_to_vector (data));
+         }
+         else if (DataName == "vector") {
+
+            objMod->store_vector (ObjectHandle, AttrHandle, config_to_vector (data));
+         }
+         else if (DataName == "scalar") {
+
+            Float64 value (config_to_float64 (data));
+            objMod->store_scalar (ObjectHandle, AttrHandle, value);
+         }
+         else if (DataName == "text") {
+
+            objMod->store_text (ObjectHandle, AttrHandle, config_to_string (data));
+         }
+         else if (DataName == "data") {
+
+            Data value;
+            if (config_to_data (data, get_plugin_runtime_context (), value, &_log)) {
+
+               objMod->store_data (ObjectHandle, AttrHandle, value);
+            }
+         }
+         else {
+
+            _log.error << "Unsupported attribute type: " << data.get_name () << endl;
+         }
+
+         found = attrData.get_next_config (it, data);
+      }
+   }
+}
+
+
+void
 dmz::ObjectPluginWebServices::_update (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
-   if (_activeTable.contains (ObjectHandle)) {
+   if (!_inUpdate && _activeTable.contains (ObjectHandle)) {
 
       _updateTable.add (Identity.to_string ());
    }

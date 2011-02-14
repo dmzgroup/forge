@@ -6,6 +6,8 @@
 #include <dmzRuntimeRTTI.h>
 #include <dmzTypesBase.h>
 #include <dmzTypesString.h>
+#include <dmzTypesStringContainer.h>
+
 
 namespace dmz {
 
@@ -40,6 +42,16 @@ namespace dmz {
             const String &Id,
             const Boolean Error,
             const Config &Data) = 0;
+
+         virtual void config_updated (
+            const String &Id,
+            const Boolean Deleted,
+            const Int32 Sequence) = 0;
+
+         virtual void config_updated (
+            const StringContainer &UpdateList,
+            const StringContainer &DeleteList,
+            const Int32 LastSequence) = 0;
 
       protected:
          WebServicesObserver (const PluginInfo &Info);

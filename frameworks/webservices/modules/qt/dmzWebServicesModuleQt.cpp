@@ -110,11 +110,11 @@ struct dmz::WebServicesModuleQt::State {
    Handle archiveHandle;
    HashTableStringTemplate<DocStruct> documentTable;
    HashTableUInt64Template<RequestStruct> requestTable;
+   HashTableUInt64Template<RequestStruct> feedTable;
    StringContainer fetchTable;
    Int32 lastSeq;
    Float64 fetchChangesDelta;
    Boolean loggedIn;
-   RequestStruct *continuousFeed;
    RequestStruct *request;
 
    State (const PluginInfo &Info);
@@ -143,7 +143,6 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       fetchChangesDelta (0),
       lastSeq (0) ,
       loggedIn (False),
-      continuousFeed (0),
       request (0) {
 
 }
@@ -152,8 +151,8 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
 dmz::WebServicesModuleQt::State::~State () {
 
    request = 0;
-   continuousFeed = 0;
 
+   feedTable.clear ();
    requestTable.empty ();
    documentTable.empty ();
 
@@ -317,49 +316,6 @@ dmz::WebServicesModuleQt::discover_plugin (
 void
 dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
 
-#if 0
-   ObjectModule *objMod (get_object_module ());
-
-   if (objMod && _state.archiveMod && _state.updateTable.get_count ()) {
-
-      Config global = _state.archiveMod->create_archive (_state.archiveHandle);
-      Config objectList;
-
-      if (global.lookup_all_config ("archive.object", objectList)) {
-
-         ConfigIterator it;
-         Config object;
-
-         while (objectList.get_next_config (it, object)) {
-
-            UUID uuid = config_to_string ("uuid", object);
-            String docId = uuid.to_string ();
-
-            Handle objHandle = objMod->lookup_handle_from_uuid (docId);
-
-            if (_state.updateTable.contains (objHandle)) {
-
-               if (!_state.is_object_pending (objHandle)) {
-
-                  Config archive ("archive");
-                  archive.add_config (object);
-
-                  UInt64 requestId = _publish_document (docId, archive);
-                  if (requestId) {
-
-//                     RequestStruct *rs = _state.get_request (requestId);
-//                     if (rs) { rs->objectHandle = objHandle; }
-                  }
-
-                  _state.updateTable.remove (objHandle);
-               }
-            }
-         }
-      }
-   }
-
-#endif
-
 //   _state.fetchChangesDelta += TimeDelta;
 //   if (_state.fetchChangesDelta > LocalFetchChangesInterval) {
 
@@ -380,7 +336,6 @@ dmz::WebServicesModuleQt::publish_config (
       const Config &Data,
       WebServicesObserver &obs) {
 
-   _state.log.warn << "publish: " << Id << endl;
    return _publish_document (Id, Data, obs) ? True : False;
 }
 
@@ -388,7 +343,6 @@ dmz::WebServicesModuleQt::publish_config (
 dmz::Boolean
 dmz::WebServicesModuleQt::fetch_config (const String &Id, WebServicesObserver &obs) {
 
-   _state.log.warn << "fetch: " << Id << endl;
    return _fetch_document (Id, obs) ? True : False;
 }
 
@@ -415,7 +369,6 @@ dmz::WebServicesModuleQt::fetch_configs (
 dmz::Boolean
 dmz::WebServicesModuleQt::delete_config (const String &Id, WebServicesObserver &obs) {
 
-   _state.log.warn << "delete: " << Id << endl;
    return _delete_document (Id, obs) ? True : False;
 }
 
@@ -436,6 +389,32 @@ dmz::WebServicesModuleQt::delete_configs (
    }
 
    return !error;
+}
+
+
+dmz::Boolean
+dmz::WebServicesModuleQt::get_config_updates (
+      WebServicesObserver &obs,
+      const Int32 Since) {
+
+   return _fetch_changes (obs, Since, False) ? True : False;
+}
+
+
+dmz::Boolean
+dmz::WebServicesModuleQt::start_realtime_updates (
+      WebServicesObserver &obs,
+      const Int32 Since) {
+
+   Boolean result (False);
+
+   RequestStruct *request = _fetch_changes (obs, Since, True);
+   if (request) {
+
+      _state.feedTable.store (request->Id, request);
+   }
+
+   return result;
 }
 
 
@@ -460,34 +439,33 @@ dmz::WebServicesModuleQt::_reply_download_progress (
       qint64 bytesReceived,
       qint64 bytesTotal) {
 
-   if (_state.continuousFeed && reply) {
+   RequestStruct *feed = _state.feedTable.lookup (RequestId);
+   if (feed && reply) {
 
-      if (_state.continuousFeed->Id == RequestId) {
+      Boolean done = False;
+      QByteArray data = reply->readLine (bytesReceived);
+      while (!data.isEmpty () && !done) {
 
-         Boolean done = False;
-         QByteArray data = reply->readLine (bytesReceived);
-         while (!data.isEmpty () && !done) {
+         String jsonData (data.constData ());
 
-            String jsonData (data.constData ());
+_state.log.info << "json: " <<jsonData << endl;
+         Config global ("global");
+         if (json_string_to_config (jsonData, global)) {
 
-            Config global ("global");
-            if (json_string_to_config (jsonData, global)) {
-
-               _state.continuousFeed->data = global;
-               done = _handle_continuous_feed (*(_state.continuousFeed));
-            }
-
-            if (!done) { data = reply->readLine (); }
+            feed->data = global;
+            done = _handle_continuous_feed (*feed);
          }
 
-         if (done) {
+         if (!done) { data = reply->readLine (); }
+      }
 
-            reply->readAll ();
+      if (done) {
 
-            _state.requestTable.remove (_state.continuousFeed->Id);
-            delete _state.continuousFeed;
-            _state.continuousFeed = 0;
-         }
+         reply->readAll ();
+
+         _state.feedTable.remove (feed->Id);
+         _state.requestTable.remove (feed->Id);
+         delete feed; feed = 0;
       }
    }
 }
@@ -521,7 +499,6 @@ _state.log.warn << "StatusCode: " << request->statusCode << endl;
 
       if (JsonData) {
 
-//         request->data = Config ("global");
          if (json_string_to_config (JsonData, request->data)) {
 
             _handle_reply (*request);
@@ -635,10 +612,7 @@ dmz::WebServicesModuleQt::_publish_document (
 
       doc.store_attribute ("_id", Id);
 
-      DocStruct *ds = _state.get_doc (Id);
-      if (ds && ds->rev) { doc.store_attribute ("_rev", ds->rev); }
-
-      doc.store_attribute ("system_id", _state.SysId.to_string ());
+      doc.store_attribute ("runtime_id", _state.SysId.to_string ());
 
       doc.store_attribute ("type", Data.get_name ());
 
@@ -650,9 +624,14 @@ dmz::WebServicesModuleQt::_publish_document (
       if (format_config_to_json (doc, out, ConfigStripGlobal, &_state.log)) {
 
          QUrl url = _get_url (Id);
+         QNetworkRequest req = _state.client->get_next_request (url);
+
+         DocStruct *ds = _state.get_doc (Id);
+         if (ds && ds->rev) { req.setRawHeader ("If-Match", ds->rev.get_buffer ()); }
+
          QByteArray data (json.get_buffer ());
 
-         const UInt64 RequestId (_state.client->put (url, data));
+         const UInt64 RequestId (_state.client->put (req, data));
          if (RequestId) {
 
             request = _state.get_request (RequestId, "publishDocument", Id, obs);
@@ -695,9 +674,11 @@ dmz::WebServicesModuleQt::_delete_document (const String &Id, WebServicesObserve
       if (doc && doc->rev) {
 
          QUrl url = _get_url (Id);
-         url.addQueryItem ("rev", doc->rev.get_buffer ());
+         QNetworkRequest req = _state.client->get_next_request (url);
 
-         UInt64 requestId = _state.client->del (url);
+         req.setRawHeader ("If-Match", doc->rev.get_buffer ());
+
+         UInt64 requestId = _state.client->del (req);
          if (requestId) {
 
             request = _state.get_request (requestId, "deleteDocument", Id, obs);
@@ -710,15 +691,24 @@ dmz::WebServicesModuleQt::_delete_document (const String &Id, WebServicesObserve
 
 
 dmz::WebServicesModuleQt::RequestStruct *
-dmz::WebServicesModuleQt::_fetch_changes (const Int32 Since, const Boolean Continuous) {
+dmz::WebServicesModuleQt::_fetch_changes (
+      WebServicesObserver &obs,
+      const Int32 Since,
+      const Boolean Continuous) {
 
    RequestStruct *request;
 
    if (_state.client) {
 
-      QUrl url = _get_url ("_changes");
-      if (Continuous) { url.addQueryItem ("feed", "continuous"); }
+      const String Id ("_changes");
+      QUrl url = _get_url (Id);
       url.addQueryItem ("since", QString::number (Since));
+
+      if (Continuous) {
+
+         url.addQueryItem ("feed", "continuous");
+         url.addQueryItem ("heartbeat", "50000");
+      }
 
       UInt64 requestId = _state.client->get (url);
       if (requestId) {
@@ -726,7 +716,7 @@ dmz::WebServicesModuleQt::_fetch_changes (const Int32 Since, const Boolean Conti
          String requestType = "fetchChanges";
          if (Continuous) { requestType << "Continuous"; }
 
-         request = _state.get_request (requestId, "fetchChanges", "_changes", *this);
+         request = _state.get_request (requestId, requestType, Id, obs);
       }
    }
 
@@ -865,7 +855,10 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
    }
    else {
 
-      _state.lastSeq = config_to_int32 ("last_seq", request.data, _state.lastSeq);
+      UInt32 lastSeq = config_to_int32 ("last_seq", request.data);
+
+      StringContainer updatedList;
+      StringContainer deletedList;
 
       ConfigIterator it;
       Config data;
@@ -876,16 +869,23 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
          const String Rev (config_to_string ("changes.rev", data));
          const Boolean Deleted (config_to_boolean ("deleted", data));
 
-         DocStruct *doc = _state.get_doc (Id);
-         if (doc) {
+         if (Deleted) {
 
-            if (!Deleted && !doc->pending && (doc->rev != Rev)) {
+            DocStruct *doc = _state.documentTable.remove (Id);
+            if (doc) { delete doc; doc = 0; }
+            deletedList.add (Id);
+         }
+         else {
 
-   _state.log.warn << "changes for id: " << Id << endl;
-//               _state.fetchTable.add (id);
+            DocStruct *doc = _state.get_doc (Id);
+            if (doc) {
+
+               if (!doc->pending && (doc->rev != Rev)) { updatedList.add (Id); }
             }
          }
       }
+
+      request.obs.config_updated (updatedList, deletedList, lastSeq);
    }
 }
 
@@ -893,32 +893,41 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
 dmz::Boolean
 dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
 
-   Boolean done (False);
+   Boolean done (True);
 
    const Config Feed (request.data);
 
    Int32 lastSeq = config_to_int32 ("last_seq", Feed, -1);
    if (lastSeq == -1) {
 
-      _state.lastSeq = config_to_int32 ("seq", Feed, _state.lastSeq);
+      done = False;
+      lastSeq = config_to_int32 ("seq", Feed);
 
-      String id = config_to_string ("id", Feed);
-      String rev = config_to_string ("changes.rev", Feed);
-      Boolean deleted = config_to_boolean ("deleted", Feed);
+      const String Id (config_to_string ("id", Feed));
+      const String Rev (config_to_string ("changes.rev", Feed));
+      const Boolean Deleted (config_to_boolean ("deleted", Feed));
 
-      DocStruct *doc = _state.get_doc (id);
-      if (doc) {
+      if (Deleted) {
 
-         if (!deleted && !doc->pending && (doc->rev != rev)) {
+         DocStruct *doc = _state.documentTable.remove (Id);
+         if (doc) {
 
-            _state.fetchTable.add (id);
+            delete doc; doc = 0;
+            request.obs.config_updated (Id, True, lastSeq);
          }
       }
-   }
-   else {
+      else {
 
-      _state.lastSeq = lastSeq;
-      done = True;
+         DocStruct *doc = _state.get_doc (Id);
+         if (doc) {
+
+            if (!doc->pending && (doc->rev != Rev)) {
+
+               doc->rev = Rev;
+               request.obs.config_updated (Id, False, lastSeq);
+            }
+         }
+      }
    }
 
    return done;

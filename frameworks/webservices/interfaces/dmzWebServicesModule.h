@@ -43,6 +43,16 @@ namespace dmz {
             const StringContainer &IdList,
             WebServicesObserver &obs) = 0;
 
+         virtual Boolean get_config_updates (
+            WebServicesObserver &obs,
+            const Int32 Since = 0) = 0;
+
+         virtual Boolean start_realtime_updates (
+            WebServicesObserver &obs,
+            const Int32 Since = 0) = 0;
+
+//         virtual Boolean stop_realtime_updates (WebServicesObserver &obs) = 0;
+
       protected:
          WebServicesModule (const PluginInfo &Info);
          ~WebServicesModule ();

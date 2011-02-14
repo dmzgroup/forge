@@ -63,6 +63,14 @@ namespace dmz {
             const StringContainer &IdList,
             WebServicesObserver &obs);
 
+         virtual Boolean get_config_updates (
+            WebServicesObserver &obs,
+            const Int32 Since);
+
+         virtual Boolean start_realtime_updates (
+            WebServicesObserver &obs,
+            const Int32 Since);
+
          // WebServicesObserver Interface
          virtual void config_published (
             const String &Id,
@@ -78,6 +86,16 @@ namespace dmz {
             const String &Id,
             const Boolean Error,
             const Config &Data) {;}
+
+         virtual void config_updated (
+            const String &Id,
+            const Boolean Deleted,
+            const Int32 Sequence) {;}
+
+         virtual void config_updated (
+            const StringContainer &UpdateList,
+            const StringContainer &DeleteList,
+            const Int32 LastSequence) {;}
 
       protected Q_SLOTS:
          void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
@@ -114,6 +132,7 @@ namespace dmz {
          RequestStruct *_delete_document (const String &Id, WebServicesObserver &obs);
 
          RequestStruct *_fetch_changes (
+            WebServicesObserver &obs,
             const Int32 Since,
             const Boolean Continuous = False);
 
