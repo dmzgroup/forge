@@ -5,16 +5,18 @@
 #include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimeLog.h>
 #include <dmzRuntimeMessaging.h>
+#include <dmzRuntimeObjectType.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
+#include <dmzTypesDeleteListTemplate.h>
 #include <dmzTypesHashTableHandleTemplate.h>
 #include <dmzTypesHashTableStringTemplate.h>
+#include <dmzTypesHashTableUUIDTemplate.h>
 #include <dmzWebServicesObserver.h>
 
 
 namespace dmz {
 
-   class ArchiveModule;
    class WebServicesModule;
 
    class ObjectPluginWebServices :
@@ -59,7 +61,8 @@ namespace dmz {
          virtual void config_updated (
             const String &Id,
             const Boolean Deleted,
-            const Int32 Sequence);
+            const Int32 Sequence,
+            const Config &Data);
 
          virtual void config_updated (
             const StringContainer &UpdatedIdList,
@@ -241,77 +244,131 @@ namespace dmz {
             const Data *PreviousValue);
 
       protected:
-         struct ObjectStruct {
+         struct FilterAttrStruct {
 
-            String name;
-            Handle handle;
-            HashTableStringTemplate<ObjectStruct> links;
+            const String Name;
+            const Mask Attr;
+            FilterAttrStruct *next;
 
-            ObjectStruct () {;}
-            ~ObjectStruct () { links.clear (); }
+            FilterAttrStruct (const String TheName, const Mask TheAttr) :
+                  Name (TheName),
+                  Attr (TheAttr),
+                  next (0) {;}
+
+            ~FilterAttrStruct () { delete_list (next);  }
+         };
+
+         struct FilterStruct {
+
+            FilterStruct *next;
+            ObjectTypeSet inTypes;
+            ObjectTypeSet exTypes;
+            HashTableHandleTemplate<Mask> attrTable;
+            HashTableHandleTemplate<Mask> stateTable;
+            FilterAttrStruct *list;
+
+            FilterStruct () :
+                  next (0),
+                  list (0) {;}
+
+            ~FilterStruct () {
+
+               delete_list (next);
+               delete_list (list);
+               attrTable.empty ();
+               stateTable.empty ();
+            }
          };
 
          struct LinkStruct {
 
-            ObjectStruct super;
-            ObjectStruct sub;
-            String super;
-            Handle superHandle;
-            String sub;
-            Handle subHandle;
-            String attrName;
-            Handle attrHandle;
+            Handle AttrHandle;
+            Handle SuperHandle;
+            Handle linkHandle;
+            String subName;
             String attrObjectName;
-            Handle attrObjectHandle;
 
-            LinkStruct (const String &TheName, const Handle TheHandle) :
-               SubName (TheName),
-               LinkHandle (TheHandle),
-               subHandle (0),
-               attrObjectHandle (0) {;}
+            LinkStruct (const Handle TheAttrHandle, const Handle TheSuperHandle) :
+               AttrHandle (TheAttrHandle),
+               SuperHandle (TheSuperHandle),
+               linkHandle (0) {;}
          };
 
          struct ObjectLinkStruct {
 
-            const Handle ObjectHandle;
-            HashTableStringTemplate<LinkStruct> table;
+            const String SubName;
+            HashTableHandleTemplate<LinkStruct> inLinks;
 
-            ObjectLinkStruct (const Handle TheHandle) : ObjectHandle (TheHandle) {;}
-            ~ObjectLinkStruct () { table.empty (); }
+            ObjectLinkStruct (const String &Name) : SubName (Name) {;}
+            ~ObjectLinkStruct () { inLinks.empty (); }
          };
+
+         Boolean _publish (const Handle ObjectHandle);
+         Boolean _fetch (const String &Id);
+
+         void _link_to_sub (ObjectLinkStruct &objLink);
 
          void _configs_deleted (const StringContainer &DeleteIdList);
 
+         Config _archive_object (const Handle ObjectHandle);
+
+         Boolean _get_attr_config (const Handle AttrHandle, Config &config);
+
          void _config_to_object (const Config &Data);
 
-         void _store_object_attributes (const Handle ObjectHandle, Config &attrData);
+         void _config_to_object_attributes (
+            const Handle ObjectHandle,
+            const Config &Data);
 
-         void _update (const UUID &Identity, const Handle ObjectHandle);
+         Boolean _add_sub_link (
+            const Handle AttrHandle,
+            const Handle SuperHandle,
+            const String &SubName,
+            const String &AttrObjName);
 
+         Boolean _handle_type (const ObjectType &Type);
+
+         Boolean _handle_attribute (
+            const Handle AttrHandle,
+            const Mask &AttrMask);
+
+         Mask _filter_state (const Handle AttrHandle, const Mask &Value);
+
+         Boolean _active (const Handle ObjectHandle);
+         Boolean _update (const Handle ObjectHandle);
+
+         void _init_filter_list (Config &local);
+         void _init_object_type_filter (Config &objects, FilterStruct &filter);
+         void _init_attribute_filter (Config &attrConfig, FilterStruct &filter);
+         void _init_state_filter (Config &stateConfig, FilterStruct &filter);
          void _init (Config &local);
 
          Log _log;
          Definitions _defs;
 
-         ArchiveModule *_archiveModule;
-         String _archiveModuleName;
-
          WebServicesModule *_webservices;
          String _webservicesName;
 
-         Handle _archiveHandle;
-         Handle _defaultAttrHandle;
+         FilterStruct *_filterList;
+
+         Handle _defaultHandle;
          HandleContainer _activeTable;
-         StringContainer _updateTable;
+         HandleContainer _publishTable;
          StringContainer _fetchTable;
          StringContainer _deleteTable;
-         StringContainer _pendingTable;
+         StringContainer _pendingPublishTable;
+         StringContainer _pendingFetchTable;
 
-         HashTableStringTemplate<ObjectStruct> _objectTable;
-         HashTableHandleTemplate<ObjectLinkStruct> _linkTable;
+         Config _currentConfig;
+         HashTableHandleTemplate<Config> _configTable;
+
+         HashTableStringTemplate<ObjectLinkStruct> _objectLinkTable;
 
          Int32 _lastSeq;
+         Boolean _inDump;
          Boolean _inUpdate;
+         Float64 _publishRate;
+         Float64 _publishDelta;
 
       private:
          ObjectPluginWebServices ();

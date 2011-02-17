@@ -46,7 +46,8 @@ namespace dmz {
          virtual void config_updated (
             const String &Id,
             const Boolean Deleted,
-            const Int32 Sequence) = 0;
+            const Int32 Sequence,
+            const Config &Data) = 0;
 
          virtual void config_updated (
             const StringContainer &UpdateList,

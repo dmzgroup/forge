@@ -395,9 +395,10 @@ dmz::WebServicesModuleQt::delete_configs (
 dmz::Boolean
 dmz::WebServicesModuleQt::get_config_updates (
       WebServicesObserver &obs,
-      const Int32 Since) {
+      const Int32 Since,
+      const Boolean Heavy) {
 
-   return _fetch_changes (obs, Since, False) ? True : False;
+   return _fetch_changes (obs, Since, Heavy) ? True : False;
 }
 
 
@@ -408,10 +409,25 @@ dmz::WebServicesModuleQt::start_realtime_updates (
 
    Boolean result (False);
 
-   RequestStruct *request = _fetch_changes (obs, Since, True);
-   if (request) {
+   if (_state.client) {
 
-      _state.feedTable.store (request->Id, request);
+      const String Id ("_changes");
+      QUrl url = _get_url (Id);
+      url.addQueryItem ("since", QString::number (Since));
+      url.addQueryItem ("feed", "continuous");
+      url.addQueryItem ("heartbeat", "50000");
+
+      UInt64 requestId = _state.client->get (url);
+      if (requestId) {
+
+         String requestType = "fetchChangesContinuous";
+
+         RequestStruct *request = _state.get_request (requestId, requestType, Id, obs);
+         if (request) {
+
+            _state.feedTable.store (request->Id, request);
+         }
+      }
    }
 
    return result;
@@ -448,6 +464,7 @@ dmz::WebServicesModuleQt::_reply_download_progress (
 
          String jsonData (data.constData ());
 
+_state.log.info << feed->DocId << " : " << feed->Id << endl;
 _state.log.info << "json: " <<jsonData << endl;
          Config global ("global");
          if (json_string_to_config (jsonData, global)) {
@@ -467,6 +484,10 @@ _state.log.info << "json: " <<jsonData << endl;
          _state.requestTable.remove (feed->Id);
          delete feed; feed = 0;
       }
+   }
+   else {
+
+      _state.log.info << bytesReceived << "/" << bytesTotal << endl;
    }
 }
 
@@ -489,10 +510,11 @@ dmz::WebServicesModuleQt::_reply_finished (
       request->statusCode =
          reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-      if (request->statusCode > 300) {
+//      if (request->statusCode > 300) {
 
 _state.log.warn << "StatusCode: " << request->statusCode << endl;
-      }
+_state.log.info << request->DocId << " : " << request->Id << endl;
+//      }
 
       QByteArray data (reply->readAll ());
       const String JsonData (data.constData ());
@@ -519,7 +541,7 @@ _state.log.warn << "StatusCode: " << request->statusCode << endl;
          request->data = Config ("global");
          request->data.store_attribute ("error", "Network Error");
          request->data.store_attribute ("reason", reason);
-
+_state.log.error << reason << endl;
          _handle_reply (*request);
       }
 
@@ -553,7 +575,27 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 //      _state.log.info << request.data << endl;
    }
 
-   if (request.Type == "postSession") {
+   if (request.Type == "fetchDocument") {
+
+       _document_fetched (request);
+   }
+   else if (request.Type == "publishDocument") {
+
+      _document_published (request);
+   }
+   else if (request.Type == "deleteDocument") {
+
+      _document_deleted (request);
+   }
+   else if (request.Type == "fetchChanges") {
+
+      _changes_fetched (request);
+   }
+   else if (request.Type == "fetchChangesHeavy") {
+
+      _changes_fetched_heavy (request);
+   }
+   else if (request.Type == "postSession") {
 
       if (config_to_boolean ("ok", request.data)) {
 
@@ -566,22 +608,6 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
 //         _state.loginFailedMsg.send ();
       }
-   }
-   else if (request.Type == "fetchChanges") {
-
-      _changes_fetched (request);
-   }
-   else if (request.Type == "fetchDocument") {
-
-       _document_fetched (request);
-   }
-   else if (request.Type == "deleteDocument") {
-
-      _document_deleted (request);
-   }
-   else if (request.Type == "publishDocument") {
-
-      _document_published (request);
    }
 }
 
@@ -694,7 +720,7 @@ dmz::WebServicesModuleQt::RequestStruct *
 dmz::WebServicesModuleQt::_fetch_changes (
       WebServicesObserver &obs,
       const Int32 Since,
-      const Boolean Continuous) {
+      const Boolean Heavy) {
 
    RequestStruct *request;
 
@@ -704,17 +730,13 @@ dmz::WebServicesModuleQt::_fetch_changes (
       QUrl url = _get_url (Id);
       url.addQueryItem ("since", QString::number (Since));
 
-      if (Continuous) {
-
-         url.addQueryItem ("feed", "continuous");
-         url.addQueryItem ("heartbeat", "50000");
-      }
+      if (Heavy) { url.addQueryItem ("include_docs", "true"); }
 
       UInt64 requestId = _state.client->get (url);
       if (requestId) {
 
          String requestType = "fetchChanges";
-         if (Continuous) { requestType << "Continuous"; }
+         if (Heavy) { requestType << "Heavy"; }
 
          request = _state.get_request (requestId, requestType, Id, obs);
       }
@@ -790,63 +812,6 @@ dmz::WebServicesModuleQt::_document_deleted (RequestStruct &request) {
 }
 
 
-//void
-//dmz::WebServicesModuleQt::_archive_fetched (
-//      const UInt64 RequestId,
-//      const Config &Archive) {
-
-//   if (RequestId && _state.archiveMod) {
-
-//      Config global ("dmz");
-//      global.add_config (Archive);
-
-//      _state.archiveMod->process_archive (_state.archiveHandle, global);
-//   }
-//}
-
-
-//void
-//dmz::WebServicesModuleQt::_session_fetched (
-//      const UInt64 RequestId,
-//      const Config &Session) {
-
-//_state.log.error << "---------- _handle_session[" << RequestId << "] ----------" << endl;
-
-//   if (RequestId) {
-
-//      const String DocId (config_to_string ("uuid", Session));
-//      const String Name  (config_to_string ("name", Session, "Unknown Action"));
-
-//      Config actionList;
-//      if (Session.lookup_all_config ("action", actionList)) {
-
-//         RuntimeContext *context (get_plugin_runtime_context ());
-
-//         ConfigIterator it;
-//         Config action;
-
-//         while (Session.get_next_config (it, action)) {
-
-//            const Message Type (
-//               config_create_message ("message", action, "", context, &_state.log));
-
-//            const Handle Target (config_to_named_handle ("target", action, "", context));
-
-//            Data value;
-//            const Boolean DataCreated (
-//               config_to_data ("data", action, context, value, &_state.log));
-
-//            if (Type) {
-
-//_state.log.warn << "sent message: " << Type.get_name () << " to: " << Target << endl;
-//               Type.send (Target, DataCreated ? &value : 0, 0);
-//            }
-//         }
-//      }
-//   }
-//}
-
-
 void
 dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
 
@@ -854,8 +819,6 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
 
    }
    else {
-
-      UInt32 lastSeq = config_to_int32 ("last_seq", request.data);
 
       StringContainer updatedList;
       StringContainer deletedList;
@@ -885,7 +848,65 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
          }
       }
 
+      UInt32 lastSeq = config_to_int32 ("last_seq", request.data);
       request.obs.config_updated (updatedList, deletedList, lastSeq);
+//      request.obs.last_config_update (lastSeq);
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_changes_fetched_heavy (RequestStruct &request) {
+
+   _state.log.error << "convert json string to config" << endl;
+
+qApp->processEvents ();
+
+   if (request.error) {
+
+   }
+   else {
+
+      ConfigIterator it;
+      Config resultDoc;
+
+      while (request.data.get_next_config (it, resultDoc)) {
+
+         const String DocId (config_to_string ("id", resultDoc));
+         const UInt32 Seq (config_to_int32 ("seq", resultDoc));
+         const Boolean Deleted (config_to_boolean ("deleted", resultDoc));
+
+         Config docData;
+         resultDoc.lookup_config ("doc", docData);
+
+         if (Deleted) {
+
+            DocStruct *doc = _state.documentTable.remove (DocId);
+            if (doc) { delete doc; doc = 0; }
+
+            request.obs.config_updated (DocId, True, Seq, docData);
+         }
+         else {
+
+            DocStruct *doc = _state.get_doc (DocId);
+            if (doc) {
+
+               doc->rev = config_to_string ("_rev", docData);
+            }
+
+            String runtimeId = config_to_string ("runtime_id", docData);
+
+            String docType = config_to_string ("type", docData);
+
+            Config data;
+            docData.lookup_config (docType, data);
+
+            request.obs.config_updated (DocId, False, Seq, data);
+         }
+      }
+
+      UInt32 lastSeq = config_to_int32 ("last_seq", request.data);
+//      request.obs.last_config_update (lastSeq);
    }
 }
 
@@ -907,13 +928,15 @@ dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
       const String Rev (config_to_string ("changes.rev", Feed));
       const Boolean Deleted (config_to_boolean ("deleted", Feed));
 
+      Config data;
+
       if (Deleted) {
 
          DocStruct *doc = _state.documentTable.remove (Id);
          if (doc) {
 
             delete doc; doc = 0;
-            request.obs.config_updated (Id, True, lastSeq);
+            request.obs.config_updated (Id, True, lastSeq, data);
          }
       }
       else {
@@ -924,7 +947,7 @@ dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
             if (!doc->pending && (doc->rev != Rev)) {
 
                doc->rev = Rev;
-               request.obs.config_updated (Id, False, lastSeq);
+               request.obs.config_updated (Id, False, lastSeq, data);
             }
          }
       }

@@ -65,7 +65,8 @@ namespace dmz {
 
          virtual Boolean get_config_updates (
             WebServicesObserver &obs,
-            const Int32 Since);
+            const Int32 Since,
+            const Boolean Heavy);
 
          virtual Boolean start_realtime_updates (
             WebServicesObserver &obs,
@@ -90,7 +91,8 @@ namespace dmz {
          virtual void config_updated (
             const String &Id,
             const Boolean Deleted,
-            const Int32 Sequence) {;}
+            const Int32 Sequence,
+            const Config &Data) {;}
 
          virtual void config_updated (
             const StringContainer &UpdateList,
@@ -134,13 +136,14 @@ namespace dmz {
          RequestStruct *_fetch_changes (
             WebServicesObserver &obs,
             const Int32 Since,
-            const Boolean Continuous = False);
+            const Boolean Heavy);
 
          void _document_published (RequestStruct &request);
          void _document_fetched (RequestStruct &request);
          void _document_deleted (RequestStruct &request);
 
          void _changes_fetched (RequestStruct &request);
+         void _changes_fetched_heavy (RequestStruct &request);
 
          Boolean _handle_continuous_feed (RequestStruct &request);
 

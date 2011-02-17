@@ -1,5 +1,5 @@
 lmk.set_name "dmzObjectPluginWebServices"
 lmk.set_type "plugin"
 lmk.add_files {"dmzObjectPluginWebServices.cpp",}
-lmk.add_libs {"dmzArchiveUtil", "dmzObjectUtil", "dmzKernel",}
-lmk.add_preqs {"dmzWebServicesFramework", "dmzArchiveFramework", "dmzObjectFramework",}
+lmk.add_libs {"dmzObjectUtil", "dmzKernel",}
+lmk.add_preqs {"dmzWebServicesFramework", "dmzObjectFramework",}

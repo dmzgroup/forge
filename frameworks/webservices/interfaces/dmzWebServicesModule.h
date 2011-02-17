@@ -45,7 +45,8 @@ namespace dmz {
 
          virtual Boolean get_config_updates (
             WebServicesObserver &obs,
-            const Int32 Since = 0) = 0;
+            const Int32 Since,
+            const Boolean Heavy = False) = 0;
 
          virtual Boolean start_realtime_updates (
             WebServicesObserver &obs,
