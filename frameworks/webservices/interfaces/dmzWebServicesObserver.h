@@ -38,6 +38,8 @@ namespace dmz {
             const Boolean Error,
             const Config &Data) = 0;
 
+         virtual void configs_fetched (const Boolean Error, const Config &Data) = 0;
+
          virtual void config_deleted (
             const String &Id,
             const Boolean Error,

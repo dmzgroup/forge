@@ -92,8 +92,8 @@ dmz::ObjectPluginWebServices::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      _webservices->get_config_updates (*this, _lastSeq, True);
-//      _webservices->start_realtime_updates (*this);
+//      _webservices->get_config_updates (*this, _lastSeq, True);
+      _webservices->start_realtime_updates (*this);
    }
    else if (State == PluginStateStop) {
 
