@@ -1,3 +1,3 @@
 fonts
 *.exe
-*.couchapprc
+couchapps/ws/.couchapprc
