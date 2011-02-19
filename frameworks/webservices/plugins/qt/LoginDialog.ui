@@ -51,12 +51,18 @@
    <item row="2" column="1">
     <widget class="QCheckBox" name="rememberMe">
      <property name="text">
-      <string>Remember password (stored in clear text)</string>
+      <string>Remember password</string>
      </property>
     </widget>
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>usernameLineEdit</tabstop>
+  <tabstop>passwordLineEdit</tabstop>
+  <tabstop>rememberMe</tabstop>
+  <tabstop>buttonBox</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

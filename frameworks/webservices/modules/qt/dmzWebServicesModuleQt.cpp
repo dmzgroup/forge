@@ -637,14 +637,36 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
       if (config_to_boolean ("ok", request.data)) {
 
-_state.log.warn << "LOGGED_IN: _session: " << request.data << endl;
+         _state.loggedIn = True;
+
+_state.log.warn << "_session: " << request.data << endl;
+
          String name = config_to_string ("name", request.data);
+
+         Boolean admin (False);
+         Config roles;
+         if (request.data.lookup_all_config ("roles", roles)) {
+
+            ConfigIterator it;
+            Config data;
+
+            while (roles.get_next_config (it, data)) {
+
+               String role = config_to_string ("value", data);
+               if (role == "_admin") { admin = True; }
+            }
+         }
+
+         if (!name && admin) { name = "admin"; }
+
+         _state.log.info << "Welcome " << name << " you have logged in." << endl;
 
          Data data;
          data.store_string (_state.usernameHandle, 0, name);
 
-         _state.loginSuccessMsg.send (0, &data, 0);
-         _state.loggedIn = True;
+         _state.loginSuccessMsg.send (&data);
+
+//         _fetch_user (name);
       }
       else {
 
@@ -653,8 +675,8 @@ _state.log.warn << "LOGGED_IN: _session: " << request.data << endl;
    }
    else if (request.Type == "deleteSession") {
 
-//      _state.logoutMsg.send ();
       _state.loggedIn = False;
+      _state.logoutMsg.send ();
    }
 }
 
@@ -1121,8 +1143,17 @@ dmz::WebServicesModuleQt::_init (Config &local) {
    Definitions defs (get_plugin_runtime_context ());
    RuntimeContext *context (get_plugin_runtime_context ());
 
-   _state.usernameHandle = _state.defs.create_named_handle (WebServicesUsername);
-   _state.passwordHandle = _state.defs.create_named_handle (WebServicesPassword);
+   _state.usernameHandle = config_to_named_handle (
+      "username.name",
+      local,
+      WebServicesUsername,
+      context);
+
+   _state.passwordHandle = config_to_named_handle (
+      "password.name",
+      local,
+      WebServicesPassword,
+      context);
 
    _state.loginRequiredMsg = config_create_message (
       "message.login-required",
@@ -1157,7 +1188,7 @@ dmz::WebServicesModuleQt::_init (Config &local) {
    subscribe_to_message (_state.loginMsg);
    subscribe_to_message (_state.logoutMsg);
 
-   _state.targetHandle = config_to_named_handle ("target.name", local, context);
+   _state.targetHandle = config_to_named_handle ("login-target.name", local, context);
 
    Config server;
    if (local.lookup_config ("server", server)) {

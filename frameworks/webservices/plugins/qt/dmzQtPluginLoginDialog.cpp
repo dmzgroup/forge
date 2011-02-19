@@ -1,12 +1,37 @@
+#include <dmzQtConfigRead.h>
+#include <dmzQtConfigWrite.h>
 #include <dmzQtModuleMainWindow.h>
 #include "dmzQtPluginLoginDialog.h"
 #include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
+#include <dmzRuntimeConfigWrite.h>
 #include <dmzRuntimeData.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzRuntimeSession.h>
 #include <QtGui/QtGui>
 
+namespace {
+
+QByteArray
+local_calc_xor (const QByteArray &Data, const QByteArray &Key) {
+
+   QByteArray result;
+
+   if (Key.isEmpty ()) { result = Data; }
+   else {
+
+      for (int ix = 0 , jx = 0; ix < Data.length (); ++ix , ++jx) {
+
+         if (jx == Key.length ()) { jx = 0; }
+         result.append (Data.at (ix) ^ Key.at (jx));
+      }
+   }
+
+    return result;
+}
+
+};
 
 dmz::QtPluginLoginDialog::QtPluginLoginDialog (const PluginInfo &Info, Config &local) :
       QObject (0),
@@ -19,6 +44,7 @@ dmz::QtPluginLoginDialog::QtPluginLoginDialog (const PluginInfo &Info, Config &l
       _passwordHandle (0),
       _targetHandle (0),
       _loggedIn (False),
+      _autoLogin (False),
       _loginDialog (0) {
 
    _init (local);
@@ -42,8 +68,28 @@ dmz::QtPluginLoginDialog::update_plugin_state (
       const PluginStateEnum State,
       const UInt32 Level) {
 
+   const QByteArray Key (get_plugin_name ().get_buffer ());
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    if (State == PluginStateInit) {
 
+      Config session (get_session_config (get_plugin_name (), context));
+
+      if (_loginDialog) {
+
+         if (config_to_boolean ("remember.me", session)) {
+
+            _ui.rememberMe->setChecked (True);
+
+            String username = config_to_string ("user.name", session);
+            _ui.usernameLineEdit->setText (username.get_buffer ());
+
+            QByteArray ba (config_to_qbytearray ("password", session));
+            QByteArray password = local_calc_xor (ba, Key.toBase64 ());
+
+            _ui.passwordLineEdit->setText (password);
+         }
+      }
    }
    else if (State == PluginStateStart) {
 
@@ -53,6 +99,26 @@ dmz::QtPluginLoginDialog::update_plugin_state (
    }
    else if (State == PluginStateShutdown) {
 
+      if (_loginDialog) {
+
+         Config session (get_plugin_name ());
+
+         Boolean rememberMe (_ui.rememberMe->isChecked ());
+         if (rememberMe) {
+
+            String username = qPrintable (_ui.usernameLineEdit->text ());
+            session.add_config (string_to_config ("user", "name", username));
+
+            QByteArray password (qPrintable (_ui.passwordLineEdit->text ()));
+
+            QByteArray ba = local_calc_xor (password, Key.toBase64 ());
+            session.add_config (qbytearray_to_config ("password", ba));
+         }
+
+         session.add_config (boolean_to_config ("remember", "me", rememberMe));
+
+         set_session_config (context, session);
+      }
    }
 }
 
@@ -106,7 +172,12 @@ dmz::QtPluginLoginDialog::receive_message (
 
    if (Type == _loginRequiredMsg) {
 
-      if (_loginDialog) { _loginDialog->open (); }
+      _log.warn << "_loginRequired" << endl;
+      if (_loginDialog) {
+
+         if (_autoLogin) { _slot_dialog_accepted (); }
+         else { _loginDialog->open (); }
+      }
    }
    else if (Type == _loginSuccessMsg) {
 
@@ -114,18 +185,15 @@ dmz::QtPluginLoginDialog::receive_message (
 
          String username;
          InData->lookup_string (_usernameHandle, 0, username);
-
-         _log.warn << "LOGGED IN NOW AS: " << username << endl;
       }
 
       _loggedIn = True;
    }
    else if (Type == _loginFailedMsg) {
 
-      if (_loginDialog) { _loginDialog->open (); }
-
       _loggedIn = False;
-      _log.error << "FAILED TO LOGIN" << endl;
+
+      if (_loginDialog) { _loginDialog->open (); }
    }
 }
 
@@ -136,12 +204,9 @@ dmz::QtPluginLoginDialog::_slot_dialog_accepted () {
    if (_loginDialog) {
 
       Data data;
-_log.warn << "_setting username and password" << endl;
+
       String username = qPrintable (_ui.usernameLineEdit->text ());
       String password = qPrintable (_ui.passwordLineEdit->text ());
-
-//      data.store_string (_usernameHandle, 0, "bordergame");
-//      data.store_string (_passwordHandle, 0, "couch4me");
 
       data.store_string (_usernameHandle, 0, username);
       data.store_string (_passwordHandle, 0, password);
@@ -206,7 +271,9 @@ dmz::QtPluginLoginDialog::_init (Config &local) {
    subscribe_to_message (_loginSuccessMsg);
    subscribe_to_message (_loginFailedMsg);
 
-   _targetHandle = config_to_named_handle ("target.name", local, context);
+   _targetHandle = config_to_named_handle ("login-target.name", local, context);
+
+   _autoLogin = config_to_boolean ("auto-login.value", local, _autoLogin);
 }
 
 

@@ -92,8 +92,10 @@ dmz::ObjectPluginWebServices::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-//      _webservices->get_config_updates (*this, _lastSeq, True);
-      _webservices->start_realtime_updates (*this);
+      if (_webservices) {
+
+         _webservices->get_config_updates (*this, _lastSeq, True);
+      }
    }
    else if (State == PluginStateStop) {
 
@@ -299,16 +301,42 @@ dmz::ObjectPluginWebServices::config_updated (
 // Message Observer Interface
 void
 dmz::ObjectPluginWebServices::receive_message (
-      const Message &Msg,
+      const Message &Type,
       const UInt32 MessageSendHandle,
       const Handle TargetObserverHandle,
       const Data *InData,
       Data *outData) {
 
-   ObjectModule *objMod (get_object_module ());
+   if (Type == _loginSuccessMsg) {
 
-   if (objMod && InData) {
+      if (InData) {
 
+//         String username;
+//         InData->lookup_string (_usernameHandle, 0, username);
+      }
+
+//      _loggedIn = True;
+
+      if (_webservices) {
+
+         _webservices->start_realtime_updates (*this);
+      }
+   }
+   else if (Type == _loginFailedMsg) {
+
+//      _loggedIn = False;
+
+      if (_webservices) {
+
+//         _webservices->stop_realtime_updates (*this);
+      }
+   }
+   else if (Type == _logoutMsg) {
+
+      if (_webservices) {
+
+//         _webservices->stop_realtime_updates (*this);
+      }
    }
 }
 
@@ -1739,9 +1767,33 @@ dmz::ObjectPluginWebServices::_init_state_filter (
 void
 dmz::ObjectPluginWebServices::_init (Config &local) {
 
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    _webservicesName = config_to_string ("module-name.web-services", local);
 
    _defaultHandle = _defs.create_named_handle (ObjectAttributeDefaultName);
+
+   _loginSuccessMsg = config_create_message (
+      "message.login-success",
+      local,
+      "LoginSuccessMessage",
+       context);
+
+   _loginFailedMsg = config_create_message (
+      "message.login-failed",
+      local,
+      "LoginFailedMessage",
+       context);
+
+   _logoutMsg = config_create_message (
+      "message.logout",
+      local,
+      "LogoutMessage",
+       context);
+
+   subscribe_to_message (_loginSuccessMsg);
+   subscribe_to_message (_loginFailedMsg);
+   subscribe_to_message (_logoutMsg);
 
    Config filterList;
    if (local.lookup_all_config ("filter", filterList)) {

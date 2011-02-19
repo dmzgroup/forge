@@ -359,6 +359,10 @@ namespace dmz {
          StringContainer _pendingPublishTable;
          StringContainer _pendingFetchTable;
 
+         Message _loginSuccessMsg;
+         Message _loginFailedMsg;
+         Message _logoutMsg;
+
          Config _currentConfig;
          HashTableHandleTemplate<Config> _configTable;
 
