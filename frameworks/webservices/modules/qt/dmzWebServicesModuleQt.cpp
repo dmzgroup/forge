@@ -1,4 +1,3 @@
-#include <dmzArchiveModule.h>
 #include <dmzFoundationJSONUtil.h>
 #include <dmzObjectAttributeMasks.h>
 #include <dmzObjectModule.h>
@@ -106,15 +105,22 @@ struct dmz::WebServicesModuleQt::State {
    QUrl serverUrl;
    String serverPath;
    String serverDatabase;
-   ArchiveModule *archiveMod;
-   Handle archiveHandle;
+   QAuthenticator auth;
+   Handle usernameHandle;
+   Handle passwordHandle;
+   Handle targetHandle;
+   Message loginRequiredMsg;
+   Message loginMsg;
+   Message loginSuccessMsg;
+   Message loginFailedMsg;
+   Message logoutMsg;
+   Boolean loggedIn;
    HashTableStringTemplate<DocStruct> documentTable;
    HashTableUInt64Template<RequestStruct> requestTable;
    HashTableUInt64Template<RequestStruct> feedTable;
    StringContainer fetchTable;
    Int32 lastSeq;
    Float64 fetchChangesDelta;
-   Boolean loggedIn;
    RequestStruct *request;
 
    State (const PluginInfo &Info);
@@ -138,8 +144,9 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       serverUrl (LocalHost),
       serverPath ("/"),
       serverDatabase (Info.get_name ()),
-      archiveMod (0),
-      archiveHandle (0),
+      usernameHandle (0),
+      passwordHandle (0),
+      targetHandle (0),
       fetchChangesDelta (0),
       lastSeq (0) ,
       loggedIn (False),
@@ -199,6 +206,7 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
       QObject (0),
       Plugin (Info),
       TimeSlice (Info),
+      MessageObserver (Info),
       WebServicesModule (Info),
       WebServicesObserver (Info),
       _state (*(new State (Info))) {
@@ -259,27 +267,6 @@ dmz::WebServicesModuleQt::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      if (_state.client) {
-
-         String DocId ("_session");
-         QUrl url (_get_root_url (DocId));
-
-         QMap<QString, QString> params;
-         params.insert ("name", "bordergame");
-         params.insert ("password", "couch4me");
-
-         QNetworkRequest request = _state.client->get_next_request (url);
-
-         request.setHeader (
-            QNetworkRequest::ContentTypeHeader,
-            "application/x-www-form-urlencoded");
-
-         UInt64 requestId = _state.client->post (request, params);
-         if (requestId) {
-
-            _state.get_request (requestId, "postSession", DocId, *this);
-         }
-      }
    }
    else if (State == PluginStateStart) {
 
@@ -300,14 +287,14 @@ dmz::WebServicesModuleQt::discover_plugin (
 
    if (Mode == PluginDiscoverAdd) {
 
-      if (!_state.archiveMod) { _state.archiveMod = ArchiveModule::cast (PluginPtr); }
+//      if (!_state.archiveMod) { _state.archiveMod = ArchiveModule::cast (PluginPtr); }
    }
    else if (Mode == PluginDiscoverRemove) {
 
-      if (_state.archiveMod && (_state.archiveMod == ArchiveModule::cast (PluginPtr))) {
+//      if (_state.archiveMod && (_state.archiveMod == ArchiveModule::cast (PluginPtr))) {
 
-         _state.archiveMod = 0;
-      }
+//         _state.archiveMod = 0;
+//      }
    }
 }
 
@@ -326,6 +313,48 @@ dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
 //         _state.continuousFeed = _fetch_changes (_state.lastSeq, True);
 //      }
 //   }
+}
+
+
+// Message Observer Interface
+void
+dmz::WebServicesModuleQt::receive_message (
+      const Message &Msg,
+      const UInt32 MessageSendHandle,
+      const Handle TargetObserverHandle,
+      const Data *InData,
+      Data *outData) {
+
+   if (Msg == _state.loginMsg) {
+
+      if (InData) {
+
+         String username;
+         InData->lookup_string (_state.usernameHandle, 0, username);
+
+         String password;
+         InData->lookup_string (_state.passwordHandle, 0, password);
+
+         if (username && password) {
+
+            _state.auth.setUser (username.get_buffer ());
+            _state.auth.setPassword (password.get_buffer ());
+
+            _fetch_session ();
+         }
+         else {
+
+            _state.log.warn << "A username and password are both needed to login."
+                            << endl;
+
+            _state.loginFailedMsg.send ();
+         }
+      }
+   }
+   else if (Msg == _state.logoutMsg) {
+
+      _delete_session ();
+   }
 }
 
 
@@ -354,13 +383,17 @@ dmz::WebServicesModuleQt::fetch_configs (
 
    Boolean error (False);
 
-   String id;
-   StringContainerIterator it;
+   if (_authenticate ()) {
 
-   while (IdList.get_next (it, id)) {
+      String id;
+      StringContainerIterator it;
 
-      if (!_fetch_document (id, obs)) { error = True; }
+      while (IdList.get_next (it, id)) {
+
+         if (!_fetch_document (id, obs)) { error = True; }
+      }
    }
+   else { error = True; }
 
    return !error;
 }
@@ -380,13 +413,17 @@ dmz::WebServicesModuleQt::delete_configs (
 
    Boolean error (False);
 
-   String id;
-   StringContainerIterator it;
+   if (_authenticate ()) {
 
-   while (IdList.get_next (it, id)) {
+      String id;
+      StringContainerIterator it;
 
-      if (!_delete_document (id, obs)) { error = True; }
+      while (IdList.get_next (it, id)) {
+
+         if (!_delete_document (id, obs)) { error = True; }
+      }
    }
+   else { error = True; }
 
    return !error;
 }
@@ -409,23 +446,26 @@ dmz::WebServicesModuleQt::start_realtime_updates (
 
    Boolean result (False);
 
-   if (_state.client) {
+   if (_authenticate ()) {
 
-      const String Id ("_changes");
-      QUrl url = _get_url (Id);
-      url.addQueryItem ("since", QString::number (Since));
-      url.addQueryItem ("feed", "continuous");
-      url.addQueryItem ("heartbeat", "50000");
+      if (_state.client) {
 
-      UInt64 requestId = _state.client->get (url);
-      if (requestId) {
+         const String Id ("_changes");
+         QUrl url = _get_url (Id);
+         url.addQueryItem ("since", QString::number (Since));
+         url.addQueryItem ("feed", "continuous");
+         url.addQueryItem ("heartbeat", "50000");
 
-         String requestType = "fetchChangesContinuous";
+         UInt64 requestId = _state.client->get (url);
+         if (requestId) {
 
-         RequestStruct *request = _state.get_request (requestId, requestType, Id, obs);
-         if (request) {
+            String requestType = "fetchChangesContinuous";
 
-            _state.feedTable.store (request->Id, request);
+            RequestStruct *request = _state.get_request (requestId, requestType, Id, obs);
+            if (request) {
+
+               _state.feedTable.store (request->Id, request);
+            }
          }
       }
    }
@@ -439,13 +479,11 @@ dmz::WebServicesModuleQt::_authenticate (
       QNetworkReply *reply,
       QAuthenticator *authenticator) {
 
-//   String name ("bordergame");
-//   String password ("couch4me");
+   if (_authenticate (False)) {
 
-//   authenticator->setUser (name.get_buffer ());
-//   authenticator->setPassword (password.get_buffer ());
-
-   _state.log.error << "Authentication Required!!!" << endl;
+      authenticator->setUser (_state.auth.user ());
+      authenticator->setPassword (_state.auth.password ());
+   }
 }
 
 void
@@ -599,15 +637,24 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
       if (config_to_boolean ("ok", request.data)) {
 
-//         String name = config_to_string ("name", request.data);
+_state.log.warn << "LOGGED_IN: _session: " << request.data << endl;
+         String name = config_to_string ("name", request.data);
 
-//         _state.loggedIn = True;
-//         _state.loginSuccessfullMsg.send ();
+         Data data;
+         data.store_string (_state.usernameHandle, 0, name);
+
+         _state.loginSuccessMsg.send (0, &data, 0);
+         _state.loggedIn = True;
       }
       else {
 
-//         _state.loginFailedMsg.send ();
+         _state.loginFailedMsg.send ();
       }
+   }
+   else if (request.Type == "deleteSession") {
+
+//      _state.logoutMsg.send ();
+      _state.loggedIn = False;
    }
 }
 
@@ -632,35 +679,38 @@ dmz::WebServicesModuleQt::_publish_document (
 
    RequestStruct *request (0);
 
-   if (Id && _state.client) {
+   if (_authenticate ()) {
 
-      Config doc ("global");
+      if (Id && _state.client) {
 
-      doc.store_attribute ("_id", Id);
+         Config doc ("global");
 
-      doc.store_attribute ("runtime_id", _state.SysId.to_string ());
+         doc.store_attribute ("_id", Id);
 
-      doc.store_attribute ("type", Data.get_name ());
+         doc.store_attribute ("runtime_id", _state.SysId.to_string ());
 
-      doc.add_config (Data);
+         doc.store_attribute ("type", Data.get_name ());
 
-      String json;
-      StreamString out (json);
+         doc.add_config (Data);
 
-      if (format_config_to_json (doc, out, ConfigStripGlobal, &_state.log)) {
+         String json;
+         StreamString out (json);
 
-         QUrl url = _get_url (Id);
-         QNetworkRequest req = _state.client->get_next_request (url);
+         if (format_config_to_json (doc, out, ConfigStripGlobal, &_state.log)) {
 
-         DocStruct *ds = _state.get_doc (Id);
-         if (ds && ds->rev) { req.setRawHeader ("If-Match", ds->rev.get_buffer ()); }
+            QUrl url = _get_url (Id);
+            QNetworkRequest req = _state.client->get_next_request (url);
 
-         QByteArray data (json.get_buffer ());
+            DocStruct *ds = _state.get_doc (Id);
+            if (ds && ds->rev) { req.setRawHeader ("If-Match", ds->rev.get_buffer ()); }
 
-         const UInt64 RequestId (_state.client->put (req, data));
-         if (RequestId) {
+            QByteArray data (json.get_buffer ());
 
-            request = _state.get_request (RequestId, "publishDocument", Id, obs);
+            const UInt64 RequestId (_state.client->put (req, data));
+            if (RequestId) {
+
+               request = _state.get_request (RequestId, "publishDocument", Id, obs);
+            }
          }
       }
    }
@@ -669,19 +719,66 @@ dmz::WebServicesModuleQt::_publish_document (
 }
 
 
+void
+dmz::WebServicesModuleQt::_fetch_session () {
+
+   if (_state.client) {
+
+      String DocId ("_session");
+      QUrl url (_get_root_url (DocId));
+
+      QMap<QString, QString> params;
+      params.insert ("name", _state.auth.user ());
+      params.insert ("password", _state.auth.password ());
+
+      QNetworkRequest request = _state.client->get_next_request (url);
+
+      request.setHeader (
+         QNetworkRequest::ContentTypeHeader,
+         "application/x-www-form-urlencoded");
+
+      UInt64 requestId = _state.client->post (request, params);
+      if (requestId) {
+
+         _state.get_request (requestId, "postSession", DocId, *this);
+      }
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_delete_session () {
+
+   if (_state.client) {
+
+      String DocId ("_session");
+      QUrl url (_get_root_url (DocId));
+
+      UInt64 requestId = _state.client->del (url);
+      if (requestId) {
+
+         _state.get_request (requestId, "deleteSession", DocId, *this);
+      }
+   }
+}
+
+
 dmz::WebServicesModuleQt::RequestStruct *
 dmz::WebServicesModuleQt::_fetch_document (const String &Id, WebServicesObserver &obs) {
 
-   RequestStruct *request;
+   RequestStruct *request (0);
 
-   if (Id && _state.client) {
+   if (_authenticate ()) {
 
-      QUrl url = _get_url (Id);
+      if (Id && _state.client) {
 
-      UInt64 requestId = _state.client->get (url);
-      if (requestId) {
+         QUrl url = _get_url (Id);
 
-         request = _state.get_request (requestId, "fetchDocument", Id, obs);
+         UInt64 requestId = _state.client->get (url);
+         if (requestId) {
+
+            request = _state.get_request (requestId, "fetchDocument", Id, obs);
+         }
       }
    }
 
@@ -692,22 +789,25 @@ dmz::WebServicesModuleQt::_fetch_document (const String &Id, WebServicesObserver
 dmz::WebServicesModuleQt::RequestStruct *
 dmz::WebServicesModuleQt::_delete_document (const String &Id, WebServicesObserver &obs) {
 
-   RequestStruct *request;
+   RequestStruct *request (0);
 
-   if (Id && _state.client) {
+   if (_authenticate ()) {
 
-      DocStruct *doc = _state.get_doc (Id);
-      if (doc && doc->rev) {
+      if (Id && _state.client) {
 
-         QUrl url = _get_url (Id);
-         QNetworkRequest req = _state.client->get_next_request (url);
+         DocStruct *doc = _state.get_doc (Id);
+         if (doc && doc->rev) {
 
-         req.setRawHeader ("If-Match", doc->rev.get_buffer ());
+            QUrl url = _get_url (Id);
+            QNetworkRequest req = _state.client->get_next_request (url);
 
-         UInt64 requestId = _state.client->del (req);
-         if (requestId) {
+            req.setRawHeader ("If-Match", doc->rev.get_buffer ());
 
-            request = _state.get_request (requestId, "deleteDocument", Id, obs);
+            UInt64 requestId = _state.client->del (req);
+            if (requestId) {
+
+               request = _state.get_request (requestId, "deleteDocument", Id, obs);
+            }
          }
       }
    }
@@ -722,23 +822,26 @@ dmz::WebServicesModuleQt::_fetch_changes (
       const Int32 Since,
       const Boolean Heavy) {
 
-   RequestStruct *request;
+   RequestStruct *request (0);
 
-   if (_state.client) {
+   if (_authenticate ()) {
 
-      const String Id ("_changes");
-      QUrl url = _get_url (Id);
-      url.addQueryItem ("since", QString::number (Since));
+      if (_state.client) {
 
-      if (Heavy) { url.addQueryItem ("include_docs", "true"); }
+         const String Id ("_changes");
+         QUrl url = _get_url (Id);
+         url.addQueryItem ("since", QString::number (Since));
 
-      UInt64 requestId = _state.client->get (url);
-      if (requestId) {
+         if (Heavy) { url.addQueryItem ("include_docs", "true"); }
 
-         String requestType = "fetchChanges";
-         if (Heavy) { requestType << "Heavy"; }
+         UInt64 requestId = _state.client->get (url);
+         if (requestId) {
 
-         request = _state.get_request (requestId, requestType, Id, obs);
+            String requestType = "fetchChanges";
+            if (Heavy) { requestType << "Heavy"; }
+
+            request = _state.get_request (requestId, requestType, Id, obs);
+         }
       }
    }
 
@@ -858,10 +961,6 @@ dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
 void
 dmz::WebServicesModuleQt::_changes_fetched_heavy (RequestStruct &request) {
 
-   _state.log.error << "convert json string to config" << endl;
-
-qApp->processEvents ();
-
    if (request.error) {
 
    }
@@ -957,6 +1056,37 @@ dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
 }
 
 
+dmz::Boolean
+dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
+
+   if (!_state.loggedIn) {
+
+      Data inData;
+      Data outData;
+
+      _state.loginRequiredMsg.send (_state.targetHandle, &inData, &outData);
+      if (outData) {
+
+         String username;
+         outData.lookup_string (_state.usernameHandle, 0, username);
+
+         String password;
+         outData.lookup_string (_state.passwordHandle, 0, password);
+
+         if (username && password) {
+
+            _state.auth.setUser (username.get_buffer ());
+            _state.auth.setPassword (password.get_buffer ());
+
+            if (GetSession) { _fetch_session (); }
+         }
+         else {
+
+         }
+      }
+   }
+}
+
 QUrl
 dmz::WebServicesModuleQt::_get_url (const String &EndPoint) const {
 
@@ -990,6 +1120,44 @@ dmz::WebServicesModuleQt::_init (Config &local) {
 
    Definitions defs (get_plugin_runtime_context ());
    RuntimeContext *context (get_plugin_runtime_context ());
+
+   _state.usernameHandle = _state.defs.create_named_handle (WebServicesUsername);
+   _state.passwordHandle = _state.defs.create_named_handle (WebServicesPassword);
+
+   _state.loginRequiredMsg = config_create_message (
+      "message.login-required",
+      local,
+      WebServicesLoginRequired,
+      context);
+
+   _state.loginMsg = config_create_message (
+      "message.login",
+      local,
+      WebServicesLogin,
+      context);
+
+   _state.loginSuccessMsg = config_create_message (
+      "message.login-success",
+      local,
+      WebServicesLoginSuccess,
+      context);
+
+   _state.loginFailedMsg = config_create_message (
+      "message.login-failed",
+      local,
+      WebServicesLoginFailed,
+      context);
+
+   _state.logoutMsg = config_create_message (
+      "message.logout",
+      local,
+      WebServicesLogout,
+      context);
+
+   subscribe_to_message (_state.loginMsg);
+   subscribe_to_message (_state.logoutMsg);
+
+   _state.targetHandle = config_to_named_handle ("target.name", local, context);
 
    Config server;
    if (local.lookup_config ("server", server)) {

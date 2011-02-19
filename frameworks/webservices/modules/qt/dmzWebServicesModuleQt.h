@@ -3,6 +3,7 @@
 
 #include <dmzArchiveObserverUtil.h>
 #include <dmzObjectObserverUtil.h>
+#include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
 #include <dmzWebServicesModule.h>
@@ -24,6 +25,7 @@ namespace dmz {
          public QObject,
          public Plugin,
          public TimeSlice,
+         public MessageObserver,
          public WebServicesModule,
          public WebServicesObserver {
 
@@ -44,6 +46,14 @@ namespace dmz {
 
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
+
+         // Message Observer Interface
+         virtual void receive_message (
+            const Message &Type,
+            const UInt32 MessageSendHandle,
+            const Handle TargetObserverHandle,
+            const Data *InData,
+            Data *outData);
 
          // WebServicesModule Interface
          virtual Boolean publish_config (
@@ -130,6 +140,9 @@ namespace dmz {
             const Config &Data,
             WebServicesObserver &obs);
 
+         void _fetch_session ();
+         void _delete_session ();
+
          RequestStruct *_fetch_document (const String &Id, WebServicesObserver &obs);
          RequestStruct *_delete_document (const String &Id, WebServicesObserver &obs);
 
@@ -146,6 +159,8 @@ namespace dmz {
          void _changes_fetched_heavy (RequestStruct &request);
 
          Boolean _handle_continuous_feed (RequestStruct &request);
+
+         Boolean _authenticate (const Boolean GetSession = True);
 
          QUrl _get_url (const String &EndPoint) const;
          QUrl _get_root_url (const String &EndPoint) const;

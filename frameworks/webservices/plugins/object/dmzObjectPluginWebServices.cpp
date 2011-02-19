@@ -181,15 +181,11 @@ dmz::ObjectPluginWebServices::update_time_slice (const Float64 TimeDelta) {
 
             objLink = _objectLinkTable.get_next (objIt);
          }
-
-//_log.warn << "count: " << _objectLinkTable.get_count () << endl;
       }
 
       if (_fetchTable.get_count ()) {
 
-_log.warn << "fetch_configs: " << _fetchTable << endl;
          _webservices->fetch_configs (_fetchTable, *this);
-
          _pendingFetchTable += _fetchTable;
          _fetchTable.clear ();
       }
