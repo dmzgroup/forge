@@ -94,7 +94,7 @@ dmz::ObjectPluginWebServices::update_plugin_state (
 
       if (_webservices) {
 
-         _webservices->get_config_updates (*this, _lastSeq, True);
+         _webservices->get_config_updates (*this, _lastSeq);
       }
    }
    else if (State == PluginStateStop) {
@@ -226,6 +226,7 @@ dmz::ObjectPluginWebServices::config_fetched (
    }
    else {
 
+      _log.warn << "config_fetched: " << Id << endl;
       _inUpdate = True;
       _config_to_object (Data);
       _inUpdate = False;
@@ -985,6 +986,10 @@ dmz::ObjectPluginWebServices::_publish (const Handle ObjectHandle) {
                   _pendingPublishTable.add (DocId);
                   result = True;
                }
+               else {
+
+                  _log.error << "publish failed" << endl;
+               }
             }
          }
       }
@@ -1579,13 +1584,13 @@ dmz::ObjectPluginWebServices::_update (const Handle ObjectHandle) {
 
       if (_publishTable.add (ObjectHandle)) {
 
-         ObjectModule *objMod (get_object_module ());
-         if (objMod) {
+//         ObjectModule *objMod (get_object_module ());
+//         if (objMod) {
 
-            ObjectType type = objMod->lookup_object_type (ObjectHandle);
+//            ObjectType type = objMod->lookup_object_type (ObjectHandle);
 
-_log.info << "_update: " << ObjectHandle << " : " << type.get_name () << endl;
-         }
+//_log.info << "_update: " << ObjectHandle << " : " << type.get_name () << endl;
+//         }
       }
 
       result = True;

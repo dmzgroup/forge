@@ -383,14 +383,33 @@ dmz::WebServicesModuleQt::fetch_configs (
 
    Boolean error (False);
 
-   if (_authenticate ()) {
+   if (_authenticate () && _state.client) {
+
+      Config global ("global");
 
       String id;
       StringContainerIterator it;
 
       while (IdList.get_next (it, id)) {
 
-         if (!_fetch_document (id, obs)) { error = True; }
+         global.add_config (string_to_config ("keys", "value", id));
+      }
+
+      String json;
+      StreamString out (json);
+      if (format_config_to_json (global, out, ConfigStripGlobal, &_state.log)) {
+
+         QByteArray data (json.get_buffer ());
+
+         String DocId ("_all_docs");
+         QUrl url (_get_url (DocId));
+         url.addQueryItem ("include_docs", "true");
+
+         UInt64 requestId = _state.client->post (url, data);
+         if (requestId) {
+
+            _state.get_request (requestId, "fetchMultipleDocuments", DocId, *this);
+         }
       }
    }
    else { error = True; }
@@ -617,6 +636,10 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
        _document_fetched (request);
    }
+   else if (request.Type == "fetchMultipleDocuments") {
+
+       _documents_fetched (request);
+   }
    else if (request.Type == "publishDocument") {
 
       _document_published (request);
@@ -735,6 +758,10 @@ dmz::WebServicesModuleQt::_publish_document (
             }
          }
       }
+   }
+   else {
+
+      _state.log.warn << "Not authenticated" << endl;
    }
 
    return request;
@@ -912,6 +939,53 @@ dmz::WebServicesModuleQt::_document_fetched (RequestStruct &request) {
       request.data.lookup_config (docType, data);
 
       request.obs.config_fetched (request.DocId, False, data);
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_documents_fetched (RequestStruct &request) {
+
+   if (request.error) {
+
+//      request.obs.config_fetched (request.DocId, True, request.data);
+   }
+   else {
+
+      Config rows;
+      if (request.data.lookup_all_config ("rows", rows)) {
+
+         ConfigIterator it;
+         Config row;
+         while (rows.get_next_config (it, row)) {
+
+            Config doc;
+            if (row.lookup_config ("doc", doc)) {
+
+               String docId = config_to_string ("_id", doc);
+               String docRev = config_to_string ("_rev", doc);
+
+               String systemId = config_to_string ("system_id", doc);
+
+               String docType = config_to_string ("type", doc);
+
+               Config data;
+               doc.lookup_config (docType, data);
+
+               request.obs.config_fetched (docId, False, data);
+
+               DocStruct *ds = _state.get_doc (docId);
+               if (ds) {
+
+                  ds->rev = docRev;
+                  ds->pending = False;
+               }
+
+               _state.log.info << docId << " fetched" << endl;
+               _state.log.warn << "-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-00-0-0-" << endl;
+            }
+         }
+      }
    }
 }
 
@@ -1107,6 +1181,8 @@ dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
          }
       }
    }
+
+   return _state.loggedIn;
 }
 
 QUrl

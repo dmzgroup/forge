@@ -153,6 +153,7 @@ namespace dmz {
 
          void _document_published (RequestStruct &request);
          void _document_fetched (RequestStruct &request);
+         void _documents_fetched (RequestStruct &request);
          void _document_deleted (RequestStruct &request);
 
          void _changes_fetched (RequestStruct &request);
