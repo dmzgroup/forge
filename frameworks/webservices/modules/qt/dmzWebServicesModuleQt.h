@@ -159,6 +159,8 @@ namespace dmz {
          void _changes_fetched (RequestStruct &request);
          void _changes_fetched_heavy (RequestStruct &request);
 
+         void _session_posted (RequestStruct &request);
+
          Boolean _handle_continuous_feed (RequestStruct &request);
 
          Boolean _authenticate (const Boolean GetSession = True);

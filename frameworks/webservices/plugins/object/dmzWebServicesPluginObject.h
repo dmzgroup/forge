@@ -1,5 +1,5 @@
-#ifndef DMZ_OBJECT_PLUGIN_WEB_SERVICES_DOT_H
-#define DMZ_OBJECT_PLUGIN_WEB_SERVICES_DOT_H
+#ifndef DMZ_WEB_SERVICES_PLUGIN_OBJECT_DOT_H
+#define DMZ_WEB_SERVICES_PLUGIN_OBJECT_DOT_H
 
 #include <dmzObjectObserverUtil.h>
 #include <dmzRuntimeDefinitions.h>
@@ -19,7 +19,7 @@ namespace dmz {
 
    class WebServicesModule;
 
-   class ObjectPluginWebServices :
+   class WebServicesPluginObject :
          public Plugin,
          public TimeSlice,
          public WebServicesObserver,
@@ -27,8 +27,8 @@ namespace dmz {
          public ObjectObserverUtil {
 
       public:
-         ObjectPluginWebServices (const PluginInfo &Info, Config &local);
-         ~ObjectPluginWebServices ();
+         WebServicesPluginObject (const PluginInfo &Info, Config &local);
+         ~WebServicesPluginObject ();
 
          // Plugin Interface
          virtual void update_plugin_state (
@@ -371,14 +371,16 @@ namespace dmz {
          Int32 _lastSeq;
          Boolean _inDump;
          Boolean _inUpdate;
+         Boolean _upToDate;
+         Boolean _authenticated;
          Float64 _publishRate;
          Float64 _publishDelta;
 
       private:
-         ObjectPluginWebServices ();
-         ObjectPluginWebServices (const ObjectPluginWebServices &);
-         ObjectPluginWebServices &operator= (const ObjectPluginWebServices &);
+         WebServicesPluginObject ();
+         WebServicesPluginObject (const WebServicesPluginObject &);
+         WebServicesPluginObject &operator= (const WebServicesPluginObject &);
    };
 };
 
-#endif // DMZ_OBJECT_PLUGIN_WEB_SERVICES_DOT_H
+#endif // DMZ_WEB_SERVICES_PLUGIN_OBJECT_DOT_H

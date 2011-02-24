@@ -1,7 +1,7 @@
 #include <dmzObjectAttributeMasks.h>
 #include <dmzObjectConsts.h>
 #include <dmzObjectModule.h>
-#include "dmzObjectPluginWebServices.h"
+#include "dmzWebServicesPluginObject.h"
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimeConfigToMatrix.h>
 #include <dmzRuntimeConfigToVector.h>
@@ -50,7 +50,7 @@ local_config_to_mask (Config config, Log &log) {
 };
 
 
-dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, Config &local) :
+dmz::WebServicesPluginObject::WebServicesPluginObject (const PluginInfo &Info, Config &local) :
       Plugin (Info),
       TimeSlice (Info),
       WebServicesObserver (Info),
@@ -64,6 +64,8 @@ dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, C
       _lastSeq (0),
       _inDump (False),
       _inUpdate (False),
+      _upToDate (False),
+      _authenticated (False),
       _publishRate (2.0),
       _publishDelta (0.0) {
 
@@ -71,7 +73,7 @@ dmz::ObjectPluginWebServices::ObjectPluginWebServices (const PluginInfo &Info, C
 }
 
 
-dmz::ObjectPluginWebServices::~ObjectPluginWebServices () {
+dmz::WebServicesPluginObject::~WebServicesPluginObject () {
 
    delete_list (_filterList);
    _filterList = 0;
@@ -83,7 +85,7 @@ dmz::ObjectPluginWebServices::~ObjectPluginWebServices () {
 
 // Plugin Interface
 void
-dmz::ObjectPluginWebServices::update_plugin_state (
+dmz::WebServicesPluginObject::update_plugin_state (
       const PluginStateEnum State,
       const UInt32 Level) {
 
@@ -92,10 +94,6 @@ dmz::ObjectPluginWebServices::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
-      if (_webservices) {
-
-         _webservices->get_config_updates (*this, _lastSeq);
-      }
    }
    else if (State == PluginStateStop) {
 
@@ -107,7 +105,7 @@ dmz::ObjectPluginWebServices::update_plugin_state (
 
 
 void
-dmz::ObjectPluginWebServices::discover_plugin (
+dmz::WebServicesPluginObject::discover_plugin (
       const PluginDiscoverEnum Mode,
       const Plugin *PluginPtr) {
 
@@ -130,7 +128,7 @@ dmz::ObjectPluginWebServices::discover_plugin (
 
 // TimeSlice Interface
 void
-dmz::ObjectPluginWebServices::update_time_slice (const Float64 TimeDelta) {
+dmz::WebServicesPluginObject::update_time_slice (const Float64 TimeDelta) {
 
    ObjectModule *objMod (get_object_module ());
 
@@ -197,7 +195,7 @@ dmz::ObjectPluginWebServices::update_time_slice (const Float64 TimeDelta) {
 
 // WebServicesObserver Interface
 void
-dmz::ObjectPluginWebServices::config_published (
+dmz::WebServicesPluginObject::config_published (
       const String &Id,
       const Boolean Error,
       const Config &Data) {
@@ -206,6 +204,7 @@ dmz::ObjectPluginWebServices::config_published (
 
    if (Error) {
 
+      _log.warn << "Error: " << config_to_string ("reason", Data) << endl;
    }
    else {
 
@@ -214,7 +213,7 @@ dmz::ObjectPluginWebServices::config_published (
 
 
 void
-dmz::ObjectPluginWebServices::config_fetched (
+dmz::WebServicesPluginObject::config_fetched (
    const String &Id,
    const Boolean Error,
    const Config &Data) {
@@ -226,19 +225,16 @@ dmz::ObjectPluginWebServices::config_fetched (
    }
    else {
 
-      _log.warn << "config_fetched: " << Id << endl;
+_log.warn << "config_fetched: " << Id << endl;
       _inUpdate = True;
       _config_to_object (Data);
       _inUpdate = False;
-
-//      ObjectLinkStruct *objLink = _objectLinkTable.lookup (Id);
-//      if (objLink) { _link_to_sub (*objLink); }
    }
 }
 
 
 void
-dmz::ObjectPluginWebServices::config_deleted (
+dmz::WebServicesPluginObject::config_deleted (
       const String &Id,
       const Boolean Error,
       const Config &Data) {
@@ -257,7 +253,7 @@ dmz::ObjectPluginWebServices::config_deleted (
 
 
 void
-dmz::ObjectPluginWebServices::config_updated (
+dmz::WebServicesPluginObject::config_updated (
       const String &Id,
       const Boolean Deleted,
       const Int32 Sequence,
@@ -277,12 +273,13 @@ dmz::ObjectPluginWebServices::config_updated (
    }
 
    _lastSeq = Sequence;
-_log.warn << " lasSeq: " << _lastSeq << endl;
+_log.warn << "config_updated[" << _lastSeq << "]: " << Id << endl;
+   _upToDate = True;
 }
 
 
 void
-dmz::ObjectPluginWebServices::config_updated (
+dmz::WebServicesPluginObject::config_updated (
       const StringContainer &UpdatedIdList,
       const StringContainer &DeletedIdList,
       const Int32 LastSequence) {
@@ -301,7 +298,7 @@ dmz::ObjectPluginWebServices::config_updated (
 
 // Message Observer Interface
 void
-dmz::ObjectPluginWebServices::receive_message (
+dmz::WebServicesPluginObject::receive_message (
       const Message &Type,
       const UInt32 MessageSendHandle,
       const Handle TargetObserverHandle,
@@ -316,16 +313,23 @@ dmz::ObjectPluginWebServices::receive_message (
 //         InData->lookup_string (_usernameHandle, 0, username);
       }
 
-//      _loggedIn = True;
+      _authenticated = True;
 
       if (_webservices) {
 
-         _webservices->start_realtime_updates (*this);
+         if (_upToDate) {
+
+            _webservices->start_realtime_updates (*this);
+         }
+         else {
+
+            _webservices->get_config_updates (*this, _lastSeq);
+         }
       }
    }
    else if (Type == _loginFailedMsg) {
 
-//      _loggedIn = False;
+      _authenticated = False;
 
       if (_webservices) {
 
@@ -333,6 +337,8 @@ dmz::ObjectPluginWebServices::receive_message (
       }
    }
    else if (Type == _logoutMsg) {
+
+      _authenticated = False;
 
       if (_webservices) {
 
@@ -344,7 +350,7 @@ dmz::ObjectPluginWebServices::receive_message (
 
 // Object Observer Interface
 void
-dmz::ObjectPluginWebServices::create_object (
+dmz::WebServicesPluginObject::create_object (
       const UUID &Identity,
       const Handle ObjectHandle,
       const ObjectType &Type,
@@ -363,7 +369,7 @@ dmz::ObjectPluginWebServices::create_object (
 
 
 void
-dmz::ObjectPluginWebServices::destroy_object (
+dmz::WebServicesPluginObject::destroy_object (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
@@ -383,7 +389,7 @@ dmz::ObjectPluginWebServices::destroy_object (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_uuid (
+dmz::WebServicesPluginObject::update_object_uuid (
       const Handle ObjectHandle,
       const UUID &Identity,
       const UUID &PrevIdentity) {
@@ -401,7 +407,7 @@ dmz::ObjectPluginWebServices::update_object_uuid (
 
 
 void
-dmz::ObjectPluginWebServices::remove_object_attribute (
+dmz::WebServicesPluginObject::remove_object_attribute (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -415,7 +421,7 @@ dmz::ObjectPluginWebServices::remove_object_attribute (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_locality (
+dmz::WebServicesPluginObject::update_object_locality (
       const UUID &Identity,
       const Handle ObjectHandle,
       const ObjectLocalityEnum Locality,
@@ -428,7 +434,7 @@ dmz::ObjectPluginWebServices::update_object_locality (
 
 
 void
-dmz::ObjectPluginWebServices::link_objects (
+dmz::WebServicesPluginObject::link_objects (
       const Handle LinkHandle,
       const Handle AttributeHandle,
       const UUID &SuperIdentity,
@@ -478,7 +484,7 @@ dmz::ObjectPluginWebServices::link_objects (
 
 
 void
-dmz::ObjectPluginWebServices::unlink_objects (
+dmz::WebServicesPluginObject::unlink_objects (
       const Handle LinkHandle,
       const Handle AttributeHandle,
       const UUID &SuperIdentity,
@@ -495,7 +501,7 @@ dmz::ObjectPluginWebServices::unlink_objects (
 
 
 void
-dmz::ObjectPluginWebServices::update_link_attribute_object (
+dmz::WebServicesPluginObject::update_link_attribute_object (
       const Handle LinkHandle,
       const Handle AttributeHandle,
       const UUID &SuperIdentity,
@@ -516,7 +522,7 @@ dmz::ObjectPluginWebServices::update_link_attribute_object (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_counter (
+dmz::WebServicesPluginObject::update_object_counter (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -557,7 +563,7 @@ dmz::ObjectPluginWebServices::update_object_counter (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_counter_minimum (
+dmz::WebServicesPluginObject::update_object_counter_minimum (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -590,7 +596,7 @@ dmz::ObjectPluginWebServices::update_object_counter_minimum (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_counter_maximum (
+dmz::WebServicesPluginObject::update_object_counter_maximum (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -623,7 +629,7 @@ dmz::ObjectPluginWebServices::update_object_counter_maximum (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_alternate_type (
+dmz::WebServicesPluginObject::update_object_alternate_type (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -650,7 +656,7 @@ dmz::ObjectPluginWebServices::update_object_alternate_type (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_state (
+dmz::WebServicesPluginObject::update_object_state (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -687,7 +693,7 @@ dmz::ObjectPluginWebServices::update_object_state (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_flag (
+dmz::WebServicesPluginObject::update_object_flag (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -712,7 +718,7 @@ dmz::ObjectPluginWebServices::update_object_flag (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_time_stamp (
+dmz::WebServicesPluginObject::update_object_time_stamp (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -737,7 +743,7 @@ dmz::ObjectPluginWebServices::update_object_time_stamp (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_position (
+dmz::WebServicesPluginObject::update_object_position (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -762,7 +768,7 @@ dmz::ObjectPluginWebServices::update_object_position (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_orientation (
+dmz::WebServicesPluginObject::update_object_orientation (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -787,7 +793,7 @@ dmz::ObjectPluginWebServices::update_object_orientation (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_velocity (
+dmz::WebServicesPluginObject::update_object_velocity (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -812,7 +818,7 @@ dmz::ObjectPluginWebServices::update_object_velocity (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_acceleration (
+dmz::WebServicesPluginObject::update_object_acceleration (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -837,7 +843,7 @@ dmz::ObjectPluginWebServices::update_object_acceleration (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_scale (
+dmz::WebServicesPluginObject::update_object_scale (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -862,7 +868,7 @@ dmz::ObjectPluginWebServices::update_object_scale (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_vector (
+dmz::WebServicesPluginObject::update_object_vector (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -887,7 +893,7 @@ dmz::ObjectPluginWebServices::update_object_vector (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_scalar (
+dmz::WebServicesPluginObject::update_object_scalar (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -912,7 +918,7 @@ dmz::ObjectPluginWebServices::update_object_scalar (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_text (
+dmz::WebServicesPluginObject::update_object_text (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -937,7 +943,7 @@ dmz::ObjectPluginWebServices::update_object_text (
 
 
 void
-dmz::ObjectPluginWebServices::update_object_data (
+dmz::WebServicesPluginObject::update_object_data (
       const UUID &Identity,
       const Handle ObjectHandle,
       const Handle AttributeHandle,
@@ -962,9 +968,9 @@ dmz::ObjectPluginWebServices::update_object_data (
 }
 
 
-// ObjectPluginWebServices Interface
+// WebServicesPluginObject Interface
 dmz::Boolean
-dmz::ObjectPluginWebServices::_publish (const Handle ObjectHandle) {
+dmz::WebServicesPluginObject::_publish (const Handle ObjectHandle) {
 
    Boolean result (False);
 
@@ -1000,7 +1006,7 @@ dmz::ObjectPluginWebServices::_publish (const Handle ObjectHandle) {
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_fetch (const String &Id) {
+dmz::WebServicesPluginObject::_fetch (const String &Id) {
 
    Boolean result (False);
 
@@ -1023,7 +1029,7 @@ dmz::ObjectPluginWebServices::_fetch (const String &Id) {
 
 
 void
-dmz::ObjectPluginWebServices::_link_to_sub (ObjectLinkStruct &objLink) {
+dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
 
    ObjectModule *objMod (get_object_module ());
    if (objMod) {
@@ -1107,7 +1113,7 @@ _log.debug << "in links: " << objLink.inLinks.get_count () << endl;
 
 
 void
-dmz::ObjectPluginWebServices::_configs_deleted (const StringContainer &DeleteIdList) {
+dmz::WebServicesPluginObject::_configs_deleted (const StringContainer &DeleteIdList) {
 
    ObjectModule *objMod (get_object_module ());
    if(objMod) {
@@ -1134,7 +1140,7 @@ dmz::ObjectPluginWebServices::_configs_deleted (const StringContainer &DeleteIdL
 
 
 dmz::Config
-dmz::ObjectPluginWebServices::_archive_object (const Handle ObjectHandle) {
+dmz::WebServicesPluginObject::_archive_object (const Handle ObjectHandle) {
 
    Config result;
 
@@ -1172,7 +1178,7 @@ dmz::ObjectPluginWebServices::_archive_object (const Handle ObjectHandle) {
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_get_attr_config (
+dmz::WebServicesPluginObject::_get_attr_config (
       const Handle AttrHandle,
       Config &config) {
 
@@ -1204,7 +1210,7 @@ dmz::ObjectPluginWebServices::_get_attr_config (
 
 
 void
-dmz::ObjectPluginWebServices::_config_to_object (const Config &Data) {
+dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
 
    ObjectModule *objMod (get_object_module ());
    if (objMod) {
@@ -1263,7 +1269,7 @@ dmz::ObjectPluginWebServices::_config_to_object (const Config &Data) {
 
 
 void
-dmz::ObjectPluginWebServices::_config_to_object_attributes (
+dmz::WebServicesPluginObject::_config_to_object_attributes (
       const Handle ObjectHandle,
       const Config &AttrData) {
 
@@ -1434,7 +1440,7 @@ dmz::ObjectPluginWebServices::_config_to_object_attributes (
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_add_sub_link (
+dmz::WebServicesPluginObject::_add_sub_link (
       const Handle AttrHandle,
       const Handle SuperHandle,
       const String &SubName,
@@ -1466,7 +1472,7 @@ dmz::ObjectPluginWebServices::_add_sub_link (
 }
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_handle_type (const ObjectType &Type) {
+dmz::WebServicesPluginObject::_handle_type (const ObjectType &Type) {
 
    Boolean result (True);
 
@@ -1494,7 +1500,7 @@ dmz::ObjectPluginWebServices::_handle_type (const ObjectType &Type) {
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_handle_attribute (
+dmz::WebServicesPluginObject::_handle_attribute (
       const Handle AttrHandle,
       const Mask &AttrMask) {
 
@@ -1549,7 +1555,7 @@ dmz::ObjectPluginWebServices::_handle_attribute (
 
 
 dmz::Mask
-dmz::ObjectPluginWebServices::_filter_state (
+dmz::WebServicesPluginObject::_filter_state (
       const Handle AttrHandle,
       const Mask &Value) {
 
@@ -1569,14 +1575,14 @@ dmz::ObjectPluginWebServices::_filter_state (
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_active (const Handle ObjectHandle) {
+dmz::WebServicesPluginObject::_active (const Handle ObjectHandle) {
 
    return _activeTable.contains (ObjectHandle);
 }
 
 
 dmz::Boolean
-dmz::ObjectPluginWebServices::_update (const Handle ObjectHandle) {
+dmz::WebServicesPluginObject::_update (const Handle ObjectHandle) {
 
    Boolean result (False);
 
@@ -1601,7 +1607,7 @@ dmz::ObjectPluginWebServices::_update (const Handle ObjectHandle) {
 
 
 void
-dmz::ObjectPluginWebServices::_init_filter_list (Config &local) {
+dmz::WebServicesPluginObject::_init_filter_list (Config &local) {
 
    ConfigIterator it;
    Config filter;
@@ -1650,7 +1656,7 @@ dmz::ObjectPluginWebServices::_init_filter_list (Config &local) {
 
 
 void
-dmz::ObjectPluginWebServices::_init_object_type_filter (
+dmz::WebServicesPluginObject::_init_object_type_filter (
       Config &objects,
       FilterStruct &filter) {
 
@@ -1690,7 +1696,7 @@ dmz::ObjectPluginWebServices::_init_object_type_filter (
 
 
 void
-dmz::ObjectPluginWebServices::_init_attribute_filter (
+dmz::WebServicesPluginObject::_init_attribute_filter (
       Config &attrConfig,
       FilterStruct &filter) {
 
@@ -1732,7 +1738,7 @@ dmz::ObjectPluginWebServices::_init_attribute_filter (
 
 
 void
-dmz::ObjectPluginWebServices::_init_state_filter (
+dmz::WebServicesPluginObject::_init_state_filter (
       Config &stateConfig,
       FilterStruct &filter) {
 
@@ -1770,7 +1776,7 @@ dmz::ObjectPluginWebServices::_init_state_filter (
 
 
 void
-dmz::ObjectPluginWebServices::_init (Config &local) {
+dmz::WebServicesPluginObject::_init (Config &local) {
 
    RuntimeContext *context (get_plugin_runtime_context ());
 
@@ -1813,12 +1819,12 @@ dmz::ObjectPluginWebServices::_init (Config &local) {
 extern "C" {
 
 DMZ_PLUGIN_FACTORY_LINK_SYMBOL dmz::Plugin *
-create_dmzObjectPluginWebServices (
+create_dmzWebServicesPluginObject (
       const dmz::PluginInfo &Info,
       dmz::Config &local,
       dmz::Config &global) {
 
-   return new dmz::ObjectPluginWebServices (Info, local);
+   return new dmz::WebServicesPluginObject (Info, local);
 }
 
 };

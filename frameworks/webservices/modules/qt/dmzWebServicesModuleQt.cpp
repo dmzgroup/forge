@@ -38,7 +38,7 @@ namespace {
    static const String Local_Rev ("_rev");
    static const String Local_Attachments ("_attachments");
 
-   static const QString LocalTimeStampFormat ("yyyy-M-d-h-m-s");
+//   static const QString LocalTimeStampFormat ("yyyy-M-d-h-m-s");
 
    static const char LocalId[] = "id";
    static const char LocalRev[] = "rev";
@@ -76,6 +76,7 @@ struct dmz::WebServicesModuleQt::RequestStruct {
    const String DocId;
    String docRev;
    WebServicesObserver &obs;
+   QDateTime timeStamp;
    Int32 statusCode;
    Boolean error;
    String errorMessage;
@@ -90,6 +91,7 @@ struct dmz::WebServicesModuleQt::RequestStruct {
       Type (TheRequestType),
       DocId (TheDocId),
       obs (theObs),
+      timeStamp (QDateTime::currentDateTime ()),
       statusCode (0),
       error (False),
       data ("global") {;}
@@ -105,6 +107,7 @@ struct dmz::WebServicesModuleQt::State {
    QUrl serverUrl;
    String serverPath;
    String serverDatabase;
+   String dateFormat;
    QAuthenticator auth;
    Handle usernameHandle;
    Handle passwordHandle;
@@ -144,6 +147,7 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       serverUrl (LocalHost),
       serverPath ("/"),
       serverDatabase (Info.get_name ()),
+      dateFormat ("ddd, dd MMM yyyy HH:mm:ss 'G''M''T'"),
       usernameHandle (0),
       passwordHandle (0),
       targetHandle (0),
@@ -383,7 +387,8 @@ dmz::WebServicesModuleQt::fetch_configs (
 
    Boolean error (False);
 
-   if (_authenticate () && _state.client) {
+//   if (_authenticate () && _state.client) {
+   if (_state.client) {
 
       Config global ("global");
 
@@ -521,8 +526,6 @@ dmz::WebServicesModuleQt::_reply_download_progress (
 
          String jsonData (data.constData ());
 
-_state.log.info << feed->DocId << " : " << feed->Id << endl;
-_state.log.info << "json: " <<jsonData << endl;
          Config global ("global");
          if (json_string_to_config (jsonData, global)) {
 
@@ -541,10 +544,6 @@ _state.log.info << "json: " <<jsonData << endl;
          _state.requestTable.remove (feed->Id);
          delete feed; feed = 0;
       }
-   }
-   else {
-
-      _state.log.info << bytesReceived << "/" << bytesTotal << endl;
    }
 }
 
@@ -567,16 +566,36 @@ dmz::WebServicesModuleQt::_reply_finished (
       request->statusCode =
          reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-//      if (request->statusCode > 300) {
+      if (reply->hasRawHeader ("Date")) {
 
-_state.log.warn << "StatusCode: " << request->statusCode << endl;
-_state.log.info << request->DocId << " : " << request->Id << endl;
-//      }
+         QString rawDate (reply->rawHeader ("Date"));
+
+         QDateTime dateTime =
+            QDateTime::fromString (rawDate, _state.dateFormat.get_buffer ());
+
+         if (dateTime.isValid ()) {
+
+            request->timeStamp = dateTime;
+         }
+      }
 
       QByteArray data (reply->readAll ());
       const String JsonData (data.constData ());
 
-      if (JsonData) {
+      if (reply->error () == QNetworkReply::AuthenticationRequiredError) {
+
+         String reason = qPrintable (reply->errorString ());
+
+         if (request->statusCode == 0) { request->statusCode = reply->error (); }
+
+         request->data = Config ("global");
+         request->data.store_attribute ("error", "Reply Error");
+         request->data.store_attribute ("reason", reason);
+         request->data.store_attribute ("code", String::number (request->statusCode));
+
+         _handle_reply (*request);
+      }
+      else if (JsonData) {
 
          if (json_string_to_config (JsonData, request->data)) {
 
@@ -587,6 +606,7 @@ _state.log.info << request->DocId << " : " << request->Id << endl;
             request->data = Config ("global");
             request->data.store_attribute ("error", "Parse Error");
             request->data.store_attribute ("reason", "Error parsing json data.");
+            request->data.store_attribute ("code", String::number (request->statusCode));
 
             _handle_reply (*request);
          }
@@ -596,9 +616,10 @@ _state.log.info << request->DocId << " : " << request->Id << endl;
          String reason = qPrintable (reply->errorString ());
 
          request->data = Config ("global");
-         request->data.store_attribute ("error", "Network Error");
+         request->data.store_attribute ("error", "No Data Error");
          request->data.store_attribute ("reason", reason);
-_state.log.error << reason << endl;
+         request->data.store_attribute ("code", String::number (request->statusCode));
+
          _handle_reply (*request);
       }
 
@@ -628,74 +649,19 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
    if (request.error) {
 
-      _state.log.error << "Error: " << msg << endl;
-//      _state.log.info << request.data << endl;
-   }
+      if (request.statusCode == 401 || request.statusCode == 204) {
 
-   if (request.Type == "fetchDocument") {
-
-       _document_fetched (request);
-   }
-   else if (request.Type == "fetchMultipleDocuments") {
-
-       _documents_fetched (request);
-   }
-   else if (request.Type == "publishDocument") {
-
-      _document_published (request);
-   }
-   else if (request.Type == "deleteDocument") {
-
-      _document_deleted (request);
-   }
-   else if (request.Type == "fetchChanges") {
-
-      _changes_fetched (request);
-   }
-   else if (request.Type == "fetchChangesHeavy") {
-
-      _changes_fetched_heavy (request);
-   }
-   else if (request.Type == "postSession") {
-
-      if (config_to_boolean ("ok", request.data)) {
-
-         _state.loggedIn = True;
-
-_state.log.warn << "_session: " << request.data << endl;
-
-         String name = config_to_string ("name", request.data);
-
-         Boolean admin (False);
-         Config roles;
-         if (request.data.lookup_all_config ("roles", roles)) {
-
-            ConfigIterator it;
-            Config data;
-
-            while (roles.get_next_config (it, data)) {
-
-               String role = config_to_string ("value", data);
-               if (role == "_admin") { admin = True; }
-            }
-         }
-
-         if (!name && admin) { name = "admin"; }
-
-         _state.log.info << "Welcome " << name << " you have logged in." << endl;
-
-         Data data;
-         data.store_string (_state.usernameHandle, 0, name);
-
-         _state.loginSuccessMsg.send (&data);
-
-//         _fetch_user (name);
-      }
-      else {
-
-         _state.loginFailedMsg.send ();
+         _authenticate ();
       }
    }
+
+   if (request.Type == "fetchDocument") { _document_fetched (request); }
+   else if (request.Type == "fetchMultipleDocuments") { _documents_fetched (request); }
+   else if (request.Type == "publishDocument") { _document_published (request); }
+   else if (request.Type == "deleteDocument") { _document_deleted (request); }
+   else if (request.Type == "fetchChanges") { _changes_fetched (request); }
+   else if (request.Type == "fetchChangesHeavy") { _changes_fetched_heavy (request); }
+   else if (request.Type == "postSession") { _session_posted (request); }
    else if (request.Type == "deleteSession") {
 
       _state.loggedIn = False;
@@ -724,8 +690,9 @@ dmz::WebServicesModuleQt::_publish_document (
 
    RequestStruct *request (0);
 
-   if (_authenticate ()) {
+   if (1 || _authenticate ()) {
 
+      _state.log.warn << "publish: " << Id << endl;
       if (Id && _state.client) {
 
          Config doc ("global");
@@ -980,9 +947,6 @@ dmz::WebServicesModuleQt::_documents_fetched (RequestStruct &request) {
                   ds->rev = docRev;
                   ds->pending = False;
                }
-
-               _state.log.info << docId << " fetched" << endl;
-               _state.log.warn << "-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-00-0-0-" << endl;
             }
          }
       }
@@ -1106,6 +1070,49 @@ dmz::WebServicesModuleQt::_changes_fetched_heavy (RequestStruct &request) {
 }
 
 
+void
+dmz::WebServicesModuleQt::_session_posted (RequestStruct &request) {
+
+   if (config_to_boolean ("ok", request.data)) {
+
+      _state.loggedIn = True;
+
+//_state.log.warn << "_session: " << request.data << endl;
+
+      String name = config_to_string ("name", request.data);
+
+      Boolean admin (False);
+      Config roles;
+      if (request.data.lookup_all_config ("roles", roles)) {
+
+         ConfigIterator it;
+         Config data;
+
+         while (roles.get_next_config (it, data)) {
+
+            String role = config_to_string ("value", data);
+            if (role == "_admin") { admin = True; }
+         }
+      }
+
+      if (!name && admin) { name = "admin"; }
+
+      _state.log.info << "Welcome " << name << " you have logged in." << endl;
+
+      Data data;
+      data.store_string (_state.usernameHandle, 0, name);
+
+      _state.loginSuccessMsg.send (&data);
+
+//         _fetch_user (name);
+   }
+   else {
+
+      _state.loginFailedMsg.send ();
+   }
+}
+
+
 dmz::Boolean
 dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
 
@@ -1185,6 +1192,7 @@ dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
    return _state.loggedIn;
 }
 
+
 QUrl
 dmz::WebServicesModuleQt::_get_url (const String &EndPoint) const {
 
@@ -1218,6 +1226,8 @@ dmz::WebServicesModuleQt::_init (Config &local) {
 
    Definitions defs (get_plugin_runtime_context ());
    RuntimeContext *context (get_plugin_runtime_context ());
+
+   _state.dateFormat = config_to_string ("date-format.value", local, _state.dateFormat);
 
    _state.usernameHandle = config_to_named_handle (
       "username.name",
