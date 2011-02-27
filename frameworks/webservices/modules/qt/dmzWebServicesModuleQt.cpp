@@ -437,7 +437,11 @@ dmz::WebServicesModuleQt::fetch_configs (
          UInt64 requestId = _state.client->post (url, data);
          if (requestId) {
 
-            _state.get_request (requestId, "fetchMultipleDocuments", DocId, *this);
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "]  POST: " << DocId << endl;
+#endif
+
+            _state.get_request (requestId, "fetchMultipleDocuments", DocId, obs);
             result = True;
          }
       }
@@ -497,6 +501,10 @@ dmz::WebServicesModuleQt::start_realtime_updates (
 
       UInt64 requestId = _state.client->get (url);
       if (requestId) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "]  GET: " << Id << endl;
+#endif
 
          String requestType = "fetchChangesContinuous";
 
@@ -687,6 +695,14 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 void
  dmz::WebServicesModuleQt::_handle_error (RequestStruct &request) {
 
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<---- [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " ERROR: " << config_to_string ("reason", request.data) << endl;
+#endif
+
+_state.log.error << "Error: " << config_to_string ("error", request.data) << endl;
+
    request.data.store_attribute ("status-code", String::number (request.statusCode));
 
    if (request.statusCode == 401 || request.statusCode == 204) {
@@ -695,9 +711,17 @@ void
 
       _authenticate ();
    }
+   else if (request.statusCode == 404) {
 
-_state.log.error << "_handle_error[" << request.Id << "]: " << request.statusCode << endl;
-_state.log.error << "reason: " << config_to_string ("reason", request.data) << endl;
+      request.data.store_attribute ("not-found", "true");
+   }
+   else if (request.statusCode == 409) {
+
+      request.data.store_attribute ("conflict", "true");
+   }
+
+//_state.log.error << "_handle_error[" << request.Id << "]: " << request.statusCode << endl;
+//_state.log.error << "reason: " << config_to_string ("reason", request.data) << endl;
 
    request.obs.handle_error (request.DocId, request.data);
 }
@@ -972,14 +996,10 @@ out << "<<<<< [" << request.Id << "]"
             Config data;
             doc.lookup_config (docType, data);
 
+            DocStruct *ds = _state.update_doc (docId, docRev);
+            if (ds) { ds->pending = False; }
+
             request.obs.handle_fetch_config (docId, docRev, data);
-
-            DocStruct *ds = _state.get_doc (docId);
-            if (ds) {
-
-               ds->rev = docRev;
-               ds->pending = False;
-            }
          }
       }
    }
@@ -1028,17 +1048,25 @@ out << "<<<<< [" << request.Id << "]"
 
    while (request.data.get_next_config (it, data)) {
 
+      const String Id (config_to_string ("id", data));
+      const String Rev (config_to_string ("changes.rev", data));
+      const Boolean Deleted (config_to_boolean ("deleted", data));
+
       Config item ("config");
-      item.store_attribute ("id", config_to_string ("id", data));
-      item.store_attribute ("rev", config_to_string ("changes.rev", data));
-      item.store_attribute ("deleted", config_to_string ("deleted", data));
+      item.store_attribute ("id", Id);
+      item.store_attribute ("rev", Rev);
+      item.store_attribute ("deleted", Deleted ? "true" : "false");
 
       updates.add_config (item);
 
-      if (config_to_boolean ("deleted", data)) {
+      if (Deleted) {
 
-         DocStruct *doc = _state.documentTable.remove (config_to_string ("id", data));
+         DocStruct *doc = _state.documentTable.remove (Id);
          if (doc) { delete doc; doc = 0; }
+      }
+      else {
+
+         _state.update_doc (Id, Rev);
       }
    }
 

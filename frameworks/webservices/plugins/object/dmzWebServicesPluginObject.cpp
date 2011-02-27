@@ -104,6 +104,7 @@ dmz::WebServicesPluginObject::update_plugin_state (
    }
    else if (State == PluginStateStart) {
 
+//      if (_webservices) { _webservices->fetch_updates (*this, _lastSeq); }
    }
    else if (State == PluginStateStop) {
 
@@ -164,13 +165,26 @@ dmz::WebServicesPluginObject::handle_error (
       const String &Id,
       const Config &Data) {
 
-   String reason = config_to_string ("reason", Data);
-   _log.error << "Error: " << reason << endl;
+   const Handle ObjectHandle (_to_handle (Id));
+   _store_flag (ObjectHandle, _fetchAttrHandle, False);
+   _store_flag (ObjectHandle, _publishAttrHandle, False);
 
    if (config_to_boolean ("authentication-required", Data)) {
 
+      _log.warn << "Authentication required." << endl;
       _authenticationRequired = True;
    }
+   else if (config_to_boolean ("conflict", Data)) {
+
+      _log.warn << "Config updated conflict." << endl;
+//      _fetch (Id);
+   }
+
+   String error = config_to_string ("error", Data);
+   _log.error << "Error: " << error << endl;
+
+   String reason = config_to_string ("reason", Data);
+   _log.error << "Reason: " << reason << endl;
 }
 
 
@@ -180,6 +194,7 @@ dmz::WebServicesPluginObject::handle_publish_config (
       const String &Rev) {
 
    const Handle ObjectHandle (_to_handle (Id));
+
    _store_rev (ObjectHandle, Rev);
    _store_flag (ObjectHandle, _publishAttrHandle, False);
 }
@@ -194,6 +209,7 @@ dmz::WebServicesPluginObject::handle_fetch_config (
    _config_to_object (Data);
 
    const Handle ObjectHandle (_to_handle (Id));
+
    _store_rev (ObjectHandle, Rev);
    _store_flag (ObjectHandle, _fetchAttrHandle, False);
 }
@@ -252,12 +268,11 @@ dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
    _fetch_configs ();
    _publish_changes ();
 
-   _online = True;
-
    _lastSeq = config_to_int32 ("last_seq", Updates);  
 
-//   _log.error << "We are now online!!!!" << endl;
-_log.warn << "handle_fetch_updates[" << _lastSeq << "]" << endl;
+   if (_webservices) { _webservices->start_realtime_updates (*this, _lastSeq); }
+
+   _online = True;
 }
 
 
@@ -281,8 +296,6 @@ dmz::WebServicesPluginObject::handle_realtime_update (
    }
 
    _lastSeq = Sequence;
-
-_log.warn << "handle_realtime_update[" << _lastSeq << "]: " << Id << endl;
 }
 
 
@@ -323,8 +336,6 @@ dmz::WebServicesPluginObject::create_object (
       const Handle ObjectHandle,
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
-
-   _log.warn << "create_object: " << Type.get_name () << endl;
 
    if (_tracking && _handle_type (Type)) {
 
@@ -670,7 +681,6 @@ dmz::WebServicesPluginObject::update_object_flag (
 
    if (AttributeHandle == _dirtyAttrHandle) {
 
-      if (Value) { _log.warn << "object dirty: " << ObjectHandle << endl; }
    }
    else if (AttributeHandle == _publishAttrHandle) {
 
@@ -1701,31 +1711,7 @@ dmz::Boolean
 dmz::WebServicesPluginObject::_update (const Handle ObjectHandle) {
 
    Boolean result (False);
-
-//   if (_online) {
-
-      if (!_inUpdate && !_inDump) {
-
-         if (_publishTable.add (ObjectHandle)) {
-
-   //         ObjectModule *objMod (get_object_module ());
-   //         if (objMod) {
-
-   //            ObjectType type = objMod->lookup_object_type (ObjectHandle);
-
-   //_log.info << "_update: " << ObjectHandle << " : " << type.get_name () << endl;
-   //         }
-         }
-
-         result = True;
-      }
-//   }
-//   else {
-
-//      ObjectModule *objMod (get_object_module ());
-//      if (objMod) { objMod->store_flag (ObjectHandle, _dirtyAttrHandle, True); }
-//   }
-
+   if (!_inUpdate && !_inDump) { result = _publishTable.add (ObjectHandle); }
    return result;
 }
 
