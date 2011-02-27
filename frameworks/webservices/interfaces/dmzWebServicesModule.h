@@ -1,7 +1,6 @@
 #ifndef DMZ_WEBSERVICES_MODULE_DOT_H
 #define DMZ_WEBSERVICES_MODULE_DOT_H
 
-#include <dmzWebServicesConsts.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeRTTI.h>
 #include <dmzTypesBase.h>
@@ -34,25 +33,24 @@ namespace dmz {
          virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs) = 0;
 
          virtual Boolean fetch_configs (
-            const StringContainer &IdList,
+            const StringContainer &List,
             WebServicesObserver &obs) = 0;
 
          virtual Boolean delete_config (const String &Id, WebServicesObserver &obs) = 0;
 
          virtual Boolean delete_configs (
-            const StringContainer &IdList,
+            const StringContainer &List,
             WebServicesObserver &obs) = 0;
 
-         virtual Boolean get_config_updates (
+         virtual Boolean fetch_updates (
             WebServicesObserver &obs,
-            const Int32 Since,
-            const Boolean Heavy = False) = 0;
+            const Int32 Since) = 0;
 
          virtual Boolean start_realtime_updates (
             WebServicesObserver &obs,
             const Int32 Since = 0) = 0;
 
-//         virtual Boolean stop_realtime_updates (WebServicesObserver &obs) = 0;
+         virtual Boolean stop_realtime_updates (WebServicesObserver &obs) = 0;
 
       protected:
          WebServicesModule (const PluginInfo &Info);

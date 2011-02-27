@@ -232,10 +232,10 @@ dmz::QtPluginLoginDialog::_init (Config &local) {
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
    _usernameHandle = config_to_named_handle (
-      "username.name", local, "UsernameName", context);
+      "username.name", local, "username", context);
 
    _passwordHandle = config_to_named_handle (
-      "password.name", local, "PasswordName", context);
+      "password.name", local, "password", context);
 
    _loginRequiredMsg = config_create_message (
       "message.login-required",

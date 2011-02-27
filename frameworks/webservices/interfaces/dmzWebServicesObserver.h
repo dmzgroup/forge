@@ -28,33 +28,28 @@ namespace dmz {
          String get_webservices_observer_name ();
 
          // WebServicesObserver Interface
-         virtual void config_published (
+         virtual void handle_error (const String &Id, const Config &Data) = 0;
+
+         virtual void handle_publish_config (
             const String &Id,
-            const Boolean Error,
+            const String &Rev) = 0;
+
+         virtual void handle_fetch_config (
+            const String &Id,
+            const String &Rev,
             const Config &Data) = 0;
 
-         virtual void config_fetched (
+         virtual void handle_delete_config (
             const String &Id,
-            const Boolean Error,
-            const Config &Data) = 0;
+            const String &Rev) = 0;
 
-//         virtual void configs_fetched (const Boolean Error, const Config &Data) = 0;
+         virtual void handle_fetch_updates (const Config &Updates) = 0;
 
-         virtual void config_deleted (
+         virtual void handle_realtime_update (
             const String &Id,
-            const Boolean Error,
-            const Config &Data) = 0;
-
-         virtual void config_updated (
-            const String &Id,
-            const Boolean Deleted,
-            const Int32 Sequence,
-            const Config &Data) = 0;
-
-         virtual void config_updated (
-            const StringContainer &UpdateList,
-            const StringContainer &DeleteList,
-            const Int32 LastSequence) = 0;
+            const String &Rev,
+            const Boolean &Deleted,
+            const Int32 Sequence) = 0;
 
       protected:
          WebServicesObserver (const PluginInfo &Info);

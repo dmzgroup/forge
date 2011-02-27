@@ -1,7 +1,9 @@
 #include <dmzObjectAttributeMasks.h>
 #include <dmzObjectConsts.h>
 #include <dmzObjectModule.h>
+#include <dmzWebServicesConsts.h>
 #include "dmzWebServicesPluginObject.h"
+#include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimeConfigToMatrix.h>
 #include <dmzRuntimeConfigToVector.h>
@@ -12,6 +14,7 @@
 #include <dmzRuntimePluginInfo.h>
 #include <dmzTypesMask.h>
 #include <dmzTypesMatrix.h>
+#include <dmzTypesStringTokenizer.h>
 #include <dmzTypesVector.h>
 #include <dmzTypesUUID.h>
 #include <dmzWebServicesModule.h>
@@ -58,14 +61,20 @@ dmz::WebServicesPluginObject::WebServicesPluginObject (const PluginInfo &Info, C
       ObjectObserverUtil (Info, local),
       _log (Info),
       _defs (Info.get_context ()),
+      _state (StateOffline),
+      _tracking (True),
+      _online (False),
       _webservices (0),
       _filterList (0),
-      _defaultHandle (0),
+      _defaultAttrHandle (0),
+      _revAttrHandle (0),
+      _dirtyAttrHandle (0),
+      _publishAttrHandle (0),
+      _fetchAttrHandle (0),
       _lastSeq (0),
       _inDump (False),
       _inUpdate (False),
-      _upToDate (False),
-      _authenticated (False),
+      _authenticationRequired (False),
       _publishRate (2.0),
       _publishDelta (0.0) {
 
@@ -79,6 +88,7 @@ dmz::WebServicesPluginObject::~WebServicesPluginObject () {
    _filterList = 0;
 
    _objectLinkTable.empty ();
+   _revisionTable.empty ();
    _configTable.empty ();
 }
 
@@ -130,134 +140,133 @@ dmz::WebServicesPluginObject::discover_plugin (
 void
 dmz::WebServicesPluginObject::update_time_slice (const Float64 TimeDelta) {
 
-   ObjectModule *objMod (get_object_module ());
-
-   if (_webservices && objMod) {
+   if (_online && !_authenticationRequired) {
 
       _publishDelta += TimeDelta;
+
+      _publish_deletes ();
 
       if (_publishDelta > _publishRate) {
 
          _publishDelta = 0;
-
-         if (_deleteTable.get_count ()) {
-
-            _webservices->delete_configs (_deleteTable, *this);
-            _deleteTable.clear ();
-         }
-
-         if (_publishTable.get_count ()) {
-
-            HandleContainerIterator it;
-            Handle objHandle (_publishTable.get_first (it));
-
-            while (objHandle) {
-
-               if (_publish (objHandle)) {
-
-                  _publishTable.remove (objHandle);
-               }
-
-               objHandle = _publishTable.get_next (it);
-            }
-         }
+         _publish_changes ();
       }
 
-      if (_objectLinkTable.get_count ()) {
-
-         HashTableStringIterator objIt;
-         ObjectLinkStruct *objLink = _objectLinkTable.get_first (objIt);
-         while (objLink) {
-
-            _link_to_sub (*objLink);
-
-            if (objLink->inLinks.get_count () == 0) {
-
-               if (_objectLinkTable.remove (objLink->SubName)) {
-
-                  delete objLink; objLink = 0;
-               }
-            }
-
-            objLink = _objectLinkTable.get_next (objIt);
-         }
-      }
-
-      if (_fetchTable.get_count ()) {
-
-         _webservices->fetch_configs (_fetchTable, *this);
-         _pendingFetchTable += _fetchTable;
-         _fetchTable.clear ();
-      }
+      _update_links ();
+      _fetch_configs ();
    }
 }
 
 
 // WebServicesObserver Interface
 void
-dmz::WebServicesPluginObject::config_published (
+dmz::WebServicesPluginObject::handle_error (
       const String &Id,
-      const Boolean Error,
       const Config &Data) {
 
-   _pendingPublishTable.remove (Id);
+   String reason = config_to_string ("reason", Data);
+   _log.error << "Error: " << reason << endl;
 
-   if (Error) {
+   if (config_to_boolean ("authentication-required", Data)) {
 
-      _log.warn << "Error: " << config_to_string ("reason", Data) << endl;
-   }
-   else {
-
+      _authenticationRequired = True;
    }
 }
 
 
 void
-dmz::WebServicesPluginObject::config_fetched (
+dmz::WebServicesPluginObject::handle_publish_config (
+      const String &Id,
+      const String &Rev) {
+
+   const Handle ObjectHandle (_to_handle (Id));
+   _store_rev (ObjectHandle, Rev);
+   _store_flag (ObjectHandle, _publishAttrHandle, False);
+}
+
+
+void
+dmz::WebServicesPluginObject::handle_fetch_config (
    const String &Id,
-   const Boolean Error,
+   const String &Rev,
    const Config &Data) {
 
-   _pendingFetchTable.remove (Id);
+   _config_to_object (Data);
 
-   if (Error) {
-
-   }
-   else {
-
-_log.warn << "config_fetched: " << Id << endl;
-      _inUpdate = True;
-      _config_to_object (Data);
-      _inUpdate = False;
-   }
+   const Handle ObjectHandle (_to_handle (Id));
+   _store_rev (ObjectHandle, Rev);
+   _store_flag (ObjectHandle, _fetchAttrHandle, False);
 }
 
 
 void
-dmz::WebServicesPluginObject::config_deleted (
+dmz::WebServicesPluginObject::handle_delete_config (
       const String &Id,
-      const Boolean Error,
-      const Config &Data) {
+      const String &Rev) {
 
-   if (Error) {
+   StringContainer container;
+   container.add (Id);
 
-   }
-   else {
-
-      StringContainer container;
-      container.add (Id);
-
-      _configs_deleted (container);
-   }
+   _configs_deleted (container);
 }
 
 
 void
-dmz::WebServicesPluginObject::config_updated (
+dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
+
+   StringContainer updatedList;
+   StringContainer deletedList;
+
+   ConfigIterator it;
+   Config data;
+
+   while (Updates.get_next_config (it, data)) {
+
+      const String Id  (config_to_string ("id", data));
+      const String RemoteRev (config_to_string ("rev", data));
+      const Boolean Deleted (config_to_boolean ("deleted", data));
+
+      String *ptr = new String (RemoteRev);
+      if (!_revisionTable.store (Id, ptr)) { delete ptr; ptr = 0; }
+
+      if (Deleted) {
+
+         deletedList.add (Id);
+      }
+      else {
+
+         const Handle ObjectHandle (_to_handle (Id));
+
+         String localRev;
+         if (_lookup_rev (ObjectHandle, localRev)) {
+
+            _publishTable.remove (ObjectHandle);
+
+            if (RemoteRev != localRev) { _fetch (Id); }
+         }
+         else { _fetch (Id); }
+      }
+   }
+
+   _configs_deleted (deletedList);
+   _fetch_configs ();
+   _publish_changes ();
+
+   _online = True;
+
+   _lastSeq = config_to_int32 ("last_seq", Updates);  
+
+//   _log.error << "We are now online!!!!" << endl;
+_log.warn << "handle_fetch_updates[" << _lastSeq << "]" << endl;
+}
+
+
+void
+dmz::WebServicesPluginObject::handle_realtime_update (
       const String &Id,
-      const Boolean Deleted,
-      const Int32 Sequence,
-      const Config &Data) {
+      const String &Rev,
+      const Boolean &Deleted,
+      const Int32 Sequence) {
 
    if (Deleted) {
 
@@ -268,31 +277,12 @@ dmz::WebServicesPluginObject::config_updated (
    }
    else {
 
-      if (Data) { config_fetched (Id, False, Data); }
-      else { _fetch (Id); }
+      _fetch (Id);
    }
 
    _lastSeq = Sequence;
-_log.warn << "config_updated[" << _lastSeq << "]: " << Id << endl;
-   _upToDate = True;
-}
 
-
-void
-dmz::WebServicesPluginObject::config_updated (
-      const StringContainer &UpdatedIdList,
-      const StringContainer &DeletedIdList,
-      const Int32 LastSequence) {
-
-   _configs_deleted (DeletedIdList);
-
-   if (_webservices && UpdatedIdList.get_count ()) {
-
-      _webservices->fetch_configs (UpdatedIdList, *this);
-      _pendingFetchTable += UpdatedIdList;
-   }
-
-   _lastSeq = LastSequence;
+_log.warn << "handle_realtime_update[" << _lastSeq << "]: " << Id << endl;
 }
 
 
@@ -313,37 +303,15 @@ dmz::WebServicesPluginObject::receive_message (
 //         InData->lookup_string (_usernameHandle, 0, username);
       }
 
-      _authenticated = True;
-
-      if (_webservices) {
-
-         if (_upToDate) {
-
-            _webservices->start_realtime_updates (*this);
-         }
-         else {
-
-            _webservices->get_config_updates (*this, _lastSeq);
-         }
-      }
+      if (_webservices && !_online) { _webservices->fetch_updates (*this, _lastSeq); }
    }
    else if (Type == _loginFailedMsg) {
 
-      _authenticated = False;
-
-      if (_webservices) {
-
-//         _webservices->stop_realtime_updates (*this);
-      }
+      _online = False;
    }
    else if (Type == _logoutMsg) {
 
-      _authenticated = False;
-
-      if (_webservices) {
-
-//         _webservices->stop_realtime_updates (*this);
-      }
+      _online = False;
    }
 }
 
@@ -356,7 +324,9 @@ dmz::WebServicesPluginObject::create_object (
       const ObjectType &Type,
       const ObjectLocalityEnum Locality) {
 
-   if (_handle_type (Type)) {
+   _log.warn << "create_object: " << Type.get_name () << endl;
+
+   if (_tracking && _handle_type (Type)) {
 
       if (_inDump) { /* do nothing */ }
       else {
@@ -373,8 +343,7 @@ dmz::WebServicesPluginObject::destroy_object (
       const UUID &Identity,
       const Handle ObjectHandle) {
 
-   if (_inDump) { /* do nothing */ }
-   else if (_activeTable.contains (ObjectHandle)) {
+   if (_active (ObjectHandle)) {
 
       _publishTable.remove (ObjectHandle);
 
@@ -492,8 +461,7 @@ dmz::WebServicesPluginObject::unlink_objects (
       const UUID &SubIdentity,
       const Handle SubHandle) {
 
-   if (_active (SuperHandle) &&
-         _handle_attribute (AttributeHandle, ObjectUnlinkMask)) {
+   if (_active (SuperHandle) && _handle_attribute (AttributeHandle, ObjectUnlinkMask)) {
 
       _update (SuperHandle);
    }
@@ -700,7 +668,17 @@ dmz::WebServicesPluginObject::update_object_flag (
       const Boolean Value,
       const Boolean *PreviousValue) {
 
-   if (_active (ObjectHandle) &&
+   if (AttributeHandle == _dirtyAttrHandle) {
+
+      if (Value) { _log.warn << "object dirty: " << ObjectHandle << endl; }
+   }
+   else if (AttributeHandle == _publishAttrHandle) {
+
+   }
+   else if (AttributeHandle == _fetchAttrHandle) {
+
+   }
+   else if (_active (ObjectHandle) &&
          _handle_attribute (AttributeHandle, ObjectFlagMask)) {
 
       _update (ObjectHandle);
@@ -969,6 +947,84 @@ dmz::WebServicesPluginObject::update_object_data (
 
 
 // WebServicesPluginObject Interface
+
+void
+dmz::WebServicesPluginObject::_publish_deletes () {
+
+   if (_webservices && _deleteTable.get_count ()) {
+
+      _webservices->delete_configs (_deleteTable, *this);
+      _deleteTable.clear ();
+   }
+}
+
+
+void
+dmz::WebServicesPluginObject::_publish_changes () {
+
+   if (_webservices && _publishTable.get_count ()) {
+
+      HandleContainerIterator it;
+      Handle objHandle (_publishTable.get_first (it));
+
+      while (objHandle) {
+
+         if (_publish (objHandle)) { _publishTable.remove (objHandle); }
+         objHandle = _publishTable.get_next (it);
+      }
+   }
+}
+
+
+void
+dmz::WebServicesPluginObject::_update_links () {
+
+   if (_objectLinkTable.get_count ()) {
+
+      HashTableStringIterator objIt;
+      ObjectLinkStruct *objLink = _objectLinkTable.get_first (objIt);
+      while (objLink) {
+
+         _link_to_sub (*objLink);
+
+         if (objLink->inLinks.get_count () == 0) {
+
+            if (_objectLinkTable.remove (objLink->SubName)) {
+
+               delete objLink; objLink = 0;
+            }
+         }
+
+         objLink = _objectLinkTable.get_next (objIt);
+      }
+   }
+}
+
+
+dmz::Boolean
+dmz::WebServicesPluginObject::_fetch_configs () {
+
+   Boolean result (False);
+
+   if (_webservices && _fetchTable.get_count ()) {
+
+      result = _webservices->fetch_configs (_fetchTable, *this);
+
+      StringContainerIterator it;
+      String id;
+
+      while (_fetchTable.get_next (it, id)) {
+
+         _store_flag (_to_handle (id), _fetchAttrHandle, result);
+      }
+
+      _fetchTable.clear ();
+   }
+
+   return result;
+}
+
+
 dmz::Boolean
 dmz::WebServicesPluginObject::_publish (const Handle ObjectHandle) {
 
@@ -977,26 +1033,15 @@ dmz::WebServicesPluginObject::_publish (const Handle ObjectHandle) {
    ObjectModule *objMod (get_object_module ());
    if (ObjectHandle && objMod && _webservices) {
 
-      UUID uuid;
-      if (objMod->lookup_uuid (ObjectHandle, uuid)) {
+      if (!_lookup_flag (ObjectHandle, _publishAttrHandle)) {
 
-         const String DocId (uuid.to_string ());
+         UUID uuid;
+         Config doc (_archive_object (ObjectHandle));
+         if (doc && objMod->lookup_uuid (ObjectHandle, uuid)) {
 
-         if (!_pendingPublishTable.contains (DocId)) {
-
-            Config doc = _archive_object (ObjectHandle);
-            if (doc) {
-
-               if (_webservices->publish_config (DocId, doc, *this)) {
-
-                  _pendingPublishTable.add (DocId);
-                  result = True;
-               }
-               else {
-
-                  _log.error << "publish failed" << endl;
-               }
-            }
+            const String Id (uuid.to_string ());
+            result = _webservices->publish_config (Id, doc, *this);
+            _store_flag (ObjectHandle, _publishAttrHandle, result);
          }
       }
    }
@@ -1010,18 +1055,9 @@ dmz::WebServicesPluginObject::_fetch (const String &Id) {
 
    Boolean result (False);
 
-   if (Id) {
+   if (!_lookup_flag (_to_handle (Id), _fetchAttrHandle)) {
 
-      if (!_pendingFetchTable.contains (Id)) {
-
-         _fetchTable.add (Id);
-
-//         if (_webservices->fetch_config (Id, *this)) {
-
-//            _pendingFetchTable.add (Id);
-//            result = True;
-//         }
-      }
+      result = _fetchTable.add (Id);
    }
 
    return result;
@@ -1037,7 +1073,6 @@ dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
       Handle subHandle = objMod->lookup_handle_from_uuid (objLink.SubName);
       if (!subHandle) {
 
-//         _fetchTable.add (objLink.SubName);
          _fetch (objLink.SubName);
       }
       else {
@@ -1064,7 +1099,6 @@ dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
 
                if (!(ls->attrObjectName)) {
 
-                  _log.info << "link done, no attr obj" << endl;
                   removeLink = True;
                }
                else {
@@ -1074,7 +1108,6 @@ dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
 
                   if (!attrObjectHandle) {
 
-//                     _fetchTable.add (ls->attrObjectName);
                      _fetch (ls->attrObjectName);
                   }
                   else {
@@ -1087,7 +1120,6 @@ dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
 
                      _inUpdate = False;
 
-                     _log.info << "link done, link attr stored" << endl;
                      removeLink = True;
                   }
                }
@@ -1097,12 +1129,8 @@ dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
 
                if (objLink.inLinks.remove (ls->SuperHandle)) {
 
-_log.debug << "remove superHandle: " << ls->SuperHandle << endl;
-
                   delete ls; ls = 0;
                }
-
-_log.debug << "in links: " << objLink.inLinks.get_count () << endl;
             }
 
             ls = objLink.inLinks.get_next (linkIt);
@@ -1113,15 +1141,15 @@ _log.debug << "in links: " << objLink.inLinks.get_count () << endl;
 
 
 void
-dmz::WebServicesPluginObject::_configs_deleted (const StringContainer &DeleteIdList) {
+dmz::WebServicesPluginObject::_configs_deleted (const StringContainer &DeletedList) {
 
    ObjectModule *objMod (get_object_module ());
-   if(objMod) {
+   if(objMod && DeletedList.get_count ()) {
 
       String id;
       StringContainerIterator it;
 
-      while (DeleteIdList.get_next (it, id)) {
+      while (DeletedList.get_next (it, id)) {
 
          Handle objectHandle = objMod->lookup_handle_from_uuid (UUID (id));
          if (objectHandle) {
@@ -1131,7 +1159,6 @@ dmz::WebServicesPluginObject::_configs_deleted (const StringContainer &DeleteIdL
             _inUpdate = False;
 
             _activeTable.remove (objectHandle);
-//            _pendingTable.remove (id);
             _deleteTable.remove (id);
          }
       }
@@ -1190,7 +1217,7 @@ dmz::WebServicesPluginObject::_get_attr_config (
       ptr = new Config ("attributes");
       if (ptr) {
 
-         if (AttrHandle != _defaultHandle) {
+         if (AttrHandle != _defaultAttrHandle) {
 
             const String Name (_defs.lookup_named_handle_name (AttrHandle));
 
@@ -1214,6 +1241,8 @@ dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
 
    ObjectModule *objMod (get_object_module ());
    if (objMod) {
+
+      _inUpdate = True;
 
       const UUID ObjUUID (config_to_string ("uuid", Data));
       String objectName (config_to_string ("name", Data));
@@ -1264,6 +1293,8 @@ dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
 
          _log.info << "Filtering object with type: " << TypeName << endl;
       }
+
+      _inUpdate = False;
    }
 }
 
@@ -1514,7 +1545,6 @@ dmz::WebServicesPluginObject::_handle_attribute (
       while (filter) {
 
          Mask *maskPtr = filter->attrTable.lookup (AttrHandle);
-
          if (!maskPtr) {
 
             FilterAttrStruct *current (filter->list);
@@ -1574,10 +1604,96 @@ dmz::WebServicesPluginObject::_filter_state (
 }
 
 
+dmz::Handle
+dmz::WebServicesPluginObject::_to_handle (const String &Id) {
+
+   Handle result (0);
+   ObjectModule *objMod (get_object_module ());
+   if (objMod && Id) { result = objMod->lookup_handle_from_uuid (UUID (Id)); }
+   return result;
+}
+
+
+dmz::Boolean
+dmz::WebServicesPluginObject::_store_rev (const Handle ObjectHandle, const String &Rev) {
+
+   Boolean result (False);
+
+   ObjectModule *objMod (get_object_module ());
+   if (objMod && ObjectHandle && _revAttrHandle && Rev) {
+
+      result = objMod->store_text (ObjectHandle, _revAttrHandle, Rev);
+
+      StringTokenizer tokenizer (Rev, '-');
+      String revCount = tokenizer.get_next ();
+
+      if (revCount) {
+
+         objMod->store_counter (
+            ObjectHandle,
+            _revAttrHandle,
+            string_to_int32 (revCount));
+      }
+   }
+
+   return result;
+}
+
+
+dmz::Boolean
+dmz::WebServicesPluginObject::_lookup_rev (const Handle ObjectHandle, String &rev) {
+
+   Boolean result (False);
+
+   ObjectModule *objMod (get_object_module ());
+   if (objMod && ObjectHandle && _revAttrHandle) {
+
+         result = objMod->lookup_text (ObjectHandle, _revAttrHandle, rev);
+   }
+
+   return result;
+}
+
+
+dmz::Boolean
+dmz::WebServicesPluginObject::_store_flag (
+      const Handle ObjectHandle,
+      const Handle AttributeHandle,
+      const Boolean Value) {
+
+   Boolean result (False);
+
+   ObjectModule *objMod (get_object_module ());
+   if (objMod && ObjectHandle && AttributeHandle) {
+
+      result = objMod->store_flag (ObjectHandle, AttributeHandle, Value);
+   }
+
+   return result;
+}
+
+
+dmz::Boolean
+dmz::WebServicesPluginObject::_lookup_flag (
+      const Handle ObjectHandle,
+      const Handle AttributeHandle) {
+
+   Boolean result (False);
+
+   ObjectModule *objMod (get_object_module ());
+   if (objMod && ObjectHandle && AttributeHandle) {
+
+      result = objMod->lookup_flag (ObjectHandle, AttributeHandle);
+   }
+
+   return result;
+}
+
+
 dmz::Boolean
 dmz::WebServicesPluginObject::_active (const Handle ObjectHandle) {
 
-   return _activeTable.contains (ObjectHandle);
+   return _tracking && _activeTable.contains (ObjectHandle);
 }
 
 
@@ -1586,21 +1702,29 @@ dmz::WebServicesPluginObject::_update (const Handle ObjectHandle) {
 
    Boolean result (False);
 
-   if (!_inUpdate && !_inDump) {
+//   if (_online) {
 
-      if (_publishTable.add (ObjectHandle)) {
+      if (!_inUpdate && !_inDump) {
 
-//         ObjectModule *objMod (get_object_module ());
-//         if (objMod) {
+         if (_publishTable.add (ObjectHandle)) {
 
-//            ObjectType type = objMod->lookup_object_type (ObjectHandle);
+   //         ObjectModule *objMod (get_object_module ());
+   //         if (objMod) {
 
-//_log.info << "_update: " << ObjectHandle << " : " << type.get_name () << endl;
-//         }
+   //            ObjectType type = objMod->lookup_object_type (ObjectHandle);
+
+   //_log.info << "_update: " << ObjectHandle << " : " << type.get_name () << endl;
+   //         }
+         }
+
+         result = True;
       }
+//   }
+//   else {
 
-      result = True;
-   }
+//      ObjectModule *objMod (get_object_module ());
+//      if (objMod) { objMod->store_flag (ObjectHandle, _dirtyAttrHandle, True); }
+//   }
 
    return result;
 }
@@ -1747,7 +1871,7 @@ dmz::WebServicesPluginObject::_init_state_filter (
 
    while (stateConfig.get_next_config (stateIt, state)) {
 
-      Handle attrHandle (_defaultHandle);
+      Handle attrHandle (_defaultAttrHandle);
 
       const String AttrName (config_to_string ("attribute", state));
 
@@ -1782,7 +1906,12 @@ dmz::WebServicesPluginObject::_init (Config &local) {
 
    _webservicesName = config_to_string ("module-name.web-services", local);
 
-   _defaultHandle = _defs.create_named_handle (ObjectAttributeDefaultName);
+   _defaultAttrHandle = _defs.create_named_handle (ObjectAttributeDefaultName);
+
+   _revAttrHandle = _defs.create_named_handle ("_rev");
+   _dirtyAttrHandle = _defs.create_named_handle ("_dirty");
+   _publishAttrHandle = _defs.create_named_handle ("_publish");
+   _fetchAttrHandle = _defs.create_named_handle ("_fetch");
 
    _loginSuccessMsg = config_create_message (
       "message.login-success",
@@ -1806,11 +1935,34 @@ dmz::WebServicesPluginObject::_init (Config &local) {
    subscribe_to_message (_loginFailedMsg);
    subscribe_to_message (_logoutMsg);
 
+   // add internal attributes to filter
+   FilterStruct *fs (new FilterStruct);
+   if (fs) {
+
+      if (!_filterList) { _filterList = fs; }
+      else { fs->next = _filterList; _filterList = fs; }
+
+      Mask *ptr (0);
+
+      ptr = new Mask (ObjectTextMask | ObjectCounterMask);
+      if (!fs->attrTable.store (_revAttrHandle, ptr)) { delete ptr; ptr = 0; }
+
+      ptr = new Mask (ObjectFlagMask);
+      if (!fs->attrTable.store (_dirtyAttrHandle, ptr)) { delete ptr; ptr = 0; }
+
+      ptr = new Mask (ObjectFlagMask);
+      if (!fs->attrTable.store (_publishAttrHandle, ptr)) { delete ptr; ptr = 0; }
+
+      ptr = new Mask (ObjectFlagMask);
+      if (!fs->attrTable.store (_fetchAttrHandle, ptr)) { delete ptr; ptr = 0; }
+   }
+
    Config filterList;
    if (local.lookup_all_config ("filter", filterList)) {
 
       _init_filter_list (filterList);
    }
+
 
    activate_global_object_observer ();
 }

@@ -64,50 +64,41 @@ namespace dmz {
          virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs);
 
          virtual Boolean fetch_configs (
-            const StringContainer &IdList,
+            const StringContainer &List,
             WebServicesObserver &obs);
 
          virtual Boolean delete_config (const String  &Id, WebServicesObserver &obs);
 
          virtual Boolean delete_configs (
-            const StringContainer &IdList,
+            const StringContainer &List,
             WebServicesObserver &obs);
 
-         virtual Boolean get_config_updates (
-            WebServicesObserver &obs,
-            const Int32 Since,
-            const Boolean Heavy);
+         virtual Boolean fetch_updates (WebServicesObserver &obs, const Int32 Since);
 
          virtual Boolean start_realtime_updates (
             WebServicesObserver &obs,
             const Int32 Since);
 
+         virtual Boolean stop_realtime_updates (WebServicesObserver &obs);
+
          // WebServicesObserver Interface
-         virtual void config_published (
+         virtual void handle_error (const String &Id, const Config &Data);
+
+         virtual void handle_publish_config (const String &Id, const String &Rev) {;}
+
+         virtual void handle_fetch_config (
             const String &Id,
-            const Boolean Error,
+            const String &Rev,
             const Config &Data) {;}
 
-         virtual void config_fetched (
-            const String &Id,
-            const Boolean Error,
-            const Config &Data) {;}
+         virtual void handle_delete_config (const String &Id, const String &Rev) {;}
+         virtual void handle_fetch_updates (const Config &Updates) {;}
 
-         virtual void config_deleted (
+         virtual void handle_realtime_update (
             const String &Id,
-            const Boolean Error,
-            const Config &Data) {;}
-
-         virtual void config_updated (
-            const String &Id,
-            const Boolean Deleted,
-            const Int32 Sequence,
-            const Config &Data) {;}
-
-         virtual void config_updated (
-            const StringContainer &UpdateList,
-            const StringContainer &DeleteList,
-            const Int32 LastSequence) {;}
+            const String &Rev,
+            const Boolean &Deleted,
+            const Int32 Sequence) {;}
 
       protected Q_SLOTS:
          void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
@@ -127,11 +118,7 @@ namespace dmz {
          struct RequestStruct;
 
          void _handle_reply (RequestStruct &request);
-
-//          void _handle_error (
-//             const UInt64 RequestId,
-//             const Int32 StatusCode,
-//             const QString &ErrorMessage);
+         void _handle_error (RequestStruct &request);
 
          RequestStruct *_publish_session (const Handle SessionHandle);
 
@@ -148,17 +135,13 @@ namespace dmz {
 
          RequestStruct *_fetch_changes (
             WebServicesObserver &obs,
-            const Int32 Since,
-            const Boolean Heavy);
+            const Int32 Since);
 
          void _document_published (RequestStruct &request);
          void _document_fetched (RequestStruct &request);
          void _documents_fetched (RequestStruct &request);
          void _document_deleted (RequestStruct &request);
-
          void _changes_fetched (RequestStruct &request);
-         void _changes_fetched_heavy (RequestStruct &request);
-
          void _session_posted (RequestStruct &request);
 
          Boolean _handle_continuous_feed (RequestStruct &request);

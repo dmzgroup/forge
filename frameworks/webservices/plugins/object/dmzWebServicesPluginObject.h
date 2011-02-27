@@ -43,31 +43,28 @@ namespace dmz {
          virtual void update_time_slice (const Float64 TimeDelta);
 
          // WebServicesObserver Interface
-         virtual void config_published (
+         virtual void handle_error (const String &Id, const Config &Data);
+
+         virtual void handle_publish_config (
             const String &Id,
-            const Boolean Error,
+            const String &Rev);
+
+         virtual void handle_fetch_config (
+            const String &Id,
+            const String &Rev,
             const Config &Data);
 
-         virtual void config_fetched (
+         virtual void handle_delete_config (
             const String &Id,
-            const Boolean Error,
-            const Config &Data);
+            const String &Rev);
 
-         virtual void config_deleted (
+         virtual void handle_fetch_updates (const Config &Updates);
+
+         virtual void handle_realtime_update (
             const String &Id,
-            const Boolean Error,
-            const Config &Data);
-
-         virtual void config_updated (
-            const String &Id,
-            const Boolean Deleted,
-            const Int32 Sequence,
-            const Config &Data);
-
-         virtual void config_updated (
-            const StringContainer &UpdatedIdList,
-            const StringContainer &DeletedIdList,
-            const Int32 LastSequence);
+            const String &Rev,
+            const Boolean &Deleted,
+            const Int32 Sequence);
 
          // Message Observer Interface
          virtual void receive_message (
@@ -244,6 +241,12 @@ namespace dmz {
             const Data *PreviousValue);
 
       protected:
+         enum StateEnum {
+            StateOffline,
+            StateOnline,
+            StateSync,
+         };
+
          struct FilterAttrStruct {
 
             const String Name;
@@ -303,6 +306,15 @@ namespace dmz {
             ~ObjectLinkStruct () { inLinks.empty (); }
          };
 
+         void _publish_deletes ();
+         void _publish_changes ();
+         void _update_links ();
+         Boolean _fetch_configs ();
+
+         void _get_ready ();
+         void _get_up_to_date ();
+         void _stay_up_to_date (const Float64 TimeDelta);
+
          Boolean _publish (const Handle ObjectHandle);
          Boolean _fetch (const String &Id);
 
@@ -334,6 +346,18 @@ namespace dmz {
 
          Mask _filter_state (const Handle AttrHandle, const Mask &Value);
 
+         Handle _to_handle (const String &Id);
+
+         Boolean _store_rev (const Handle ObjectHandle, const String &Rev);
+         Boolean _lookup_rev (const Handle ObjectHandle, String &rev);
+
+         Boolean _store_flag (
+            const Handle ObjectHandle,
+            const Handle AttributeHandle,
+            const Boolean Value);
+
+         Boolean _lookup_flag (const Handle ObjectHandle, const Handle AttributeHandle);
+
          Boolean _active (const Handle ObjectHandle);
          Boolean _update (const Handle ObjectHandle);
 
@@ -345,13 +369,20 @@ namespace dmz {
 
          Log _log;
          Definitions _defs;
+         StateEnum _state;
+         Boolean _tracking;
+         Boolean _online;
 
          WebServicesModule *_webservices;
          String _webservicesName;
 
          FilterStruct *_filterList;
 
-         Handle _defaultHandle;
+         Handle _defaultAttrHandle;
+         Handle _revAttrHandle;
+         Handle _dirtyAttrHandle;
+         Handle _publishAttrHandle;
+         Handle _fetchAttrHandle;
          HandleContainer _activeTable;
          HandleContainer _publishTable;
          StringContainer _fetchTable;
@@ -365,14 +396,13 @@ namespace dmz {
 
          Config _currentConfig;
          HashTableHandleTemplate<Config> _configTable;
-
          HashTableStringTemplate<ObjectLinkStruct> _objectLinkTable;
+         HashTableStringTemplate<String> _revisionTable;
 
          Int32 _lastSeq;
          Boolean _inDump;
          Boolean _inUpdate;
-         Boolean _upToDate;
-         Boolean _authenticated;
+         Boolean _authenticationRequired;
          Float64 _publishRate;
          Float64 _publishDelta;
 
