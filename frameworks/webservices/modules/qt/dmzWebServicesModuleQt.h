@@ -56,12 +56,16 @@ namespace dmz {
             Data *outData);
 
          // WebServicesModule Interface
+//         virtual Boolean set_channel (const String &Channel);
+
          virtual Boolean publish_config (
             const String &Id,
             const Config &Data,
             WebServicesObserver &obs);
 
-         virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs);
+         virtual Boolean fetch_config (
+            const String &Id,
+            WebServicesObserver &obs);
 
          virtual Boolean fetch_configs (
             const StringContainer &List,

@@ -268,7 +268,7 @@ dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
    _fetch_configs ();
    _publish_changes ();
 
-   _lastSeq = config_to_int32 ("last_seq", Updates);  
+   _lastSeq = config_to_int32 ("last_seq", Updates);
 
    if (_webservices) { _webservices->start_realtime_updates (*this, _lastSeq); }
 

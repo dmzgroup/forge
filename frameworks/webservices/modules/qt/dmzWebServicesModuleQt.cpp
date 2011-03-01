@@ -744,6 +744,9 @@ dmz::WebServicesModuleQt::_publish_document (
 
       doc.store_attribute ("runtime_id", _state.SysId.to_string ());
 
+      String type = config_to_string ("type", Data);
+      if (type) { doc.store_attribute ("object_type", type); }
+
       doc.store_attribute ("type", Data.get_name ());
 
       doc.add_config (Data);
