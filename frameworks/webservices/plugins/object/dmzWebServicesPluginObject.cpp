@@ -56,12 +56,13 @@ local_config_to_mask (Config config, Log &log) {
 dmz::WebServicesPluginObject::WebServicesPluginObject (const PluginInfo &Info, Config &local) :
       Plugin (Info),
       TimeSlice (Info),
-      WebServicesObserver (Info),
+      WebServicesCallback (Info),
       MessageObserver (Info),
       ObjectObserverUtil (Info, local),
       _log (Info),
       _defs (Info.get_context ()),
-      _state (StateOffline),
+      _appState (Info),
+      _appName (_appState.get_app_name ()),
       _tracking (True),
       _online (False),
       _webservices (0),
@@ -71,6 +72,9 @@ dmz::WebServicesPluginObject::WebServicesPluginObject (const PluginInfo &Info, C
       _dirtyAttrHandle (0),
       _publishAttrHandle (0),
       _fetchAttrHandle (0),
+      _userNameHandle (0),
+      _dbApp (0),
+      _dbStudent (0),
       _lastSeq (0),
       _inDump (False),
       _inUpdate (False),
@@ -159,15 +163,19 @@ dmz::WebServicesPluginObject::update_time_slice (const Float64 TimeDelta) {
 }
 
 
-// WebServicesObserver Interface
+// WebServicesCallback Interface
 void
 dmz::WebServicesPluginObject::handle_error (
+      const Handle Database,
       const String &Id,
       const Config &Data) {
 
-   const Handle ObjectHandle (_to_handle (Id));
-   _store_flag (ObjectHandle, _fetchAttrHandle, False);
-   _store_flag (ObjectHandle, _publishAttrHandle, False);
+   if (Database == _dbApp) {
+
+      const Handle ObjectHandle (_to_handle (Id));
+      _store_flag (ObjectHandle, _fetchAttrHandle, False);
+      _store_flag (ObjectHandle, _publishAttrHandle, False);
+   }
 
    if (config_to_boolean ("authentication-required", Data)) {
 
@@ -177,19 +185,31 @@ dmz::WebServicesPluginObject::handle_error (
    else if (config_to_boolean ("conflict", Data)) {
 
       _log.warn << "Config updated conflict." << endl;
-//      _fetch (Id);
+//      _fetch (Database, Id);
+   }
+   else {
+
+      if ((Database == _dbApp) && (Id == "_changes") && _webservices) {
+
+         _webservices->start_realtime_updates (_dbApp, *this, _lastSeq);
+      }
+      else {
+
+         _log.warn << "Unknown error." << endl;
+      }
    }
 
-   String error = config_to_string ("error", Data);
-   _log.error << "Error: " << error << endl;
+//   String error = config_to_string ("error", Data);
+//   _log.error << "Error: " << error << endl;
 
-   String reason = config_to_string ("reason", Data);
-   _log.error << "Reason: " << reason << endl;
+//   String reason = config_to_string ("reason", Data);
+//   _log.error << "Reason: " << reason << endl;
 }
 
 
 void
 dmz::WebServicesPluginObject::handle_publish_config (
+      const Handle Database,
       const String &Id,
       const String &Rev) {
 
@@ -202,21 +222,36 @@ dmz::WebServicesPluginObject::handle_publish_config (
 
 void
 dmz::WebServicesPluginObject::handle_fetch_config (
-   const String &Id,
-   const String &Rev,
-   const Config &Data) {
+      const Handle Database,
+      const String &Id,
+      const String &Rev,
+      const Config &Data) {
 
-   _config_to_object (Data);
+   if (Database == _dbApp) {
 
-   const Handle ObjectHandle (_to_handle (Id));
+      _config_to_object (Data);
 
-   _store_rev (ObjectHandle, Rev);
-   _store_flag (ObjectHandle, _fetchAttrHandle, False);
+      const Handle ObjectHandle (_to_handle (Id));
+
+      _store_rev (ObjectHandle, Rev);
+      _store_flag (ObjectHandle, _fetchAttrHandle, False);
+   }
+   else if (Database == _dbStudent) {
+
+      String db = config_to_string (_appName, Data);
+      if (db) { _dbApp = _defs.create_named_handle (db); }
+
+      if (!_online && _dbApp && _webservices) {
+
+         _webservices->fetch_updates (_dbApp, *this, _lastSeq);
+      }
+   }
 }
 
 
 void
 dmz::WebServicesPluginObject::handle_delete_config (
+      const Handle Database,
       const String &Id,
       const String &Rev) {
 
@@ -228,7 +263,9 @@ dmz::WebServicesPluginObject::handle_delete_config (
 
 
 void
-dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
+dmz::WebServicesPluginObject::handle_fetch_updates (
+      const Handle Database,
+      const Config &Updates) {
 
    StringContainer updatedList;
    StringContainer deletedList;
@@ -270,7 +307,10 @@ dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
 
    _lastSeq = config_to_int32 ("last_seq", Updates);
 
-   if (_webservices) { _webservices->start_realtime_updates (*this, _lastSeq); }
+   if (_webservices) {
+
+      _webservices->start_realtime_updates (_dbApp, *this, _lastSeq);
+   }
 
    _online = True;
 }
@@ -278,6 +318,7 @@ dmz::WebServicesPluginObject::handle_fetch_updates (const Config &Updates) {
 
 void
 dmz::WebServicesPluginObject::handle_realtime_update (
+      const Handle Database,
       const String &Id,
       const String &Rev,
       const Boolean &Deleted,
@@ -310,21 +351,34 @@ dmz::WebServicesPluginObject::receive_message (
 
    if (Type == _loginSuccessMsg) {
 
-      if (InData) {
+      if (_webservices) {
 
-//         String username;
-//         InData->lookup_string (_usernameHandle, 0, username);
+         if (_dbApp) {
+
+            if (!_online) { _webservices->fetch_updates (_dbApp, *this, _lastSeq); }
+         }
+         else if (InData) {
+
+            String userName;
+            if (InData->lookup_string (_userNameHandle, 0, userName)) {
+
+               if (userName && _dbStudent) {
+
+                  _webservices->fetch_config (_dbStudent, userName, *this);
+               }
+            }
+         }
       }
-
-      if (_webservices && !_online) { _webservices->fetch_updates (*this, _lastSeq); }
    }
    else if (Type == _loginFailedMsg) {
 
       _online = False;
+      _dbApp = 0;
    }
    else if (Type == _logoutMsg) {
 
       _online = False;
+      _dbApp = 0;
    }
 }
 
@@ -961,9 +1015,9 @@ dmz::WebServicesPluginObject::update_object_data (
 void
 dmz::WebServicesPluginObject::_publish_deletes () {
 
-   if (_webservices && _deleteTable.get_count ()) {
+   if (_webservices && _dbApp && _deleteTable.get_count ()) {
 
-      _webservices->delete_configs (_deleteTable, *this);
+      _webservices->delete_configs (_dbApp, _deleteTable, *this);
       _deleteTable.clear ();
    }
 }
@@ -972,7 +1026,7 @@ dmz::WebServicesPluginObject::_publish_deletes () {
 void
 dmz::WebServicesPluginObject::_publish_changes () {
 
-   if (_webservices && _publishTable.get_count ()) {
+   if (_publishTable.get_count ()) {
 
       HandleContainerIterator it;
       Handle objHandle (_publishTable.get_first (it));
@@ -1016,9 +1070,9 @@ dmz::WebServicesPluginObject::_fetch_configs () {
 
    Boolean result (False);
 
-   if (_webservices && _fetchTable.get_count ()) {
+   if (_webservices && _dbApp && _fetchTable.get_count ()) {
 
-      result = _webservices->fetch_configs (_fetchTable, *this);
+      result = _webservices->fetch_configs (_dbApp, _fetchTable, *this);
 
       StringContainerIterator it;
       String id;
@@ -1041,7 +1095,7 @@ dmz::WebServicesPluginObject::_publish (const Handle ObjectHandle) {
    Boolean result (False);
 
    ObjectModule *objMod (get_object_module ());
-   if (ObjectHandle && objMod && _webservices) {
+   if (ObjectHandle && objMod && _webservices && _dbApp) {
 
       if (!_lookup_flag (ObjectHandle, _publishAttrHandle)) {
 
@@ -1050,7 +1104,7 @@ dmz::WebServicesPluginObject::_publish (const Handle ObjectHandle) {
          if (doc && objMod->lookup_uuid (ObjectHandle, uuid)) {
 
             const String Id (uuid.to_string ());
-            result = _webservices->publish_config (Id, doc, *this);
+            result = _webservices->publish_config (_dbApp, Id, doc, *this);
             _store_flag (ObjectHandle, _publishAttrHandle, result);
          }
       }
@@ -1898,6 +1952,14 @@ dmz::WebServicesPluginObject::_init (Config &local) {
    _dirtyAttrHandle = _defs.create_named_handle ("_dirty");
    _publishAttrHandle = _defs.create_named_handle ("_publish");
    _fetchAttrHandle = _defs.create_named_handle ("_fetch");
+
+   _userNameHandle = config_to_named_handle (
+      "username.name", local, "username", context);
+
+   String dbName = config_to_string ("db.app", local);
+   if (dbName) { _dbApp = _defs.create_named_handle (dbName); }
+
+   _dbStudent = config_to_named_handle ("db.student", local, "students", context);
 
    _loginSuccessMsg = config_create_message (
       "message.login-success",

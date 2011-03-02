@@ -12,7 +12,7 @@ namespace dmz {
 
    class Data;
    class Message;
-   class WebServicesObserver;
+   class WebServicesCallback;
 
    class WebServicesModule {
 
@@ -25,32 +25,48 @@ namespace dmz {
          Handle get_webservices_module_handle () const;
 
          // WebServicesModule Interface
+         virtual Boolean is_valid_database (const Handle Database) = 0;
+         virtual String lookup_database_name_from_handle (const Handle Databse) = 0;
+
          virtual Boolean publish_config (
+            const Handle Database,
             const String &Id,
             const Config &Data,
-            WebServicesObserver &obs) = 0;
+            WebServicesCallback &cb) = 0;
 
-         virtual Boolean fetch_config (const String &Id, WebServicesObserver &obs) = 0;
+         virtual Boolean fetch_config (
+            const Handle Database,
+            const String &Id,
+            WebServicesCallback &cb) = 0;
 
          virtual Boolean fetch_configs (
+            const Handle Database,
             const StringContainer &List,
-            WebServicesObserver &obs) = 0;
+            WebServicesCallback &cb) = 0;
 
-         virtual Boolean delete_config (const String &Id, WebServicesObserver &obs) = 0;
+         virtual Boolean delete_config (
+            const Handle Database,
+            const String &Id,
+            WebServicesCallback &cb) = 0;
 
          virtual Boolean delete_configs (
+            const Handle Database,
             const StringContainer &List,
-            WebServicesObserver &obs) = 0;
+            WebServicesCallback &cb) = 0;
 
          virtual Boolean fetch_updates (
-            WebServicesObserver &obs,
+            const Handle Database,
+            WebServicesCallback &cb,
             const Int32 Since) = 0;
 
          virtual Boolean start_realtime_updates (
-            WebServicesObserver &obs,
+            const Handle Database,
+            WebServicesCallback &cb,
             const Int32 Since = 0) = 0;
 
-         virtual Boolean stop_realtime_updates (WebServicesObserver &obs) = 0;
+         virtual Boolean stop_realtime_updates (
+            const Handle Database,
+            WebServicesCallback &cb) = 0;
 
       protected:
          WebServicesModule (const PluginInfo &Info);

@@ -1,6 +1,7 @@
 #ifndef DMZ_WEB_SERVICES_PLUGIN_OBJECT_DOT_H
 #define DMZ_WEB_SERVICES_PLUGIN_OBJECT_DOT_H
 
+#include <dmzApplicationState.h>
 #include <dmzObjectObserverUtil.h>
 #include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimeLog.h>
@@ -12,7 +13,7 @@
 #include <dmzTypesHashTableHandleTemplate.h>
 #include <dmzTypesHashTableStringTemplate.h>
 #include <dmzTypesHashTableUUIDTemplate.h>
-#include <dmzWebServicesObserver.h>
+#include <dmzWebServicesCallback.h>
 
 
 namespace dmz {
@@ -22,7 +23,7 @@ namespace dmz {
    class WebServicesPluginObject :
          public Plugin,
          public TimeSlice,
-         public WebServicesObserver,
+         public WebServicesCallback,
          public MessageObserver,
          public ObjectObserverUtil {
 
@@ -42,25 +43,34 @@ namespace dmz {
          // TimeSlice Interface
          virtual void update_time_slice (const Float64 TimeDelta);
 
-         // WebServicesObserver Interface
-         virtual void handle_error (const String &Id, const Config &Data);
+         // WebServicesCallback Interface
+         virtual void handle_error (
+            const Handle Database,
+            const String &Id,
+            const Config &Data);
 
          virtual void handle_publish_config (
+            const Handle Database,
             const String &Id,
             const String &Rev);
 
          virtual void handle_fetch_config (
+            const Handle Database,
             const String &Id,
             const String &Rev,
             const Config &Data);
 
          virtual void handle_delete_config (
+            const Handle Database,
             const String &Id,
             const String &Rev);
 
-         virtual void handle_fetch_updates (const Config &Updates);
+         virtual void handle_fetch_updates (
+            const Handle Database,
+            const Config &Updates);
 
          virtual void handle_realtime_update (
+            const Handle Database,
             const String &Id,
             const String &Rev,
             const Boolean &Deleted,
@@ -241,12 +251,6 @@ namespace dmz {
             const Data *PreviousValue);
 
       protected:
-         enum StateEnum {
-            StateOffline,
-            StateOnline,
-            StateSync,
-         };
-
          struct FilterAttrStruct {
 
             const String Name;
@@ -369,36 +373,34 @@ namespace dmz {
 
          Log _log;
          Definitions _defs;
-         StateEnum _state;
+         ApplicationState _appState;
+         String _appName;
          Boolean _tracking;
          Boolean _online;
-
          WebServicesModule *_webservices;
          String _webservicesName;
-
          FilterStruct *_filterList;
-
          Handle _defaultAttrHandle;
          Handle _revAttrHandle;
          Handle _dirtyAttrHandle;
          Handle _publishAttrHandle;
          Handle _fetchAttrHandle;
+         Handle _userNameHandle;
+         Handle _dbApp;
+         Handle _dbStudent;
          HandleContainer _activeTable;
          HandleContainer _publishTable;
          StringContainer _fetchTable;
          StringContainer _deleteTable;
          StringContainer _pendingPublishTable;
          StringContainer _pendingFetchTable;
-
          Message _loginSuccessMsg;
          Message _loginFailedMsg;
          Message _logoutMsg;
-
          Config _currentConfig;
          HashTableHandleTemplate<Config> _configTable;
          HashTableStringTemplate<ObjectLinkStruct> _objectLinkTable;
          HashTableStringTemplate<String> _revisionTable;
-
          Int32 _lastSeq;
          Boolean _inDump;
          Boolean _inUpdate;

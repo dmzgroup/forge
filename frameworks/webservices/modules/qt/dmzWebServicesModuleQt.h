@@ -7,7 +7,7 @@
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
 #include <dmzWebServicesModule.h>
-#include <dmzWebServicesObserver.h>
+#include <dmzWebServicesCallback.h>
 #include <QtCore/QObject>
 #include <QtNetwork/QNetworkReply>
 
@@ -27,7 +27,7 @@ namespace dmz {
          public TimeSlice,
          public MessageObserver,
          public WebServicesModule,
-         public WebServicesObserver {
+         public WebServicesCallback {
 
       Q_OBJECT
 
@@ -56,49 +56,77 @@ namespace dmz {
             Data *outData);
 
          // WebServicesModule Interface
-//         virtual Boolean set_channel (const String &Channel);
+         virtual Boolean is_valid_database (const Handle Database);
+         virtual String lookup_database_name_from_handle (const Handle Databse);
 
          virtual Boolean publish_config (
+            const Handle Database,
             const String &Id,
             const Config &Data,
-            WebServicesObserver &obs);
+            WebServicesCallback &cb);
 
          virtual Boolean fetch_config (
+            const Handle Database,
             const String &Id,
-            WebServicesObserver &obs);
+            WebServicesCallback &cb);
 
          virtual Boolean fetch_configs (
+            const Handle Database,
             const StringContainer &List,
-            WebServicesObserver &obs);
+            WebServicesCallback &cb);
 
-         virtual Boolean delete_config (const String  &Id, WebServicesObserver &obs);
+         virtual Boolean delete_config (
+            const Handle Database,
+            const String  &Id,
+            WebServicesCallback &cb);
 
          virtual Boolean delete_configs (
+            const Handle Database,
             const StringContainer &List,
-            WebServicesObserver &obs);
+            WebServicesCallback &cb);
 
-         virtual Boolean fetch_updates (WebServicesObserver &obs, const Int32 Since);
-
-         virtual Boolean start_realtime_updates (
-            WebServicesObserver &obs,
+         virtual Boolean fetch_updates (
+            const Handle Database,
+            WebServicesCallback &cb,
             const Int32 Since);
 
-         virtual Boolean stop_realtime_updates (WebServicesObserver &obs);
+         virtual Boolean start_realtime_updates (
+            const Handle Database,
+            WebServicesCallback &cb,
+            const Int32 Since);
 
-         // WebServicesObserver Interface
-         virtual void handle_error (const String &Id, const Config &Data);
+         virtual Boolean stop_realtime_updates (
+            const Handle Database,
+            WebServicesCallback &cb);
 
-         virtual void handle_publish_config (const String &Id, const String &Rev) {;}
+         // WebServicesCallback Interface
+         virtual void handle_error (
+            const Handle Database,
+            const String &Id,
+            const Config &Data);
+
+         virtual void handle_publish_config (
+            const Handle Database,
+            const String &Id,
+            const String &Rev) {;}
 
          virtual void handle_fetch_config (
+            const Handle Database,
             const String &Id,
             const String &Rev,
             const Config &Data) {;}
 
-         virtual void handle_delete_config (const String &Id, const String &Rev) {;}
-         virtual void handle_fetch_updates (const Config &Updates) {;}
+         virtual void handle_delete_config (
+            const Handle Database,
+            const String &Id,
+            const String &Rev) {;}
+
+         virtual void handle_fetch_updates (
+            const Handle Database,
+            const Config &Updates) {;}
 
          virtual void handle_realtime_update (
+            const Handle Database,
             const String &Id,
             const String &Rev,
             const Boolean &Deleted,
@@ -118,6 +146,7 @@ namespace dmz {
          void _reply_finished (const UInt64 RequestId, QNetworkReply *reply);
 
       protected:
+         struct DatabaseStruct;
          struct DocStruct;
          struct RequestStruct;
 
@@ -127,18 +156,28 @@ namespace dmz {
          RequestStruct *_publish_session (const Handle SessionHandle);
 
          RequestStruct *_publish_document (
+            const Handle Database,
             const String &Id,
             const Config &Data,
-            WebServicesObserver &obs);
+            WebServicesCallback &cb);
 
          void _fetch_session ();
          void _delete_session ();
+         void _fetch_dbs ();
 
-         RequestStruct *_fetch_document (const String &Id, WebServicesObserver &obs);
-         RequestStruct *_delete_document (const String &Id, WebServicesObserver &obs);
+         RequestStruct *_fetch_document (
+            const Handle Database,
+            const String &Id,
+            WebServicesCallback &cb);
+
+         RequestStruct *_delete_document (
+            const Handle Database,
+            const String &Id,
+            WebServicesCallback &cb);
 
          RequestStruct *_fetch_changes (
-            WebServicesObserver &obs,
+            const Handle Database,
+            WebServicesCallback &cb,
             const Int32 Since);
 
          void _document_published (RequestStruct &request);
@@ -147,12 +186,12 @@ namespace dmz {
          void _document_deleted (RequestStruct &request);
          void _changes_fetched (RequestStruct &request);
          void _session_posted (RequestStruct &request);
+         void _dbs_fetched (RequestStruct &request);
 
          Boolean _handle_continuous_feed (RequestStruct &request);
-
          Boolean _authenticate (const Boolean GetSession = True);
 
-         QUrl _get_url (const String &EndPoint) const;
+         QUrl _get_url (const String &Database, const String &EndPoint) const;
          QUrl _get_root_url (const String &EndPoint) const;
 
          void _init (Config &local);

@@ -2,5 +2,5 @@ lmk.set_name "dmzWebServicesFramework"
 lmk.add_files {
    "dmzWebServicesConsts.h",
    "dmzWebServicesModule.h",
-   "dmzWebServicesObserver.h",
+   "dmzWebServicesCallback.h",
 }
