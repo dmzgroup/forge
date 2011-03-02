@@ -813,12 +813,12 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
       case PublishDocument: _document_published (request); break;
       case DeleteDocument: _document_deleted (request); break;
       case FetchChanges: _changes_fetched (request); break;
+      case FetchDatabases: _dbs_fetched (request); break;
       case PostSession: _session_posted (request); break;
       case DeleteSession:
          _state.loggedIn = False;
          _state.logoutMsg.send ();
          break;
-      case FetchDatabases: _dbs_fetched (request); break;
    }
 }
 
