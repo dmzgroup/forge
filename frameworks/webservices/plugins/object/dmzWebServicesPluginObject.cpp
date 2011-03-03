@@ -72,7 +72,7 @@ dmz::WebServicesPluginObject::WebServicesPluginObject (const PluginInfo &Info, C
       _dirtyAttrHandle (0),
       _publishAttrHandle (0),
       _fetchAttrHandle (0),
-      _userNameHandle (0),
+      _nameHandle (0),
       _dbApp (0),
       _dbStudent (0),
       _lastSeq (0),
@@ -360,7 +360,7 @@ dmz::WebServicesPluginObject::receive_message (
          else if (InData) {
 
             String userName;
-            if (InData->lookup_string (_userNameHandle, 0, userName)) {
+            if (InData->lookup_string (_nameHandle, 0, userName)) {
 
                if (userName && _dbStudent) {
 
@@ -1953,8 +1953,8 @@ dmz::WebServicesPluginObject::_init (Config &local) {
    _publishAttrHandle = _defs.create_named_handle ("_publish");
    _fetchAttrHandle = _defs.create_named_handle ("_fetch");
 
-   _userNameHandle = config_to_named_handle (
-      "username.name", local, "username", context);
+   _nameHandle = config_to_named_handle (
+      "attribute.name", local, "name", context);
 
    String dbName = config_to_string ("db.app", local);
    if (dbName) { _dbApp = _defs.create_named_handle (dbName); }

@@ -23,7 +23,7 @@ namespace dmz {
    const char WebServicesLoginFailedMessageName[]   = "LoginFailedMessage";
    const char WebServicesLogoutMessageName[]        = "LogoutMessage";
 
-   const char WebServicesAttributeUserName[]        = "username";
+   const char WebServicesAttributeUserName[]        = "name";
    const char WebServicesAttributePassword[]        = "password";
    const char WebServicesAttributeIdName[]          = "_id";
    const char WebServicesAttributeRevName[]         = "_rev";

@@ -40,7 +40,7 @@ dmz::QtPluginLoginDialog::QtPluginLoginDialog (const PluginInfo &Info, Config &l
       _log (Info),
       _mainWindowModule (0),
       _mainWindowModuleName (),
-      _usernameHandle (0),
+      _nameHandle (0),
       _passwordHandle (0),
       _targetHandle (0),
       _loggedIn (False),
@@ -172,7 +172,6 @@ dmz::QtPluginLoginDialog::receive_message (
 
    if (Type == _loginRequiredMsg) {
 
-      _log.warn << "_loginRequired" << endl;
       if (_loginDialog) {
 
          if (_autoLogin) { _slot_dialog_accepted (); }
@@ -184,7 +183,7 @@ dmz::QtPluginLoginDialog::receive_message (
       if (InData) {
 
          String username;
-         InData->lookup_string (_usernameHandle, 0, username);
+         InData->lookup_string (_nameHandle, 0, username);
       }
 
       _loggedIn = True;
@@ -208,7 +207,7 @@ dmz::QtPluginLoginDialog::_slot_dialog_accepted () {
       String username = qPrintable (_ui.usernameLineEdit->text ());
       String password = qPrintable (_ui.passwordLineEdit->text ());
 
-      data.store_string (_usernameHandle, 0, username);
+      data.store_string (_nameHandle, 0, username);
       data.store_string (_passwordHandle, 0, password);
 
       _loginMsg.send (_targetHandle, &data);
@@ -219,7 +218,7 @@ dmz::QtPluginLoginDialog::_slot_dialog_accepted () {
 void
 dmz::QtPluginLoginDialog::_slot_dialog_rejected () {
 
-   _log.error << "dialog rejected" << endl;
+   // _log.error << "dialog rejected" << endl;
 }
 
 
@@ -231,11 +230,11 @@ dmz::QtPluginLoginDialog::_init (Config &local) {
 
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
-   _usernameHandle = config_to_named_handle (
-      "username.name", local, "username", context);
+   _nameHandle = config_to_named_handle (
+      "attribute.name", local, "name", context);
 
    _passwordHandle = config_to_named_handle (
-      "password.name", local, "password", context);
+      "attribute.password", local, "password", context);
 
    _loginRequiredMsg = config_create_message (
       "message.login-required",

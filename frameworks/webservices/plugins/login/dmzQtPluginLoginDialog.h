@@ -53,7 +53,7 @@ namespace dmz {
          Log _log;
          QtModuleMainWindow *_mainWindowModule;
          String _mainWindowModuleName;
-         Handle _usernameHandle;
+         Handle _nameHandle;
          Handle _passwordHandle;
          Handle _targetHandle;
          Message _loginRequiredMsg;

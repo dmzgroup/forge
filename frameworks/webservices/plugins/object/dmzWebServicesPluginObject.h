@@ -385,7 +385,7 @@ namespace dmz {
          Handle _dirtyAttrHandle;
          Handle _publishAttrHandle;
          Handle _fetchAttrHandle;
-         Handle _userNameHandle;
+         Handle _nameHandle;
          Handle _dbApp;
          Handle _dbStudent;
          HandleContainer _activeTable;

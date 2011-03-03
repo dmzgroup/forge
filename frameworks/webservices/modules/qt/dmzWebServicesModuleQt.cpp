@@ -143,7 +143,7 @@ struct dmz::WebServicesModuleQt::State {
    String serverPath;
    String dateFormat;
    QAuthenticator auth;
-   Handle usernameHandle;
+   Handle nameHandle;
    Handle passwordHandle;
    Handle targetHandle;
    Message loginRequiredMsg;
@@ -186,7 +186,7 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       serverUrl (LocalHost),
       serverPath ("/"),
       dateFormat ("ddd, dd MMM yyyy HH:mm:ss 'G''M''T'"),
-      usernameHandle (0),
+      nameHandle (0),
       passwordHandle (0),
       targetHandle (0),
       fetchChangesDelta (0),
@@ -425,22 +425,22 @@ dmz::WebServicesModuleQt::receive_message (
 
       if (InData) {
 
-         String username;
-         InData->lookup_string (_state.usernameHandle, 0, username);
+         String name;
+         InData->lookup_string (_state.nameHandle, 0, name);
 
          String password;
          InData->lookup_string (_state.passwordHandle, 0, password);
 
-         if (username && password) {
+         if (name && password) {
 
-            _state.auth.setUser (username.get_buffer ());
+            _state.auth.setUser (name.get_buffer ());
             _state.auth.setPassword (password.get_buffer ());
 
             _fetch_session ();
          }
          else {
 
-            _state.log.warn << "A username and password are both needed to login."
+            _state.log.warn << "A user name and password are both needed to login."
                             << endl;
 
             _state.loginFailedMsg.send ();
@@ -647,7 +647,27 @@ dmz::WebServicesModuleQt::stop_realtime_updates (
    const Handle Database,
    WebServicesCallback &cb) {
 
-   _state.log.error << "NOT IMPLEMENTED YET!!!!" << endl;
+   Boolean result (False);
+
+   if (is_valid_database (Database)) {
+
+      HashTableUInt64Iterator it;
+      RequestStruct *request (_state.feedTable.get_first (it));
+
+      _state.log.error << "NOT IMPLEMENTED YET!!!!" << endl;
+
+      while (request) {
+
+         if (request->cb.get_webservices_callback_handle () ==
+               cb.get_webservices_callback_handle ()) {
+
+         }
+
+         request = _state.feedTable.get_next (it);
+      }
+   }
+
+   return result;
 }
 
 
@@ -686,7 +706,8 @@ dmz::WebServicesModuleQt::_reply_download_progress (
    if (feed && reply) {
 
       Boolean done = False;
-      QByteArray data = reply->readLine (bytesReceived);
+
+      QByteArray data = reply->readLine ();
       while (!data.isEmpty () && !done) {
 
          String jsonData (data.constData ());
@@ -775,6 +796,8 @@ dmz::WebServicesModuleQt::_reply_finished (
          }
       }
       else {
+
+         _state.feedTable.remove (request->Id);
 
          String reason = qPrintable (reply->errorString ());
 
@@ -1284,7 +1307,7 @@ out << "<<<<< [" << request.Id << "]"
       _state.log.info << "Welcome " << name << " you have logged in." << endl;
 
       Data data;
-      data.store_string (_state.usernameHandle, 0, name);
+      data.store_string (_state.nameHandle, 0, name);
 
       _state.loginSuccessMsg.send (&data);
    }
@@ -1384,15 +1407,15 @@ dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
       _state.loginRequiredMsg.send (_state.targetHandle, &inData, &outData);
       if (outData) {
 
-         String username;
-         outData.lookup_string (_state.usernameHandle, 0, username);
+         String name;
+         outData.lookup_string (_state.nameHandle, 0, name);
 
          String password;
          outData.lookup_string (_state.passwordHandle, 0, password);
 
-         if (username && password) {
+         if (name && password) {
 
-            _state.auth.setUser (username.get_buffer ());
+            _state.auth.setUser (name.get_buffer ());
             _state.auth.setPassword (password.get_buffer ());
 
             if (GetSession) { _fetch_session (); }
@@ -1445,14 +1468,14 @@ dmz::WebServicesModuleQt::_init (Config &local) {
 
    _state.dateFormat = config_to_string ("date-format.value", local, _state.dateFormat);
 
-   _state.usernameHandle = config_to_named_handle (
-      "username.name",
+   _state.nameHandle = config_to_named_handle (
+      "attribute.name",
       local,
       WebServicesAttributeUserName,
       context);
 
    _state.passwordHandle = config_to_named_handle (
-      "password.name",
+      "attribute.password",
       local,
       WebServicesAttributePassword,
       context);
