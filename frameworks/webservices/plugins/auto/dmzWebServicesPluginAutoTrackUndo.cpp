@@ -77,18 +77,13 @@ dmz::WebServicesPluginAutoTrackUndo::update_recording_state (
       if (RecordingState == UndoRecordingStateStart) {
 
          String nextUndo, nextRedo;
-         _undo.get_current_undo_names (nextUndo, nextRedo);
+//         _undo.get_current_undo_names (nextUndo, nextRedo);
 //         _sessionHandle = _webservices->start_session (nextUndo);
 //         _log.error << "Start: " << nextUndo << " : " << _sessionHandle << endl;
       }
       else if (RecordingState == UndoRecordingStateStop) {
 
 //         _webservices->stop_session (_sessionHandle);
-         _sessionHandle = 0;
-      }
-      else if (RecordingState == UndoRecordingStateAbort) {
-
-//         _webservices->abort_session (_sessionHandle);
          _sessionHandle = 0;
       }
    }
