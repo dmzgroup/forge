@@ -133,7 +133,7 @@ ForgeQtExtAppShellResources::State::init_cache_dir () {
       if (!is_valid_path (cacheDir)) {
 
          create_directory (cacheDir);
-         log.info << "Created applicatoin cache dir: " << cacheDir << endl;
+         log.info << "Created application cache dir: " << cacheDir << endl;
       }
 
       retVal = True;
