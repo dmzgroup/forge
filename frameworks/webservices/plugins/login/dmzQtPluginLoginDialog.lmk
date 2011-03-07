@@ -5,5 +5,5 @@ lmk.add_files {"LoginDialog.ui",}
 lmk.add_files ({"dmzQtPluginLoginDialog.h",},{src="moc"})
 lmk.add_files {"dmzQtPluginLoginDialog.cpp",}
 lmk.add_libs {"dmzQtUtil","dmzKernel",}
-lmk.add_preqs {"dmzQtFramework",}
+lmk.add_preqs {"dmzWebServicesFramework", "dmzQtFramework",}
 lmkQt.add_libs {"QtCore","QtGui",}

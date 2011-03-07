@@ -1964,19 +1964,19 @@ dmz::WebServicesPluginObject::_init (Config &local) {
    _loginSuccessMsg = config_create_message (
       "message.login-success",
       local,
-      "LoginSuccessMessage",
+      WebServicesLoginSuccessMessageName,
        context);
 
    _loginFailedMsg = config_create_message (
       "message.login-failed",
       local,
-      "LoginFailedMessage",
+      WebServicesLoginFailedMessageName,
        context);
 
    _logoutMsg = config_create_message (
       "message.logout",
       local,
-      "LogoutMessage",
+      WebServicesLogoutMessageName,
        context);
 
    subscribe_to_message (_loginSuccessMsg);

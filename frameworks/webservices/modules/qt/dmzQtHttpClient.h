@@ -15,6 +15,8 @@ class QUrl;
 
 namespace dmz {
 
+   class QtNetworkCookieJar;
+
    class QtHttpClient: public QObject {
 
       Q_OBJECT
@@ -95,8 +97,9 @@ namespace dmz {
 
       protected:
          Log _log;
+         RuntimeContext *_context;
+         QtNetworkCookieJar *_cookieJar;
          QNetworkAccessManager *_manager;
-
          UInt64 _requestCounter;
          QMap<UInt64, QNetworkReply *> _replyMap;
          QMap<QByteArray, QByteArray> _defaultHeaders;

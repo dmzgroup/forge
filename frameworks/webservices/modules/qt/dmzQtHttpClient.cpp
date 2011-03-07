@@ -1,7 +1,10 @@
 #include "dmzQtHttpClient.h"
+#include "dmzQtNetworkCookieJar.h"
+#include <dmzRuntimeSession.h>
 #include <QtCore/QUrl>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QSslError>
+#include <QtNetwork/QSslConfiguration>
 #include <QtCore/QDebug>
 
 
@@ -30,9 +33,13 @@ namespace {
 dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
       QObject (parent),
       _log (Info),
+      _context (Info.get_context ()),
       _requestCounter (1000) {
 
+   _cookieJar = new QtNetworkCookieJar (this);
    _manager = new QNetworkAccessManager (this);
+
+   _manager->setCookieJar (_cookieJar);
 
    connect (
       _manager, SIGNAL (authenticationRequired (QNetworkReply *, QAuthenticator *)),
@@ -49,6 +56,12 @@ dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
    _defaultHeaders.insert ("User-Agent", LocalUserAgentName);
    _defaultHeaders.insert ("Accept", LocalApplicationJson);
    _defaultHeaders.insert ("Content-Type", LocalApplicationJson);
+
+   if (_cookieJar) {
+
+      Config session (get_session_config ("QtHttpClient", _context));
+      _cookieJar->load_cookies (session);
+   }
 }
 
 
@@ -59,6 +72,16 @@ dmz::QtHttpClient::~QtHttpClient () {
       abort_all ();
       _manager->deleteLater ();
       _manager = 0;
+   }
+
+   if (_cookieJar) {
+
+      Config session ("QtHttpClient");
+      _cookieJar->save_cookies (session);
+      set_session_config (_context, session);
+
+      delete _cookieJar;
+      _cookieJar = 0;
    }
 }
 
@@ -396,6 +419,12 @@ dmz::QtHttpClient::_ssl_errors (QNetworkReply *reply, const QList<QSslError> &Er
 
 //         }
 //      }
+
+      QString commonName =
+         reply->sslConfiguration().peerCertificate().issuerInfo (
+            QSslCertificate::CommonName);
+
+      _log.warn << "[ssl] server host: " << qPrintable (commonName) << endl;
 
       reply->ignoreSslErrors ();
    }

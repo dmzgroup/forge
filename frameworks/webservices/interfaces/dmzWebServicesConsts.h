@@ -17,16 +17,17 @@ namespace dmz {
 //! \addtogroup WebServices
 //! @{
 
-   const char WebServicesLoginRequiredMessageName[] = "LoginRequiredMessage";
-   const char WebServicesLoginMessageName[]         = "LoginMessage";
-   const char WebServicesLoginSuccessMessageName[]  = "LoginSuccessMessage";
-   const char WebServicesLoginFailedMessageName[]   = "LoginFailedMessage";
-   const char WebServicesLogoutMessageName[]        = "LogoutMessage";
+   const char WebServicesLoginRequiredMessageName[] = "Login_Required_Message";
+   const char WebServicesLoginMessageName[]         = "Login_Message";
+   const char WebServicesLoginSuccessMessageName[]  = "Login_Success_Message";
+   const char WebServicesLoginFailedMessageName[]   = "Login_Failed_Message";
+   const char WebServicesLogoutMessageName[]        = "Logout_Message";
 
+   const char WebServicesAttributeAdminName[]       = "admin";
    const char WebServicesAttributeUserName[]        = "name";
-   const char WebServicesAttributePassword[]        = "password";
+   const char WebServicesAttributePasswordName[]    = "password";
    const char WebServicesAttributeIdName[]          = "_id";
-   const char WebServicesAttributeRevName[]         = "_rev";
+   const char WebServicesAttributeRevisionName[]    = "_rev";
    const char WebServicesAttributeTypeName[]        = "type";
 };
 

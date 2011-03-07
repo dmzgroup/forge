@@ -1,3 +1,4 @@
+#include <dmzFoundationBase64.h>
 #include <dmzFoundationJSONUtil.h>
 #include <dmzObjectAttributeMasks.h>
 #include <dmzObjectModule.h>
@@ -46,6 +47,8 @@ namespace {
       FetchChanges,
       FetchChangesContinuous,
       FetchDatabases,
+      FetchSession,
+      FetchUser,
       FetchDocument,
       FetchMultipleDocuments,
       PostSession,
@@ -143,6 +146,8 @@ struct dmz::WebServicesModuleQt::State {
    String serverPath;
    String dateFormat;
    QAuthenticator auth;
+   Boolean autoLogin;
+   Handle adminHandle;
    Handle nameHandle;
    Handle passwordHandle;
    Handle targetHandle;
@@ -152,6 +157,7 @@ struct dmz::WebServicesModuleQt::State {
    Message loginFailedMsg;
    Message logoutMsg;
    Boolean loggedIn;
+   Boolean fetchingSession;
    HashTableHandleTemplate<String> databaseNameTable;
    HashTableHandleTemplate<DatabaseStruct> databaseDocTable;
    HashTableUInt64Template<RequestStruct> requestTable;
@@ -160,6 +166,7 @@ struct dmz::WebServicesModuleQt::State {
    Int32 lastSeq;
    Float64 fetchChangesDelta;
    RequestStruct *request;
+   QQueue<RequestTypeEnum> requestQueue;
 
    State (const PluginInfo &Info);
    ~State ();
@@ -186,6 +193,8 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       serverUrl (LocalHost),
       serverPath ("/"),
       dateFormat ("ddd, dd MMM yyyy HH:mm:ss 'G''M''T'"),
+      autoLogin (False),
+      adminHandle (0),
       nameHandle (0),
       passwordHandle (0),
       targetHandle (0),
@@ -297,7 +306,10 @@ dmz::WebServicesModuleQt::State::get_request (
 }
 
 
-dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &local) :
+dmz::WebServicesModuleQt::WebServicesModuleQt (
+      const PluginInfo &Info,
+      Config &local,
+      Config &global) :
       QObject (0),
       Plugin (Info),
       TimeSlice (Info),
@@ -345,6 +357,7 @@ dmz::WebServicesModuleQt::WebServicesModuleQt (const PluginInfo &Info, Config &l
    // _state.syncTimer.start (1000);
 
    _init (local);
+   _init_login (global);
 }
 
 
@@ -362,7 +375,7 @@ dmz::WebServicesModuleQt::update_plugin_state (
 
    if (State == PluginStateInit) {
 
-      _fetch_dbs ();
+      _fetch_all_dbs ();
    }
    else if (State == PluginStateStart) {
 
@@ -409,6 +422,8 @@ dmz::WebServicesModuleQt::update_time_slice (const Float64 TimeDelta) {
 //         _state.continuousFeed = _fetch_changes (_state.lastSeq, True);
 //      }
 //   }
+
+   stop_time_slice ();
 }
 
 
@@ -436,7 +451,7 @@ dmz::WebServicesModuleQt::receive_message (
             _state.auth.setUser (name.get_buffer ());
             _state.auth.setPassword (password.get_buffer ());
 
-            _fetch_session ();
+            _post_session ();
          }
          else {
 
@@ -695,6 +710,41 @@ dmz::WebServicesModuleQt::_authenticate (
    }
 }
 
+
+dmz::Boolean
+dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
+
+   if (!_state.loggedIn) {
+
+      Data inData;
+      Data outData;
+
+      _state.loginRequiredMsg.send (_state.targetHandle, &inData, &outData);
+      if (outData) {
+
+         String name;
+         outData.lookup_string (_state.nameHandle, 0, name);
+
+         String password;
+         outData.lookup_string (_state.passwordHandle, 0, password);
+
+         if (name && password) {
+
+            _state.auth.setUser (name.get_buffer ());
+            _state.auth.setPassword (password.get_buffer ());
+
+            if (GetSession) { _post_session (); }
+         }
+         else {
+
+         }
+      }
+   }
+
+   return _state.loggedIn;
+}
+
+
 void
 dmz::WebServicesModuleQt::_reply_download_progress (
       const UInt64 RequestId,
@@ -831,13 +881,15 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
 
    switch (request.Type) {
 
-      case FetchDocument: _document_fetched (request); break;
-      case FetchMultipleDocuments: _documents_fetched (request); break;
-      case PublishDocument: _document_published (request); break;
-      case DeleteDocument: _document_deleted (request); break;
-      case FetchChanges: _changes_fetched (request); break;
-      case FetchDatabases: _dbs_fetched (request); break;
-      case PostSession: _session_posted (request); break;
+      case FetchDocument: _handle_fetch_document (request); break;
+      case FetchMultipleDocuments: _handle_fetch_documents (request); break;
+      case PublishDocument: _handle_publish_document (request); break;
+      case DeleteDocument: _handle_delete_document (request); break;
+      case FetchChanges: _handle_fetch_changes (request); break;
+      case FetchDatabases: _handle_fetch_all_dbs (request); break;
+      case FetchUser: _handle_fetch_user (request); break;
+      case PostSession: _handle_post_session (request); break;
+      case FetchSession: _handle_fetch_session (request); break;
       case DeleteSession:
          _state.loggedIn = False;
          _state.logoutMsg.send ();
@@ -937,7 +989,92 @@ out << ">>>>> [" << requestId << "]  PUT: " << db << ": " << Id << endl;
 
 
 void
+dmz::WebServicesModuleQt::_handle_publish_document (RequestStruct &request) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<<<<< [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " PUBLISH: " << lookup_database_name_from_handle (request.Database)
+    << ": " << request.DocId << endl;
+#endif
+
+   String docId = config_to_string ("id", request.data);
+
+   if (request.DocId == docId) {
+
+      request.docRev = config_to_string ("rev", request.data);
+
+      request.cb.handle_publish_config (
+         request.Database,
+         request.DocId,
+         request.docRev);
+   }
+   else {
+
+      _handle_error (request);
+   }
+}
+
+
+void
 dmz::WebServicesModuleQt::_fetch_session () {
+
+   if (_state.client) {
+
+      const String DocId ("_session");
+      QUrl url (_get_root_url (DocId));
+
+      UInt64 requestId = _state.client->get (url);
+      if (requestId) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "] GET: " << DocId << endl;
+#endif
+
+         _state.get_request (requestId, FetchSession, 0, DocId, *this);
+      }
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_handle_fetch_session (RequestStruct &request) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<<<<< [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " SESSION" << endl;
+#endif
+
+   Boolean authenticated (False);
+
+   if (config_to_boolean ("ok", request.data)) {
+
+      String authHandler = config_to_string ("info.authenticated", request.data);
+
+      if (authHandler) {
+
+         _state.log.info << "AuthHandler: " << authHandler << endl;
+      }
+
+      Config user;
+      if (request.data.lookup_config ("userCtx", user)) {
+
+         String name = config_to_string ("name", user);
+         if (name) {
+
+            _login_user (user);
+            authenticated = True;
+         }
+      }
+   }
+
+   if (!authenticated) { _authenticate (); }
+}
+
+
+void
+dmz::WebServicesModuleQt::_post_session () {
 
    if (_state.client) {
 
@@ -968,6 +1105,27 @@ out << ">>>>> [" << requestId << "] POST: " << DocId << endl;
 
 
 void
+dmz::WebServicesModuleQt::_handle_post_session (RequestStruct &request) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<<<<< [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " SESSION" << endl;
+#endif
+
+   if (config_to_boolean ("ok", request.data)) {
+
+      _login_user (request.data);
+   }
+   else {
+
+      _state.loggedIn = False;
+      _state.loginFailedMsg.send ();
+   }
+}
+
+
+void
 dmz::WebServicesModuleQt::_delete_session () {
 
    if (_state.client) {
@@ -989,7 +1147,7 @@ out << ">>>>> [" << requestId << "]  DEL: " << DocId << endl;
 
 
 void
-dmz::WebServicesModuleQt::_fetch_dbs () {
+dmz::WebServicesModuleQt::_fetch_all_dbs () {
 
    if (_state.client) {
 
@@ -1005,6 +1163,86 @@ out << ">>>>> [" << requestId << "]  GET: " << DocId << endl;
 
          _state.get_request (requestId, FetchDatabases, 0, DocId, *this);
       }
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_handle_fetch_all_dbs (RequestStruct &request) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<<<<< [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " ALL DBS" << endl;
+#endif
+
+   ConfigIterator it;
+   Config cd;
+   while (request.data.get_next_config (it, cd)) {
+
+      String db;
+      if (cd.lookup_attribute ("value", db)) {
+
+         Handle handle = _state.defs.create_named_handle (db);
+         String *ptr = new String (db);
+         if (!_state.databaseNameTable.store (handle, ptr)) { delete ptr; ptr = 0; }
+      }
+   }
+
+   if (!_state.loggedIn) {
+
+      if (_state.autoLogin) {
+
+         _state.log.debug << "Trying to auto login as: "
+            << qPrintable (_state.auth.user ())
+            << endl;
+
+         _post_session ();
+      }
+      else { _fetch_session (); }
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_fetch_user () {
+
+   const String UserPrefix ("org.couchdb.user:");
+   const String UserName (qPrintable (_state.auth.user ()));
+
+   if (_state.client && UserName) {
+
+      const String DocId (UserPrefix  + UserName);
+      QUrl url (_get_url ("_users", DocId));
+
+      UInt64 requestId = _state.client->get (url);
+      if (requestId) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "]  GET: " << DocId << endl;
+#endif
+
+         _state.get_request (requestId, FetchUser, 0, DocId, *this);
+      }
+   }
+}
+
+
+void
+dmz::WebServicesModuleQt::_handle_fetch_user (RequestStruct &request) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << "<<<<< [" << request.Id << "]"
+    << "[" << request.statusCode << "]"
+    << " USER: " << request.DocId << endl;
+#endif
+
+   String error = config_to_string ("error", request.data);
+   if (error) {
+
+   }
+   else {
+
    }
 }
 
@@ -1040,103 +1278,8 @@ out << ">>>>> [" << requestId << "]  GET: " << db << ": " << Id << endl;
 }
 
 
-dmz::WebServicesModuleQt::RequestStruct *
-dmz::WebServicesModuleQt::_delete_document (
-      const Handle Database,
-      const String &Id,
-      WebServicesCallback &cb) {
-
-   RequestStruct *request (0);
-
-   if (is_valid_database (Database) && Id && _state.client) {
-
-      String db = lookup_database_name_from_handle (Database);
-
-      DocStruct *doc = _state.get_doc (Database, Id);
-      if (doc && doc->rev) {
-
-         QUrl url = _get_url (db, Id);
-         QNetworkRequest req = _state.client->get_next_request (url);
-
-         req.setRawHeader ("If-Match", doc->rev.get_buffer ());
-
-         UInt64 requestId = _state.client->del (req);
-         if (requestId) {
-
-#ifdef DMZ_WEBSERVICES_DEBUG
-out << ">>>>> [" << requestId << "]  DEL: " << db << ": " << Id << endl;
-#endif
-
-            request = _state.get_request (requestId, DeleteDocument, Database, Id, cb);
-         }
-      }
-   }
-
-   return request;
-}
-
-
-dmz::WebServicesModuleQt::RequestStruct *
-dmz::WebServicesModuleQt::_fetch_changes (
-      const Handle Database,
-      WebServicesCallback &cb,
-      const Int32 Since) {
-
-   RequestStruct *request (0);
-
-   if (is_valid_database (Database) && _state.client) {
-
-      String db = lookup_database_name_from_handle (Database);
-
-      const String Id ("_changes");
-      QUrl url = _get_url (db, Id);
-      url.addQueryItem ("since", QString::number (Since));
-
-      UInt64 requestId = _state.client->get (url);
-      if (requestId) {
-
-#ifdef DMZ_WEBSERVICES_DEBUG
-out << ">>>>> [" << requestId << "]  GET: " << db << ": " << Id << endl;
-#endif
-
-         request = _state.get_request (requestId, FetchChanges, Database, Id, cb);
-      }
-   }
-
-   return request;
-}
-
-
 void
-dmz::WebServicesModuleQt::_document_published (RequestStruct &request) {
-
-#ifdef DMZ_WEBSERVICES_DEBUG
-out << "<<<<< [" << request.Id << "]"
-    << "[" << request.statusCode << "]"
-    << " PUBLISH: " << lookup_database_name_from_handle (request.Database)
-    << ": " << request.DocId << endl;
-#endif
-
-   String docId = config_to_string ("id", request.data);
-
-   if (request.DocId == docId) {
-
-      request.docRev = config_to_string ("rev", request.data);
-
-      request.cb.handle_publish_config (
-         request.Database,
-         request.DocId,
-         request.docRev);
-   }
-   else {
-
-      _handle_error (request);
-   }
-}
-
-
-void
-dmz::WebServicesModuleQt::_document_fetched (RequestStruct &request) {
+dmz::WebServicesModuleQt::_handle_fetch_document (RequestStruct &request) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
 out << "<<<<< [" << request.Id << "]"
@@ -1172,7 +1315,7 @@ out << "<<<<< [" << request.Id << "]"
 
 
 void
-dmz::WebServicesModuleQt::_documents_fetched (RequestStruct &request) {
+dmz::WebServicesModuleQt::_handle_fetch_documents (RequestStruct &request) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
 out << "<<<<< [" << request.Id << "]"
@@ -1213,8 +1356,44 @@ out << "<<<<< [" << request.Id << "]"
 }
 
 
+dmz::WebServicesModuleQt::RequestStruct *
+dmz::WebServicesModuleQt::_delete_document (
+      const Handle Database,
+      const String &Id,
+      WebServicesCallback &cb) {
+
+   RequestStruct *request (0);
+
+   if (is_valid_database (Database) && Id && _state.client) {
+
+      String db = lookup_database_name_from_handle (Database);
+
+      DocStruct *doc = _state.get_doc (Database, Id);
+      if (doc && doc->rev) {
+
+         QUrl url = _get_url (db, Id);
+         QNetworkRequest req = _state.client->get_next_request (url);
+
+         req.setRawHeader ("If-Match", doc->rev.get_buffer ());
+
+         UInt64 requestId = _state.client->del (req);
+         if (requestId) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "]  DEL: " << db << ": " << Id << endl;
+#endif
+
+            request = _state.get_request (requestId, DeleteDocument, Database, Id, cb);
+         }
+      }
+   }
+
+   return request;
+}
+
+
 void
-dmz::WebServicesModuleQt::_document_deleted (RequestStruct &request) {
+dmz::WebServicesModuleQt::_handle_delete_document (RequestStruct &request) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
 out << "<<<<< [" << request.Id << "]"
@@ -1237,8 +1416,39 @@ out << "<<<<< [" << request.Id << "]"
 }
 
 
+dmz::WebServicesModuleQt::RequestStruct *
+dmz::WebServicesModuleQt::_fetch_changes (
+      const Handle Database,
+      WebServicesCallback &cb,
+      const Int32 Since) {
+
+   RequestStruct *request (0);
+
+   if (is_valid_database (Database) && _state.client) {
+
+      String db = lookup_database_name_from_handle (Database);
+
+      const String Id ("_changes");
+      QUrl url = _get_url (db, Id);
+      url.addQueryItem ("since", QString::number (Since));
+
+      UInt64 requestId = _state.client->get (url);
+      if (requestId) {
+
+#ifdef DMZ_WEBSERVICES_DEBUG
+out << ">>>>> [" << requestId << "]  GET: " << db << ": " << Id << endl;
+#endif
+
+         request = _state.get_request (requestId, FetchChanges, Database, Id, cb);
+      }
+   }
+
+   return request;
+}
+
+
 void
-dmz::WebServicesModuleQt::_changes_fetched (RequestStruct &request) {
+dmz::WebServicesModuleQt::_handle_fetch_changes (RequestStruct &request) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
 out << "<<<<< [" << request.Id << "]"
@@ -1276,69 +1486,34 @@ out << "<<<<< [" << request.Id << "]"
 
 
 void
-dmz::WebServicesModuleQt::_session_posted (RequestStruct &request) {
+dmz::WebServicesModuleQt::_login_user (const Config &User) {
 
-#ifdef DMZ_WEBSERVICES_DEBUG
-out << "<<<<< [" << request.Id << "]"
-    << "[" << request.statusCode << "]"
-    << " SESSION" << endl;
-#endif
+   String name = config_to_string ("name", User);
 
-   if (config_to_boolean ("ok", request.data)) {
+   Boolean admin (False);
+   Config roles;
+   if (User.lookup_all_config ("roles", roles)) {
 
-      _state.loggedIn = True;
+      ConfigIterator it;
+      Config data;
 
-      String name = config_to_string ("name", request.data);
+      while (!admin && roles.get_next_config (it, data)) {
 
-      Boolean admin (False);
-      Config roles;
-      if (request.data.lookup_all_config ("roles", roles)) {
-
-         ConfigIterator it;
-         Config data;
-
-         while (!name && roles.get_next_config (it, data)) {
-
-            String role = config_to_string ("value", data);
-            if (role == "_admin") { name = "admin"; }
-         }
-      }
-
-      _state.log.info << "Welcome " << name << " you have logged in." << endl;
-
-      Data data;
-      data.store_string (_state.nameHandle, 0, name);
-
-      _state.loginSuccessMsg.send (&data);
-   }
-   else {
-
-      _state.loginFailedMsg.send ();
-   }
-}
-
-
-void
-dmz::WebServicesModuleQt::_dbs_fetched (RequestStruct &request) {
-
-#ifdef DMZ_WEBSERVICES_DEBUG
-out << "<<<<< [" << request.Id << "]"
-    << "[" << request.statusCode << "]"
-    << " ALL DBS" << endl;
-#endif
-
-   ConfigIterator it;
-   Config cd;
-   while (request.data.get_next_config (it, cd)) {
-
-      String db;
-      if (cd.lookup_attribute ("value", db)) {
-
-         Handle handle = _state.defs.create_named_handle (db);
-         String *ptr = new String (db);
-         if (!_state.databaseNameTable.store (handle, ptr)) { delete ptr; ptr = 0; }
+         String role = config_to_string ("value", data);
+         if (role == "_admin") { admin = True; }
       }
    }
+
+   if (!name && admin) { name = "admin"; }
+
+   _state.loggedIn = True;
+   _state.log.info << "Welcome " << name << " you have logged in." << endl;
+
+   Data data;
+   data.store_string (_state.nameHandle, 0, name);
+   data.store_boolean (_state.adminHandle, 0, admin);
+
+   _state.loginSuccessMsg.send (&data);
 }
 
 
@@ -1396,40 +1571,6 @@ dmz::WebServicesModuleQt::_handle_continuous_feed (RequestStruct &request) {
 }
 
 
-dmz::Boolean
-dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
-
-   if (!_state.loggedIn) {
-
-      Data inData;
-      Data outData;
-
-      _state.loginRequiredMsg.send (_state.targetHandle, &inData, &outData);
-      if (outData) {
-
-         String name;
-         outData.lookup_string (_state.nameHandle, 0, name);
-
-         String password;
-         outData.lookup_string (_state.passwordHandle, 0, password);
-
-         if (name && password) {
-
-            _state.auth.setUser (name.get_buffer ());
-            _state.auth.setPassword (password.get_buffer ());
-
-            if (GetSession) { _fetch_session (); }
-         }
-         else {
-
-         }
-      }
-   }
-
-   return _state.loggedIn;
-}
-
-
 QUrl
 dmz::WebServicesModuleQt::_get_url (
       const String &Database,
@@ -1459,6 +1600,26 @@ dmz::WebServicesModuleQt::_get_root_url (const String &EndPoint) const {
 
 
 void
+dmz::WebServicesModuleQt::_init_login (Config &global) {
+
+   Config login;
+   if (global.lookup_config ("login", login)) {
+
+      String user = config_to_string ("user", login);
+      String password = config_to_string ("password", login);
+
+      if (user && password) {
+
+         _state.auth.setUser (user.get_buffer ());
+         _state.auth.setPassword (decode_base64 (password).get_buffer ());
+
+         _state.autoLogin = True;
+      }
+   }
+}
+
+
+void
 dmz::WebServicesModuleQt::_init (Config &local) {
 
    setObjectName (get_plugin_name ().get_buffer ());
@@ -1467,6 +1628,12 @@ dmz::WebServicesModuleQt::_init (Config &local) {
    RuntimeContext *context (get_plugin_runtime_context ());
 
    _state.dateFormat = config_to_string ("date-format.value", local, _state.dateFormat);
+
+   _state.adminHandle = config_to_named_handle (
+      "attribute.admin",
+      local,
+      WebServicesAttributeAdminName,
+      context);
 
    _state.nameHandle = config_to_named_handle (
       "attribute.name",
@@ -1477,7 +1644,7 @@ dmz::WebServicesModuleQt::_init (Config &local) {
    _state.passwordHandle = config_to_named_handle (
       "attribute.password",
       local,
-      WebServicesAttributePassword,
+      WebServicesAttributePasswordName,
       context);
 
    _state.loginRequiredMsg = config_create_message (
@@ -1560,7 +1727,7 @@ create_dmzWebServicesModuleQt (
       dmz::Config &local,
       dmz::Config &global) {
 
-   return new dmz::WebServicesModuleQt (Info, local);
+   return new dmz::WebServicesModuleQt (Info, local, global);
 }
 
 };

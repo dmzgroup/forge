@@ -9,6 +9,7 @@
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
 #include <dmzRuntimeSession.h>
+#include <dmzWebServicesConsts.h>
 #include <QtGui/QtGui>
 
 namespace {
@@ -77,12 +78,12 @@ dmz::QtPluginLoginDialog::update_plugin_state (
 
       if (_loginDialog) {
 
-         if (config_to_boolean ("remember.me", session)) {
+         if (config_to_boolean ("remember-me.value", session)) {
 
             _ui.rememberMe->setChecked (True);
 
-            String username = config_to_string ("user.name", session);
-            _ui.usernameLineEdit->setText (username.get_buffer ());
+            String user = config_to_string ("user.value", session);
+            _ui.userNameLineEdit->setText (user.get_buffer ());
 
             QByteArray ba (config_to_qbytearray ("password", session));
             QByteArray password = local_calc_xor (ba, Key.toBase64 ());
@@ -106,8 +107,8 @@ dmz::QtPluginLoginDialog::update_plugin_state (
          Boolean rememberMe (_ui.rememberMe->isChecked ());
          if (rememberMe) {
 
-            String username = qPrintable (_ui.usernameLineEdit->text ());
-            session.add_config (string_to_config ("user", "name", username));
+            String user = qPrintable (_ui.userNameLineEdit->text ());
+            session.add_config (string_to_config ("user", "value", user));
 
             QByteArray password (qPrintable (_ui.passwordLineEdit->text ()));
 
@@ -115,7 +116,7 @@ dmz::QtPluginLoginDialog::update_plugin_state (
             session.add_config (qbytearray_to_config ("password", ba));
          }
 
-         session.add_config (boolean_to_config ("remember", "me", rememberMe));
+         session.add_config (boolean_to_config ("remember-me", "value", rememberMe));
 
          set_session_config (context, session);
       }
@@ -182,11 +183,11 @@ dmz::QtPluginLoginDialog::receive_message (
 
       if (InData) {
 
-         String username;
-         InData->lookup_string (_nameHandle, 0, username);
-      }
+         String user;
+         InData->lookup_string (_nameHandle, 0, user);
 
-      _loggedIn = True;
+         if (user) { _loggedIn = True; }
+      }
    }
    else if (Type == _loginFailedMsg) {
 
@@ -204,10 +205,10 @@ dmz::QtPluginLoginDialog::_slot_dialog_accepted () {
 
       Data data;
 
-      String username = qPrintable (_ui.usernameLineEdit->text ());
+      String user = qPrintable (_ui.userNameLineEdit->text ());
       String password = qPrintable (_ui.passwordLineEdit->text ());
 
-      data.store_string (_nameHandle, 0, username);
+      data.store_string (_nameHandle, 0, user);
       data.store_string (_passwordHandle, 0, password);
 
       _loginMsg.send (_targetHandle, &data);
@@ -218,7 +219,6 @@ dmz::QtPluginLoginDialog::_slot_dialog_accepted () {
 void
 dmz::QtPluginLoginDialog::_slot_dialog_rejected () {
 
-   // _log.error << "dialog rejected" << endl;
 }
 
 
@@ -239,32 +239,32 @@ dmz::QtPluginLoginDialog::_init (Config &local) {
    _loginRequiredMsg = config_create_message (
       "message.login-required",
       local,
-      "LoginRequiredMessage",
-       context);
+      WebServicesLoginRequiredMessageName,
+      context);
 
    _loginMsg = config_create_message (
       "message.login",
       local,
-      "LoginMessage",
-       context);
+      WebServicesLoginMessageName,
+      context);
 
    _loginSuccessMsg = config_create_message (
       "message.login-success",
       local,
-      "LoginSuccessMessage",
-       context);
+      WebServicesLoginSuccessMessageName,
+      context);
 
    _loginFailedMsg = config_create_message (
       "message.login-failed",
       local,
-      "LoginFailedMessage",
-       context);
+      WebServicesLoginFailedMessageName,
+      context);
 
    _logoutMsg = config_create_message (
       "message.logout",
       local,
-      "LogoutMessage",
-       context);
+      WebServicesLogoutMessageName,
+      context);
 
    subscribe_to_message (_loginRequiredMsg);
    subscribe_to_message (_loginSuccessMsg);

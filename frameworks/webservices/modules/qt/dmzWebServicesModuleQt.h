@@ -32,7 +32,7 @@ namespace dmz {
       Q_OBJECT
 
       public:
-         WebServicesModuleQt (const PluginInfo &Info, Config &local);
+         WebServicesModuleQt (const PluginInfo &Info, Config &local, Config &global);
          ~WebServicesModuleQt ();
 
          // Plugin Interface
@@ -132,6 +132,9 @@ namespace dmz {
             const Boolean &Deleted,
             const Int32 Sequence) {;}
 
+      Q_SIGNALS:
+         void fetch_db_finished ();
+
       protected Q_SLOTS:
          void _authenticate (QNetworkReply *reply, QAuthenticator *authenticator);
 
@@ -153,40 +156,52 @@ namespace dmz {
          void _handle_reply (RequestStruct &request);
          void _handle_error (RequestStruct &request);
 
-         RequestStruct *_publish_session (const Handle SessionHandle);
-
          RequestStruct *_publish_document (
             const Handle Database,
             const String &Id,
             const Config &Data,
             WebServicesCallback &cb);
 
+         void _handle_publish_document (RequestStruct &request);
+
          void _fetch_session ();
+         void _handle_fetch_session (RequestStruct &request);
+
+         void _post_session ();
+         void _handle_post_session (RequestStruct &request);
+
          void _delete_session ();
-         void _fetch_dbs ();
+
+         void _fetch_all_dbs ();
+         void _handle_fetch_all_dbs (RequestStruct &request);
+
+         void _fetch_user ();
+         void _handle_fetch_user (RequestStruct &reqeust);
 
          RequestStruct *_fetch_document (
             const Handle Database,
             const String &Id,
             WebServicesCallback &cb);
 
+         void _handle_fetch_document (RequestStruct &request);
+
+         void _handle_fetch_documents (RequestStruct &request);
+
          RequestStruct *_delete_document (
             const Handle Database,
             const String &Id,
             WebServicesCallback &cb);
+
+         void _handle_delete_document (RequestStruct &request);
 
          RequestStruct *_fetch_changes (
             const Handle Database,
             WebServicesCallback &cb,
             const Int32 Since);
 
-         void _document_published (RequestStruct &request);
-         void _document_fetched (RequestStruct &request);
-         void _documents_fetched (RequestStruct &request);
-         void _document_deleted (RequestStruct &request);
-         void _changes_fetched (RequestStruct &request);
-         void _session_posted (RequestStruct &request);
-         void _dbs_fetched (RequestStruct &request);
+         void _handle_fetch_changes (RequestStruct &request);
+
+         void _login_user (const Config &User);
 
          Boolean _handle_continuous_feed (RequestStruct &request);
          Boolean _authenticate (const Boolean GetSession = True);
@@ -194,6 +209,7 @@ namespace dmz {
          QUrl _get_url (const String &Database, const String &EndPoint) const;
          QUrl _get_root_url (const String &EndPoint) const;
 
+         void _init_login (Config &global);
          void _init (Config &local);
 
       protected:
