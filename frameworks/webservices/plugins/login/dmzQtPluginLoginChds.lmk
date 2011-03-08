@@ -1,0 +1,10 @@
+require "lmkQt"
+lmkQt.set_name "dmzQtPluginLoginChds"
+lmk.set_type "plugin"
+lmk.add_files {"dmzQtPluginLoginChds.qrc"}
+lmk.add_files {"dmzQtPluginLoginChds.ui",}
+lmk.add_files ({"dmzQtPluginLoginChds.h",},{src="moc"})
+lmk.add_files {"dmzQtPluginLoginChds.cpp",}
+lmk.add_libs {"dmzQtUtil","dmzKernel",}
+lmk.add_preqs {"dmzWebServicesFramework", "dmzQtFramework",}
+lmkQt.add_libs {"QtCore","QtGui",}

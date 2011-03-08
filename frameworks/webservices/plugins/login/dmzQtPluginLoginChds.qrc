@@ -1,0 +1,24 @@
+<RCC>
+  <qresource>
+    <file>chds/Box.png</file>
+    <file>chds/Burn.png</file>
+    <file>chds/Camera.png</file>
+    <file>chds/Chip.png</file>
+    <file>chds/Coffee.png</file>
+    <file>chds/Film.png</file>
+    <file>chds/House.png</file>
+    <file>chds/Microphone.png</file>
+    <file>chds/MusicalNote.png</file>
+    <file>chds/Phone.png</file>
+    <file>chds/ShoppingBag.png</file>
+    <file>chds/Smile.png</file>
+    <file>chds/Stoplight.png</file>
+    <file>chds/Suit.png</file>
+    <file>chds/Trees.png</file>
+    <file>chds/WallClock.png</file>
+    <file>chds/Wallet.png</file>
+    <file>chds/Water.png</file>
+    <file>chds/Yield.png</file>
+    <file>chds/Bell.png</file>
+  </qresource>
+</RCC>
