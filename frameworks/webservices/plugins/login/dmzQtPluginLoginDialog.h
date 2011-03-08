@@ -5,7 +5,7 @@
 #include <dmzRuntimeMessaging.h>
 #include <dmzRuntimePlugin.h>
 #include <QtCore/QObject>
-#include "ui_LoginDialog.h"
+#include "ui_dmzQtPluginLoginDialog.h"
 
 class QDialog;
 
