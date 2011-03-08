@@ -4,7 +4,7 @@
 #include <QtCore/QUrl>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QSslError>
-#include <QtNetwork/QSslConfiguration>
+//#include <QtNetwork/QSslConfiguration>
 #include <QtCore/QDebug>
 
 
@@ -60,7 +60,7 @@ dmz::QtHttpClient::QtHttpClient (const PluginInfo &Info, QObject *parent) :
    if (_cookieJar) {
 
       Config session (get_session_config ("QtHttpClient", _context));
-      _cookieJar->load_cookies (session);
+//      _cookieJar->load_cookies (session);
    }
 }
 
@@ -78,7 +78,7 @@ dmz::QtHttpClient::~QtHttpClient () {
 
       Config session ("QtHttpClient");
       _cookieJar->save_cookies (session);
-      set_session_config (_context, session);
+//      set_session_config (_context, session);
 
       delete _cookieJar;
       _cookieJar = 0;
@@ -420,11 +420,11 @@ dmz::QtHttpClient::_ssl_errors (QNetworkReply *reply, const QList<QSslError> &Er
 //         }
 //      }
 
-      QString commonName =
-         reply->sslConfiguration().peerCertificate().issuerInfo (
-            QSslCertificate::CommonName);
+//      QString commonName =
+//         reply->sslConfiguration().peerCertificate().issuerInfo (
+//            QSslCertificate::CommonName);
 
-      _log.warn << "[ssl] server host: " << qPrintable (commonName) << endl;
+//      _log.warn << "[ssl] server host: " << qPrintable (commonName) << endl;
 
       reply->ignoreSslErrors ();
    }

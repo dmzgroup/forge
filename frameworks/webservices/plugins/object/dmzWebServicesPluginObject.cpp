@@ -12,6 +12,7 @@
 #include <dmzRuntimeObjectType.h>
 #include <dmzRuntimePluginFactoryLinkSymbol.h>
 #include <dmzRuntimePluginInfo.h>
+#include <dmzRuntimeSession.h>
 #include <dmzTypesMask.h>
 #include <dmzTypesMatrix.h>
 #include <dmzTypesStringTokenizer.h>
@@ -103,8 +104,12 @@ dmz::WebServicesPluginObject::update_plugin_state (
       const PluginStateEnum State,
       const UInt32 Level) {
 
+   RuntimeContext *context (get_plugin_runtime_context ());
+
    if (State == PluginStateInit) {
 
+//      Config session (get_session_config (get_plugin_name (), context));
+//      _lastSeq = config_to_int32 ("last-sequence.value", session, _lastSeq);
    }
    else if (State == PluginStateStart) {
 
@@ -115,6 +120,14 @@ dmz::WebServicesPluginObject::update_plugin_state (
    }
    else if (State == PluginStateShutdown) {
 
+      Config session (get_plugin_name ());
+
+      session.add_config (string_to_config (
+         "last-sequence",
+         "value",
+         String::number (_lastSeq)));
+
+      set_session_config (context, session);
    }
 }
 
