@@ -112,7 +112,7 @@ struct dmz::WebServicesModuleQt::RequestStruct {
    const String DocId;
    String docRev;
    WebServicesCallback &cb;
-   QDateTime timeStamp;
+   UInt32 timeStamp;
    Int32 statusCode;
    Boolean error;
    String errorMessage;
@@ -129,7 +129,7 @@ struct dmz::WebServicesModuleQt::RequestStruct {
       Type (TheRequestType),
       DocId (TheDocId),
       cb (theCallback),
-      timeStamp (QDateTime::currentDateTime ()),
+      timeStamp (0),
       statusCode (0),
       error (False),
       data ("global") {;}
@@ -151,6 +151,7 @@ struct dmz::WebServicesModuleQt::State {
    Handle nameHandle;
    Handle passwordHandle;
    Handle targetHandle;
+   Handle timeHandle;
    Message loginRequiredMsg;
    Message loginMsg;
    Message loginSuccessMsg;
@@ -198,6 +199,7 @@ dmz::WebServicesModuleQt::State::State (const PluginInfo &Info) :
       nameHandle (0),
       passwordHandle (0),
       targetHandle (0),
+      timeHandle (0),
       fetchChangesDelta (0),
       lastSeq (0) ,
       loggedIn (False),
@@ -788,6 +790,7 @@ void
 dmz::WebServicesModuleQt::_reply_aborted (const UInt64 RequestId) {
 
    _state.log.error << "_reply_aborted: " << RequestId << endl;
+   _state.log.error << "Not implemented!!!" << endl;
 }
 
 
@@ -806,13 +809,10 @@ dmz::WebServicesModuleQt::_reply_finished (
 
          QString rawDate (reply->rawHeader ("Date"));
 
-         QDateTime dateTime =
-            QDateTime::fromString (rawDate, _state.dateFormat.get_buffer ());
+         QDateTime dateTime = QDateTime::fromString (
+            rawDate, _state.dateFormat.get_buffer ());
 
-         if (dateTime.isValid ()) {
-
-            request->timeStamp = dateTime;
-         }
+         if (dateTime.isValid ()) { request->timeStamp = dateTime.toTime_t (); }
       }
 
       QByteArray data (reply->readAll ());
@@ -828,11 +828,21 @@ dmz::WebServicesModuleQt::_reply_finished (
          request->data.store_attribute ("error", "Reply Error");
          request->data.store_attribute ("reason", reason);
 
+         if (request->timeStamp) {
+
+            request->data.store_attribute ("date", String::number (request->timeStamp));
+         }
+
          _handle_error (*request);
       }
       else if (JsonData) {
 
          if (json_string_to_config (JsonData, request->data)) {
+
+            if (request->timeStamp) {
+
+               request->data.store_attribute ("date", String::number (request->timeStamp));
+            }
 
             _handle_reply (*request);
          }
@@ -841,6 +851,11 @@ dmz::WebServicesModuleQt::_reply_finished (
             request->data = Config ("global");
             request->data.store_attribute ("error", "Parse Error");
             request->data.store_attribute ("reason", "Error parsing json data.");
+
+            if (request->timeStamp) {
+
+               request->data.store_attribute ("date", String::number (request->timeStamp));
+            }
 
             _handle_error (*request);
          }
@@ -854,6 +869,11 @@ dmz::WebServicesModuleQt::_reply_finished (
          request->data = Config ("global");
          request->data.store_attribute ("error", "No Data Error");
          request->data.store_attribute ("reason", reason);
+
+         if (request->timeStamp) {
+
+            request->data.store_attribute ("date", String::number (request->timeStamp));
+         }
 
          _handle_error (*request);
       }
@@ -1059,6 +1079,11 @@ out << "<<<<< [" << request.Id << "]"
 
       Config user;
       if (request.data.lookup_config ("userCtx", user)) {
+
+         if (request.timeStamp) {
+
+            user.store_attribute ("date", String::number (request.timeStamp));
+         }
 
          String name = config_to_string ("name", user);
          if (name) {
@@ -1513,6 +1538,14 @@ dmz::WebServicesModuleQt::_login_user (const Config &User) {
    data.store_string (_state.nameHandle, 0, name);
    data.store_boolean (_state.adminHandle, 0, admin);
 
+   const UInt32 Time = config_to_uint32 ("date", User);
+   if (Time) {
+
+      QDateTime serverTime = QDateTime::fromTime_t (Time);
+      _state.log.info << "Server Time: " << qPrintable (serverTime.toString ()) << endl;
+      data.store_uint32 (_state.timeHandle, 0, Time);
+   }
+
    _state.loginSuccessMsg.send (&data);
 }
 
@@ -1645,6 +1678,12 @@ dmz::WebServicesModuleQt::_init (Config &local) {
       "attribute.password",
       local,
       WebServicesAttributePasswordName,
+      context);
+
+   _state.timeHandle = config_to_named_handle (
+      "attribute.time-stamp",
+      local,
+      WebServicesAttributeTimeStampName,
       context);
 
    _state.loginRequiredMsg = config_create_message (

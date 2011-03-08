@@ -9,6 +9,7 @@
 #include <dmzRuntimeObjectType.h>
 #include <dmzRuntimePlugin.h>
 #include <dmzRuntimeTimeSlice.h>
+#include <dmzRuntimeTime.h>
 #include <dmzTypesDeleteListTemplate.h>
 #include <dmzTypesHashTableHandleTemplate.h>
 #include <dmzTypesHashTableStringTemplate.h>
@@ -375,6 +376,7 @@ namespace dmz {
          Definitions _defs;
          ApplicationState _appState;
          String _appName;
+         Time _time;
          Boolean _tracking;
          Boolean _online;
          WebServicesModule *_webservices;

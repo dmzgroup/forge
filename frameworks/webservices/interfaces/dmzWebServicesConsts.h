@@ -26,6 +26,7 @@ namespace dmz {
    const char WebServicesAttributeAdminName[]       = "admin";
    const char WebServicesAttributeUserName[]        = "name";
    const char WebServicesAttributePasswordName[]    = "password";
+   const char WebServicesAttributeTimeStampName[]   = "time-stamp";
    const char WebServicesAttributeIdName[]          = "_id";
    const char WebServicesAttributeRevisionName[]    = "_rev";
    const char WebServicesAttributeTypeName[]        = "type";
