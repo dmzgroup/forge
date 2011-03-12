@@ -1361,7 +1361,8 @@ out << "<<<<< [" << request.Id << "]"
 
             String docId = config_to_string ("_id", doc);
             String docRev = config_to_string ("_rev", doc);
-            String runtimeId = config_to_string ("runtime_id", doc);
+            //String runtimeId = config_to_string ("runtime_id", doc);
+            //String objectType = config_to_string("object_type", doc);
             String docType = config_to_string ("type", doc);
 
             Config data;
