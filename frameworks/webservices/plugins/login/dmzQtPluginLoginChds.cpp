@@ -26,8 +26,7 @@ dmz::QtPluginLoginChds::QtPluginLoginChds (const PluginInfo &Info, Config &local
       _loggedIn (False),
       _loginDialog (0),
       _pictureGroup (0),
-      _colorGroup (0),
-      _showHelp (False) {
+      _colorGroup (0) {
 
    _init (local);
 }
@@ -157,8 +156,6 @@ dmz::QtPluginLoginChds::_slot_dialog_accepted () {
       data.store_string (_passwordHandle, 0, _picture + _color);
 
       _loginMsg.send (_targetHandle, &data);
-
-      _showHelp = True;
    }
 }
 
@@ -190,8 +187,6 @@ dmz::QtPluginLoginChds::_slot_update_dialog () {
 
    QPushButton *button = _ui.buttonBox->button (QDialogButtonBox::Ok);
    if (button) { button->setEnabled (enabled); }
-
-   _ui.helpLabel->setHidden (_showHelp? False : True);
 }
 
 

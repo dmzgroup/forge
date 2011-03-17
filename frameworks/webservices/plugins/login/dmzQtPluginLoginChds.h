@@ -76,7 +76,6 @@ namespace dmz {
          String _user;
          String _color;
          String _picture;
-         Boolean _showHelp;
 
       private:
          QtPluginLoginChds ();
