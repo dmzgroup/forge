@@ -466,7 +466,7 @@ dmz::WebServicesModuleQt::receive_message (
    }
    else if (Msg == _state.logoutMsg) {
 
-      _delete_session ();
+      if (_state.loggedIn) { _delete_session (); }
    }
 }
 
@@ -910,10 +910,7 @@ dmz::WebServicesModuleQt::_handle_reply (RequestStruct &request) {
       case FetchUser: _handle_fetch_user (request); break;
       case PostSession: _handle_post_session (request); break;
       case FetchSession: _handle_fetch_session (request); break;
-      case DeleteSession:
-         _state.loggedIn = False;
-         _state.logoutMsg.send ();
-         break;
+      case DeleteSession: _state.loggedIn = False; break;
    }
 }
 
