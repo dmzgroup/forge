@@ -233,7 +233,6 @@ dmz::WebServicesPluginObject::handle_publish_config (
    _store_flag (ObjectHandle, _publishAttrHandle, False);
 }
 
-static dmz::Boolean printIt (dmz::False);
 
 void
 dmz::WebServicesPluginObject::handle_fetch_config (
@@ -247,11 +246,7 @@ dmz::WebServicesPluginObject::handle_fetch_config (
       const String Type (Data.get_name());
       if (Type == "object") {
 
-if (Id == "5f54be7e-7341-4a57-ab68-5e3bc30e0b0e") { printIt = True; }
-
          _config_to_object (Data);
-
-if (Id == "5f54be7e-7341-4a57-ab68-5e3bc30e0b0e") { printIt = False; }
 
          const Handle ObjectHandle (_to_handle (Id));
 
@@ -1318,7 +1313,7 @@ dmz::WebServicesPluginObject::_get_attr_config (
    return result;
 }
 
-static dmz::String theUUID;
+
 void
 dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
 
@@ -1330,8 +1325,6 @@ dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
       const UUID ObjUUID (config_to_string ("uuid", Data));
       String objectName (config_to_string ("name", Data));
       if (!objectName) { objectName = ObjUUID.to_string (); }
-
-theUUID = objectName;
 
       const String TypeName (config_to_string ("type", Data));
       const ObjectType Type (TypeName, get_plugin_runtime_context ());
@@ -1383,8 +1376,6 @@ theUUID = objectName;
    }
 }
 
-static dmz::String theName ("6ec23c1d-54a4-447d-9338-2ea25a541fcc");
-static dmz::String theAttrName;
 
 void
 dmz::WebServicesPluginObject::_config_to_object_attributes (
@@ -1396,13 +1387,6 @@ dmz::WebServicesPluginObject::_config_to_object_attributes (
 
       const String AttributeName (
          config_to_string ("name", AttrData, ObjectAttributeDefaultName));
-
-if (AttributeName == "vote_undecided" && printIt) {
-
-   _log.warn << AttrData << endl;
-}
-
-theAttrName = AttributeName;
 
       const Handle AttrHandle (_defs.create_named_handle (AttributeName));
 
