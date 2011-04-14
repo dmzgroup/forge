@@ -290,25 +290,29 @@ namespace dmz {
 
          struct LinkStruct {
 
-            Handle AttrHandle;
-            Handle SuperHandle;
-            Handle linkHandle;
-            String subName;
-            String attrObjectName;
+            String name;
+            String attr;
+            Handle handle;
 
-            LinkStruct (const Handle TheAttrHandle, const Handle TheSuperHandle) :
-               AttrHandle (TheAttrHandle),
-               SuperHandle (TheSuperHandle),
-               linkHandle (0) {;}
+            LinkStruct () : handle (0) {;}
+         };
+
+         struct LinkGroupStruct {
+
+            const Handle AttrHandle;
+            HashTableStringTemplate<LinkStruct> table;
+
+            LinkGroupStruct (const Handle TheHandle) : AttrHandle (TheHandle) {;}
+            ~LinkGroupStruct () { table.empty (); }
          };
 
          struct ObjectLinkStruct {
 
-            const String SubName;
-            HashTableHandleTemplate<LinkStruct> inLinks;
+            const Handle ObjectHandle;
+            HashTableHandleTemplate<LinkGroupStruct> table;
 
-            ObjectLinkStruct (const String &Name) : SubName (Name) {;}
-            ~ObjectLinkStruct () { inLinks.empty (); }
+            ObjectLinkStruct (const Handle TheHandle) : ObjectHandle (TheHandle) {;}
+            ~ObjectLinkStruct () { table.empty (); }
          };
 
          void _publish_deletes ();
@@ -323,7 +327,7 @@ namespace dmz {
          Boolean _publish (const Handle ObjectHandle);
          Boolean _fetch (const String &Id);
 
-         void _link_to_sub (ObjectLinkStruct &objLink);
+         void _link_to_sub (const Handle SuperHandle, LinkGroupStruct &group);
 
          void _configs_deleted (const StringContainer &DeleteIdList);
 
@@ -401,7 +405,7 @@ namespace dmz {
          Message _logoutMsg;
          Config _currentConfig;
          HashTableHandleTemplate<Config> _configTable;
-         HashTableStringTemplate<ObjectLinkStruct> _objectLinkTable;
+         HashTableHandleTemplate<ObjectLinkStruct> _linkTable;
          HashTableStringTemplate<String> _revisionTable;
          Int32 _lastSeq;
          Boolean _inDump;

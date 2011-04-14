@@ -93,7 +93,7 @@ dmz::WebServicesPluginObject::~WebServicesPluginObject () {
    delete_list (_filterList);
    _filterList = 0;
 
-   _objectLinkTable.empty ();
+   _linkTable.empty ();
    _revisionTable.empty ();
    _configTable.empty ();
 }
@@ -233,6 +233,7 @@ dmz::WebServicesPluginObject::handle_publish_config (
    _store_flag (ObjectHandle, _publishAttrHandle, False);
 }
 
+static dmz::Boolean printIt (dmz::False);
 
 void
 dmz::WebServicesPluginObject::handle_fetch_config (
@@ -243,12 +244,20 @@ dmz::WebServicesPluginObject::handle_fetch_config (
 
    if (Database == _dbApp) {
 
-      _config_to_object (Data);
+      const String Type (Data.get_name());
+      if (Type == "object") {
 
-      const Handle ObjectHandle (_to_handle (Id));
+if (Id == "5f54be7e-7341-4a57-ab68-5e3bc30e0b0e") { printIt = True; }
 
-      _store_rev (ObjectHandle, Rev);
-      _store_flag (ObjectHandle, _fetchAttrHandle, False);
+         _config_to_object (Data);
+
+if (Id == "5f54be7e-7341-4a57-ab68-5e3bc30e0b0e") { printIt = False; }
+
+         const Handle ObjectHandle (_to_handle (Id));
+
+         _store_rev (ObjectHandle, Rev);
+         _store_flag (ObjectHandle, _fetchAttrHandle, False);
+      }
    }
    else if (Database == _dbStudent) {
 
@@ -1057,23 +1066,28 @@ dmz::WebServicesPluginObject::_publish_changes () {
 void
 dmz::WebServicesPluginObject::_update_links () {
 
-   if (_objectLinkTable.get_count ()) {
+   if (_linkTable.get_count ()) {
 
-      HashTableStringIterator objIt;
-      ObjectLinkStruct *objLink = _objectLinkTable.get_first (objIt);
-      while (objLink) {
+      HashTableHandleIterator objIt;
+      ObjectLinkStruct *current = _linkTable.get_first (objIt);
+      while (current) {
 
-         _link_to_sub (*objLink);
+         HashTableHandleIterator linkIt;
+         LinkGroupStruct *group (current->table.get_first (linkIt));
+         while (group) {
 
-         if (objLink->inLinks.get_count () == 0) {
+            _link_to_sub (current->ObjectHandle, *group);
 
-            if (_objectLinkTable.remove (objLink->SubName)) {
+            if (group->table.get_count () == 0) {
 
-               delete objLink; objLink = 0;
+               current->table.remove (group->AttrHandle);
+               delete group; group = 0;
             }
+
+            group = current->table.get_next (linkIt);
          }
 
-         objLink = _objectLinkTable.get_next (objIt);
+         current = _linkTable.get_next (objIt);
       }
    }
 }
@@ -1143,76 +1157,67 @@ dmz::WebServicesPluginObject::_fetch (const String &Id) {
 
 
 void
-dmz::WebServicesPluginObject::_link_to_sub (ObjectLinkStruct &objLink) {
+dmz::WebServicesPluginObject::_link_to_sub (const Handle SuperHandle, LinkGroupStruct &group) {
 
    ObjectModule *objMod (get_object_module ());
    if (objMod) {
 
-      Handle subHandle = objMod->lookup_handle_from_uuid (objLink.SubName);
-      if (!subHandle) {
+      HashTableStringIterator subIt;
+      LinkStruct *link (group.table.get_first (subIt));
+      while (link) {
 
-         _fetch (objLink.SubName);
-      }
-      else {
+         Handle subHandle = objMod->lookup_handle_from_uuid (link->name);
+         if (!subHandle) {
 
-         HashTableHandleIterator linkIt;
-         LinkStruct *ls = objLink.inLinks.get_first (linkIt);
-         while (ls) {
+            _fetch (link->name);
+         }
+         else {
 
-            Boolean removeLink (False);
-
-            if (!ls->linkHandle) {
+            if (!link->handle) {
 
                _inUpdate = True;
 
-               ls->linkHandle = objMod->link_objects (
-                  ls->AttrHandle,
-                  ls->SuperHandle,
-                  subHandle);
+               link->handle = objMod->link_objects (group.AttrHandle, SuperHandle, subHandle);
 
                _inUpdate = False;
             }
 
-            if (ls->linkHandle) {
+            if (link->handle) {
 
-               if (!(ls->attrObjectName)) {
+               Boolean removeLink (False);
+
+               if (!(link->attr)) {
 
                   removeLink = True;
                }
                else {
 
-                  Handle attrObjectHandle =
-                        objMod->lookup_handle_from_uuid (ls->attrObjectName);
-
+                  Handle attrObjectHandle = objMod->lookup_handle_from_uuid (link->attr);
                   if (!attrObjectHandle) {
 
-                     _fetch (ls->attrObjectName);
+                     _fetch (link->attr);
                   }
                   else {
 
                      _inUpdate = True;
 
-                     objMod->store_link_attribute_object (
-                        ls->linkHandle,
-                        attrObjectHandle);
+                     objMod->store_link_attribute_object (link->handle, attrObjectHandle);
 
                      _inUpdate = False;
 
                      removeLink = True;
                   }
                }
-            }
 
-            if (removeLink) {
+               if (removeLink) {
 
-               if (objLink.inLinks.remove (ls->SuperHandle)) {
-
-                  delete ls; ls = 0;
+                  group.table.remove (link->name);
+                  delete link; link = 0;
                }
             }
-
-            ls = objLink.inLinks.get_next (linkIt);
          }
+
+         link = group.table.get_next (subIt);
       }
    }
 }
@@ -1313,7 +1318,7 @@ dmz::WebServicesPluginObject::_get_attr_config (
    return result;
 }
 
-
+static dmz::String theUUID;
 void
 dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
 
@@ -1325,6 +1330,8 @@ dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
       const UUID ObjUUID (config_to_string ("uuid", Data));
       String objectName (config_to_string ("name", Data));
       if (!objectName) { objectName = ObjUUID.to_string (); }
+
+theUUID = objectName;
 
       const String TypeName (config_to_string ("type", Data));
       const ObjectType Type (TypeName, get_plugin_runtime_context ());
@@ -1363,19 +1370,21 @@ dmz::WebServicesPluginObject::_config_to_object (const Config &Data) {
             _log.error << "Unable to create object of type: " << TypeName << endl;
          }
       }
-      else if (!Type) {
+      else if (!Type && TypeName) {
 
          _log.error << "Unable to create object of unknown type: " << TypeName << endl;
       }
-      else {
+      else if (TypeName) {
 
-         _log.info << "Filtering object with type: " << TypeName << endl;
+         _log.info << "Unknown type: " << TypeName << endl;
       }
 
       _inUpdate = False;
    }
 }
 
+static dmz::String theName ("6ec23c1d-54a4-447d-9338-2ea25a541fcc");
+static dmz::String theAttrName;
 
 void
 dmz::WebServicesPluginObject::_config_to_object_attributes (
@@ -1388,13 +1397,19 @@ dmz::WebServicesPluginObject::_config_to_object_attributes (
       const String AttributeName (
          config_to_string ("name", AttrData, ObjectAttributeDefaultName));
 
+if (AttributeName == "vote_undecided" && printIt) {
+
+   _log.warn << AttrData << endl;
+}
+
+theAttrName = AttributeName;
+
       const Handle AttrHandle (_defs.create_named_handle (AttributeName));
 
       Config data;
       ConfigIterator it;
 
       Boolean found (AttrData.get_first_config (it, data));
-
       while (found) {
 
          const String DataName (data.get_name ().to_lower ());
@@ -1409,7 +1424,6 @@ dmz::WebServicesPluginObject::_config_to_object_attributes (
             ConfigIterator it;
 
             Boolean found (linkList.get_first_config (it, obj));
-
             while (found) {
 
                const String Name (config_to_string ("name", obj));
@@ -1557,28 +1571,49 @@ dmz::WebServicesPluginObject::_add_sub_link (
 
    Boolean result (False);
 
-   ObjectLinkStruct *objLink = _objectLinkTable.lookup (SubName);
+   ObjectLinkStruct *objLink = _linkTable.lookup (SuperHandle);
    if (!objLink) {
 
-      objLink = new ObjectLinkStruct (SubName);
-      if (!_objectLinkTable.store (SubName, objLink)) {
+      objLink = new ObjectLinkStruct (SuperHandle);
+      if (!_linkTable.store (SuperHandle, objLink)) {
 
          delete objLink; objLink = 0;
+         _log.warn << "_linkTable.store failed for " << SuperHandle << endl;
       }
    }
 
    if (objLink) {
 
-      LinkStruct *ls = new LinkStruct (AttrHandle, SuperHandle);
-      ls->subName = SubName;
-      ls->attrObjectName = AttrObjName;
+      LinkGroupStruct *group = objLink->table.lookup (AttrHandle);
+      if (!group) {
 
-      if (objLink->inLinks.store (SuperHandle, ls)) { result = True; }
-      else { delete ls; ls = 0; }
+         group = new LinkGroupStruct (AttrHandle);
+         if (!objLink->table.store (AttrHandle, group)) {
+
+            delete group; group = 0;
+            _log.warn << "objLink->table.store failed for " << AttrHandle << endl;
+         }
+      }
+
+      if (group) {
+
+         LinkStruct *link = new LinkStruct;
+         link->name = SubName;
+         link->attr = AttrObjName;
+
+         if (!group->table.store (SubName, link)) {
+
+            delete link; link = 0;
+            _log.warn << "group->table.store failed for: " << SubName << endl;
+            _log.warn << "Super: " << _defs.lookup_named_handle_name (SuperHandle) << endl;
+            _log.warn << " Attr: " << _defs.lookup_named_handle_name (AttrHandle) << endl;
+         }
+      }
    }
 
    return result;
 }
+
 
 dmz::Boolean
 dmz::WebServicesPluginObject::_handle_type (const ObjectType &Type) {
