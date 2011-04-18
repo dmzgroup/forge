@@ -1063,23 +1063,15 @@ dmz::WebServicesPluginObject::_update_links () {
 
    if (_linkTable.get_count ()) {
 
-_log.info << "count: " << _linkTable.get_count () << endl;
-
       HashTableHandleIterator objIt;
       ObjectLinkStruct *current = _linkTable.get_first (objIt);
       while (current) {
-
-_log.info << "current: " << current->ObjectHandle << ": " << current->table.get_count () << endl;
 
          HashTableHandleIterator linkIt;
          LinkGroupStruct *group (current->table.get_first (linkIt));
          while (group) {
 
-_log.info << "group: " << group->AttrHandle << ": " << group->table.get_count () << endl;
-
             _link_to_sub (current->ObjectHandle, *group);
-
-//_log.warn << "group->table: " << group->table.get_count () << endl;
 
             if (group->table.get_count () == 0) {
 
@@ -1090,8 +1082,6 @@ _log.info << "group: " << group->AttrHandle << ": " << group->table.get_count ()
             group = current->table.get_next (linkIt);
          }
 
-//_log.warn << "current->table: " << current->table.get_count () << endl;
-
          if (current->table.get_count () == 0) {
 
             _linkTable.remove (current->ObjectHandle);
@@ -1099,8 +1089,6 @@ _log.info << "group: " << group->AttrHandle << ": " << group->table.get_count ()
 
          current = _linkTable.get_next (objIt);
       }
-
-//_log.warn << "linkTable: " << _linkTable.get_count () << endl;
    }
 }
 
@@ -1178,8 +1166,6 @@ dmz::WebServicesPluginObject::_link_to_sub (const Handle SuperHandle, LinkGroupS
       LinkStruct *link (group.table.get_first (subIt));
       while (link) {
 
-_log.info << "link: " << link->name << ": " << link->attr << ": " << endl;
-
          Handle subHandle = objMod->lookup_handle_from_uuid (link->name);
          if (!subHandle) {
 
@@ -1189,11 +1175,14 @@ _log.info << "link: " << link->name << ": " << link->attr << ": " << endl;
 
             if (!link->handle) {
 
-               _inUpdate = True;
-_log.error << "link_objects: " << _defs.lookup_named_handle_name (group.AttrHandle) << ": " << SuperHandle << " -> " << subHandle << endl;
-               link->handle = objMod->link_objects (group.AttrHandle, SuperHandle, subHandle);
-_log.info << "link->handle: " << link->handle << endl;
+               link->handle =
+                  objMod->lookup_link_handle (group.AttrHandle, SuperHandle, subHandle);
+            }
 
+            if (!link->handle) {
+
+               _inUpdate = True;
+               link->handle = objMod->link_objects (group.AttrHandle, SuperHandle, subHandle);
                _inUpdate = False;
             }
 
@@ -1214,11 +1203,15 @@ _log.info << "link->handle: " << link->handle << endl;
                   }
                   else {
 
-                     _inUpdate = True;
+                     Handle linkAttrObjectHandle =
+                        objMod->lookup_link_attribute_object (link->handle);
 
-                     objMod->store_link_attribute_object (link->handle, attrObjectHandle);
+                     if (!linkAttrObjectHandle) {
 
-                     _inUpdate = False;
+                        _inUpdate = True;
+                        objMod->store_link_attribute_object (link->handle, attrObjectHandle);
+                        _inUpdate = False;
+                     }
 
                      removeLink = True;
                   }
@@ -1227,7 +1220,6 @@ _log.info << "link->handle: " << link->handle << endl;
                if (removeLink) {
 
                   group.table.remove (link->name);
-_log.error << "removeLink: " << link->name << ": " << group.table.get_count () << endl;
                   delete link; link = 0;
                }
             }
@@ -1609,9 +1601,9 @@ dmz::WebServicesPluginObject::_add_sub_link (
          if (!group->table.store (SubName, link)) {
 
             delete link; link = 0;
-            _log.warn << "group->table.store failed for: " << SubName << endl;
-            _log.warn << "Super[" << SuperHandle << "]: " << _defs.lookup_named_handle_name (SuperHandle) << endl;
-            _log.warn << "Attr[" << AttrHandle << "]: " << _defs.lookup_named_handle_name (AttrHandle) << endl;
+            _log.warn << "group->table.store failed for: " << SubName
+               << " with attr:" << _defs.lookup_named_handle_name (AttrHandle)
+               << endl;
          }
       }
    }
