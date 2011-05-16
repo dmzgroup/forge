@@ -210,14 +210,14 @@ dmz::QtPluginLoginChds::_create_dialog (QWidget *parent) {
          _ui.userNameLineEdit, SIGNAL (textChanged (const QString &)),
          this, SLOT (_slot_update_dialog ()));
 
-      _init_picutres ();
+      _init_pictures ();
       _init_colors ();
    }
 }
 
 
 void
-dmz::QtPluginLoginChds::_init_picutres () {
+dmz::QtPluginLoginChds::_init_pictures () {
 
    _pictureGroup = new QButtonGroup (_loginDialog);
 

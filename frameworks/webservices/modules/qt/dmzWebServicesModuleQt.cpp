@@ -145,6 +145,8 @@ struct dmz::WebServicesModuleQt::State {
    QUrl serverUrl;
    String serverPath;
    String dateFormat;
+   String defaultLogin;
+   String defaultPassword;
    QAuthenticator auth;
    Boolean autoLogin;
    Handle adminHandle;
@@ -1045,7 +1047,8 @@ dmz::WebServicesModuleQt::_fetch_session () {
       if (requestId) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
-out << ">>>>> [" << requestId << "] GET: " << DocId << endl;
+//out << ">>>>> [" << requestId << "] GET: " << DocId << endl;
+out << ">>>>> [" << requestId << "] GET: " << DocId << " url: " << qPrintable(url.toString ()) << " name: " << qPrintable(_state.auth.user ()) << " pw: " << qPrintable(_state.auth.password ()) << endl;
 #endif
 
          _state.get_request (requestId, FetchSession, 0, DocId, *this);
@@ -1083,7 +1086,7 @@ out << "<<<<< [" << request.Id << "]"
          }
 
          String name = config_to_string ("name", user);
-         if (name) {
+         if (name && (name != _state.defaultLogin)) {
 
             _login_user (user);
             authenticated = True;
@@ -1117,7 +1120,7 @@ dmz::WebServicesModuleQt::_post_session () {
       if (requestId) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
-out << ">>>>> [" << requestId << "] POST: " << DocId << endl;
+out << ">>>>> [" << requestId << "] POST: " << DocId << " url: " << qPrintable(url.toString ()) << " name: " << qPrintable(_state.auth.user ()) << " pw: " << qPrintable(_state.auth.password ()) << endl;
 #endif
 
          _state.get_request (requestId, PostSession, 0, DocId, *this);
@@ -1176,6 +1179,7 @@ dmz::WebServicesModuleQt::_fetch_all_dbs () {
       const String DocId ("_all_dbs");
       QUrl url (_get_root_url (DocId));
 
+      out << "URL: " << qPrintable(url.toString ()) << endl;
       UInt64 requestId = _state.client->get (url);
       if (requestId) {
 
@@ -1613,6 +1617,14 @@ dmz::WebServicesModuleQt::_get_url (
    path << _state.serverPath << Database  << "/" << EndPoint;
 
    url.setPath (path.get_buffer ());
+//   if (!_state.adminLogin.empty ()) {
+
+//      url.setUserName (_state.adminLogin.get_buffer ());
+//   }
+//   if (!_state.adminPassword.empty ()) {
+
+//      url.setPassword (_state.adminPassword.get_buffer ());
+//   }
    return url;
 }
 
@@ -1626,6 +1638,14 @@ dmz::WebServicesModuleQt::_get_root_url (const String &EndPoint) const {
    path << _state.serverPath << EndPoint;
 
    url.setPath (path.get_buffer ());
+//   if (!_state.adminLogin.empty ()) {
+
+//      url.setUserName (_state.adminLogin.get_buffer ());
+//   }
+//   if (!_state.adminPassword.empty ()) {
+
+//      url.setPassword (_state.adminPassword.get_buffer ());
+//   }
    return url;
 }
 
@@ -1727,15 +1747,25 @@ dmz::WebServicesModuleQt::_init (Config &local) {
 
          String host = config_to_string ("host", proxy, "localhost");
          Int32 port = config_to_int32 ("port", proxy, 8888);
+         String user = config_to_string ("login", proxy, "");
+         String password = config_to_string ("password", proxy, "");
 
          QNetworkProxy proxy;
          proxy.setType (QNetworkProxy::HttpProxy);
          proxy.setHostName (host.get_buffer ());
          proxy.setPort (port);
 
+         _state.log.info << "Using proxy: ";
+         if (!user.empty () && !password.empty ()) {
+
+            _state.log.info << user << ":" << password << "@";
+            proxy.setUser (user.get_buffer ());
+            proxy.setPassword (password.get_buffer ());
+         }
+
          QNetworkProxy::setApplicationProxy(proxy);
 
-         _state.log.info << "Using proxy: " << host << ":" << port << endl;
+         _state.log.info << host << ":" << port << endl;
       }
 
       String host = qPrintable (_state.serverUrl.host ());
@@ -1745,6 +1775,12 @@ dmz::WebServicesModuleQt::_init (Config &local) {
       Int32 port = _state.serverUrl.port ();
       port = config_to_int32 ("port", server, port);
       _state.serverUrl.setPort (port);
+
+      _state.defaultLogin = config_to_string ("login", server, "").get_buffer ();
+      _state.serverUrl.setUserName (_state.defaultLogin.get_buffer ());
+
+      _state.defaultPassword = config_to_string ("password", server, "").get_buffer ();
+      _state.serverUrl.setPassword (_state.defaultPassword.get_buffer ());
 
       if (port == 443) { _state.serverUrl.setScheme ("https"); }
 

@@ -52,7 +52,7 @@ namespace dmz {
       protected:
          // QtPluginLoginChds Interface
          void _create_dialog (QWidget *parent);
-         void _init_picutres ();
+         void _init_pictures ();
          void _init_colors ();
          void _init (Config &local);
 
