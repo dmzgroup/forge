@@ -11,6 +11,7 @@
 #include <dmzRuntimeSession.h>
 #include <dmzWebServicesConsts.h>
 #include <QtGui/QtGui>
+#include <QtCore/QCryptographicHash>
 
 
 dmz::QtPluginLoginChds::QtPluginLoginChds (const PluginInfo &Info, Config &local) :
@@ -56,11 +57,11 @@ dmz::QtPluginLoginChds::update_plugin_state (
 
       Config session (get_session_config (get_plugin_name (), context));
 
-      if (_loginDialog) {
+//      if (_loginDialog) {
 
-         String user = config_to_string ("user.value", session);
-         _ui.userNameLineEdit->setText (user.get_buffer ());
-      }
+//         String user = config_to_string ("user.value", session);
+//         _ui.userNameLineEdit->setText (user.get_buffer ());
+//      }
    }
    else if (State == PluginStateStart) {
 
@@ -74,7 +75,9 @@ dmz::QtPluginLoginChds::update_plugin_state (
 
          Config session (get_plugin_name ());
          String user = qPrintable (_ui.userNameLineEdit->text ());
-         session.add_config (string_to_config ("user", "value", user));
+         QByteArray ba = QCryptographicHash::hash (user.get_buffer (), QCryptographicHash::Sha1);
+         session.add_config (
+            string_to_config ("user", "value", qPrintable(QString(ba.toHex ()))));
          set_session_config (context, session);
       }
    }
@@ -181,7 +184,9 @@ dmz::QtPluginLoginChds::_slot_update_dialog () {
       _picture = qPrintable (pictureButton->text ());
       _color = qPrintable (colorButton->text ());
 
-      _user = qPrintable (_ui.userNameLineEdit->text ());
+      QString name = _ui.userNameLineEdit->text ();
+      QByteArray ba = QCryptographicHash::hash (name.toLocal8Bit (), QCryptographicHash::Sha1);
+      _user = qPrintable (QString(ba.toHex ()));
       if (_user) { enabled = True; }
    }
 

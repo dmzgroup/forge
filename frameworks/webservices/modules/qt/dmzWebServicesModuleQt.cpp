@@ -1047,8 +1047,7 @@ dmz::WebServicesModuleQt::_fetch_session () {
       if (requestId) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
-//out << ">>>>> [" << requestId << "] GET: " << DocId << endl;
-out << ">>>>> [" << requestId << "] GET: " << DocId << " url: " << qPrintable(url.toString ()) << " name: " << qPrintable(_state.auth.user ()) << " pw: " << qPrintable(_state.auth.password ()) << endl;
+out << ">>>>> [" << requestId << "] GET: " << DocId << endl;
 #endif
 
          _state.get_request (requestId, FetchSession, 0, DocId, *this);
@@ -1120,7 +1119,7 @@ dmz::WebServicesModuleQt::_post_session () {
       if (requestId) {
 
 #ifdef DMZ_WEBSERVICES_DEBUG
-out << ">>>>> [" << requestId << "] POST: " << DocId << " url: " << qPrintable(url.toString ()) << " name: " << qPrintable(_state.auth.user ()) << " pw: " << qPrintable(_state.auth.password ()) << endl;
+out << ">>>>> [" << requestId << "] POST: " << DocId << endl;
 #endif
 
          _state.get_request (requestId, PostSession, 0, DocId, *this);
@@ -1617,14 +1616,6 @@ dmz::WebServicesModuleQt::_get_url (
    path << _state.serverPath << Database  << "/" << EndPoint;
 
    url.setPath (path.get_buffer ());
-//   if (!_state.adminLogin.empty ()) {
-
-//      url.setUserName (_state.adminLogin.get_buffer ());
-//   }
-//   if (!_state.adminPassword.empty ()) {
-
-//      url.setPassword (_state.adminPassword.get_buffer ());
-//   }
    return url;
 }
 
@@ -1638,14 +1629,6 @@ dmz::WebServicesModuleQt::_get_root_url (const String &EndPoint) const {
    path << _state.serverPath << EndPoint;
 
    url.setPath (path.get_buffer ());
-//   if (!_state.adminLogin.empty ()) {
-
-//      url.setUserName (_state.adminLogin.get_buffer ());
-//   }
-//   if (!_state.adminPassword.empty ()) {
-
-//      url.setPassword (_state.adminPassword.get_buffer ());
-//   }
    return url;
 }
 
