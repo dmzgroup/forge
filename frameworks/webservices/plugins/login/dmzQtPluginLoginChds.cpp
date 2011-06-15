@@ -166,7 +166,7 @@ dmz::QtPluginLoginChds::_slot_dialog_accepted () {
 void
 dmz::QtPluginLoginChds::_slot_dialog_rejected () {
 
-
+   _loginSkippedMsg.send ();
 }
 
 
@@ -373,6 +373,12 @@ dmz::QtPluginLoginChds::_init (Config &local) {
       "message.login-failed",
       local,
       WebServicesLoginFailedMessageName,
+      context);
+
+   _loginSkippedMsg = config_create_message (
+      "message.login-skipped",
+      local,
+      WebServicesLoginSkippedMessageName,
       context);
 
    subscribe_to_message (_loginRequiredMsg);
