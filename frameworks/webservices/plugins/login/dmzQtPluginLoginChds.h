@@ -67,6 +67,10 @@ namespace dmz {
          Message _loginSuccessMsg;
          Message _loginFailedMsg;
          Message _loginSkippedMsg;
+         Message _waitToOpenMsg;
+         Message _allowOpenMsg;
+         Boolean _waitToOpen;
+         Boolean _triedToOpen;
          Boolean _loggedIn;
          QDialog *_loginDialog;
          Ui::LoginDialog _ui;

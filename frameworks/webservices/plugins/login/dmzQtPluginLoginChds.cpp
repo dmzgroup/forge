@@ -24,6 +24,8 @@ dmz::QtPluginLoginChds::QtPluginLoginChds (const PluginInfo &Info, Config &local
       _nameHandle (0),
       _passwordHandle (0),
       _targetHandle (0),
+      _waitToOpen (False),
+      _triedToOpen (False),
       _loggedIn (False),
       _loginDialog (0),
       _pictureGroup (0),
@@ -122,12 +124,25 @@ dmz::QtPluginLoginChds::receive_message (
       const Data *InData,
       Data *outData) {
 
-   if (Type == _loginRequiredMsg) {
+   _log.warn << Type.get_name () << ": " <<  _waitToOpen << " : " << _triedToOpen << endl;
+
+   if (Type == _waitToOpenMsg) { _waitToOpen = true; }
+   else if (Type == _allowOpenMsg) {
+
+      _waitToOpen = false;
+      if (_triedToOpen) {
+
+         _loginDialog->open ();
+         _triedToOpen = false;
+      }
+   }
+   else if (Type == _loginRequiredMsg) {
 
       if (_loginDialog) {
 
          _slot_update_dialog ();
-         _loginDialog->open ();
+         if (!_waitToOpen) { _loginDialog->open (); }
+         else { _triedToOpen = true; }
       }
    }
    else if (Type == _loginSuccessMsg) {
@@ -144,7 +159,11 @@ dmz::QtPluginLoginChds::receive_message (
 
       _loggedIn = False;
 
-      if (_loginDialog) { _loginDialog->open (); }
+      if (_loginDialog) {
+
+        if (!_waitToOpen) { _loginDialog->open (); }
+        else { _triedToOpen = true; }
+      }
    }
 }
 
@@ -381,6 +400,23 @@ dmz::QtPluginLoginChds::_init (Config &local) {
       WebServicesLoginSkippedMessageName,
       context);
 
+   _waitToOpenMsg = config_create_message (
+      "wait-message.name",
+      local,
+      "",
+      context);
+
+   _allowOpenMsg = config_create_message (
+      "allow-message.name",
+      local,
+      "",
+      context);
+
+   _log.warn << _waitToOpenMsg.get_name () << endl;
+   _log.warn << _allowOpenMsg.get_name () << endl;
+
+   subscribe_to_message (_waitToOpenMsg);
+   subscribe_to_message (_allowOpenMsg);
    subscribe_to_message (_loginRequiredMsg);
    subscribe_to_message (_loginSuccessMsg);
    subscribe_to_message (_loginFailedMsg);
