@@ -124,8 +124,6 @@ dmz::QtPluginLoginChds::receive_message (
       const Data *InData,
       Data *outData) {
 
-   _log.warn << Type.get_name () << ": " <<  _waitToOpen << " : " << _triedToOpen << endl;
-
    if (Type == _waitToOpenMsg) { _waitToOpen = true; }
    else if (Type == _allowOpenMsg) {
 
@@ -411,9 +409,6 @@ dmz::QtPluginLoginChds::_init (Config &local) {
       local,
       "",
       context);
-
-   _log.warn << _waitToOpenMsg.get_name () << endl;
-   _log.warn << _allowOpenMsg.get_name () << endl;
 
    subscribe_to_message (_waitToOpenMsg);
    subscribe_to_message (_allowOpenMsg);
