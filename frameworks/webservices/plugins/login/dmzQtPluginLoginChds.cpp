@@ -202,8 +202,8 @@ dmz::QtPluginLoginChds::_slot_update_dialog () {
       _color = qPrintable (colorButton->text ());
 
       QString name = _ui.userNameLineEdit->text ();
-      QByteArray ba = QCryptographicHash::hash (name.toLocal8Bit (), QCryptographicHash::Sha1);
-      _user = qPrintable (QString(ba.toHex ()));
+      QByteArray ba = QCryptographicHash::hash (name.toLower ().toLocal8Bit (), QCryptographicHash::Sha1);
+      _user = qPrintable (QString (ba.toHex ()));
       if (_user) { enabled = True; }
    }
 
