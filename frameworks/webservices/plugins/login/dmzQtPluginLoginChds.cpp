@@ -59,11 +59,11 @@ dmz::QtPluginLoginChds::update_plugin_state (
 
       Config session (get_session_config (get_plugin_name (), context));
 
-//      if (_loginDialog) {
+      if (_loginDialog) {
 
-//         String user = config_to_string ("user.value", session);
-//         _ui.userNameLineEdit->setText (user.get_buffer ());
-//      }
+         String user = config_to_string ("user.value", session);
+         _ui.userNameLineEdit->setText (user.get_buffer ());
+      }
    }
    else if (State == PluginStateStart) {
 
@@ -78,8 +78,7 @@ dmz::QtPluginLoginChds::update_plugin_state (
          Config session (get_plugin_name ());
          String user = qPrintable (_ui.userNameLineEdit->text ());
          QByteArray ba = QCryptographicHash::hash (user.get_buffer (), QCryptographicHash::Sha1);
-         session.add_config (
-            string_to_config ("user", "value", qPrintable(QString(ba.toHex ()))));
+         session.add_config (string_to_config ("user", "value", user));
          set_session_config (context, session);
       }
    }
