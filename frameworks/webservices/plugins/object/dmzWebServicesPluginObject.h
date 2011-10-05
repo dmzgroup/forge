@@ -394,6 +394,7 @@ namespace dmz {
          Handle _nameHandle;
          Handle _dbApp;
          Handle _dbStudent;
+         Handle _dbHandle;
          HandleContainer _activeTable;
          HandleContainer _publishTable;
          StringContainer _fetchTable;
@@ -403,6 +404,8 @@ namespace dmz {
          Message _loginSuccessMsg;
          Message _loginFailedMsg;
          Message _logoutMsg;
+         Message _loginSkippedMsg;
+         Message _loginMsg;
          Config _currentConfig;
          HashTableHandleTemplate<Config> _configTable;
          HashTableHandleTemplate<ObjectLinkStruct> _linkTable;

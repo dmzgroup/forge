@@ -2,6 +2,7 @@
 #include <dmzQtConfigWrite.h>
 #include <dmzQtModuleMainWindow.h>
 #include "dmzQtPluginLoginChds.h"
+#include <dmzRuntimeDefinitions.h>
 #include <dmzRuntimeConfigToNamedHandle.h>
 #include <dmzRuntimeConfigToTypesBase.h>
 #include <dmzRuntimeConfigWrite.h>
@@ -63,6 +64,8 @@ dmz::QtPluginLoginChds::update_plugin_state (
 
          String user = config_to_string ("user.value", session);
          _ui.userNameLineEdit->setText (user.get_buffer ());
+         _lastDB = config_to_string ("database.value", session);
+         _ui.databaseName->setText (_lastDB.get_buffer ());
       }
    }
    else if (State == PluginStateStart) {
@@ -79,6 +82,11 @@ dmz::QtPluginLoginChds::update_plugin_state (
          String user = qPrintable (_ui.userNameLineEdit->text ());
          QByteArray ba = QCryptographicHash::hash (user.get_buffer (), QCryptographicHash::Sha1);
          session.add_config (string_to_config ("user", "value", user));
+         String database =
+            _ui.checkBox->isChecked() ?
+               _defaultDatabase :
+               qPrintable (_ui.databaseName->text ());
+         session.add_config (string_to_config ("database", "value", database));
          set_session_config (context, session);
       }
    }
@@ -173,8 +181,13 @@ dmz::QtPluginLoginChds::_slot_dialog_accepted () {
       Data data;
       data.store_string (_nameHandle, 0, _user);
       data.store_string (_passwordHandle, 0, _picture + _color);
+      data.store_string (
+         _databaseHandle,
+         0,
+         _ui.checkBox->isChecked () ? _defaultDatabase : _database);
 
-      _loginMsg.send (_targetHandle, &data);
+//      _loginMsg.send (_targetHandle, &data);
+      _loginMsg.send (&data);
    }
 }
 
@@ -182,7 +195,9 @@ dmz::QtPluginLoginChds::_slot_dialog_accepted () {
 void
 dmz::QtPluginLoginChds::_slot_dialog_rejected () {
 
-   _loginSkippedMsg.send ();
+   Data data;
+   data.store_string (_databaseHandle, 0, _lastDB);
+   _loginSkippedMsg.send (&data);
 }
 
 
@@ -203,6 +218,7 @@ dmz::QtPluginLoginChds::_slot_update_dialog () {
       QString name = _ui.userNameLineEdit->text ();
       QByteArray ba = QCryptographicHash::hash (name.toLower ().toLocal8Bit (), QCryptographicHash::Sha1);
       _user = qPrintable (QString (ba.toHex ()));
+      _database = qPrintable (_ui.databaseName->text ());
       if (_user) { enabled = True; }
    }
 
@@ -218,6 +234,9 @@ dmz::QtPluginLoginChds::_create_dialog (QWidget *parent) {
 
       _loginDialog = new QDialog (parent);
       _ui.setupUi (_loginDialog);
+
+      _ui.databaseName->hide ();
+      _ui.databaseName->setText (QString (_database.get_buffer ()));
 
       connect (
          _loginDialog, SIGNAL (accepted ()),
@@ -358,6 +377,7 @@ void
 dmz::QtPluginLoginChds::_init (Config &local) {
 
    RuntimeContext *context (get_plugin_runtime_context ());
+   Definitions defs (get_plugin_runtime_context ());
 
    _mainWindowModuleName = config_to_string ("module.main-window.name", local);
 
@@ -366,6 +386,11 @@ dmz::QtPluginLoginChds::_init (Config &local) {
 
    _passwordHandle = config_to_named_handle (
       "attribute.password", local, "password", context);
+
+   _databaseHandle = config_to_named_handle (
+      "attribute.database", local, "database", context);
+
+   _defaultDatabase = config_to_string ("defaultdb.name", local, "");
 
    _loginRequiredMsg = config_create_message (
       "message.login-required",

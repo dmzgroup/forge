@@ -62,6 +62,7 @@ namespace dmz {
          Handle _nameHandle;
          Handle _passwordHandle;
          Handle _targetHandle;
+         Handle _databaseHandle;
          Message _loginRequiredMsg;
          Message _loginMsg;
          Message _loginSuccessMsg;
@@ -79,6 +80,9 @@ namespace dmz {
          Config _colorConfig;
          QButtonGroup *_colorGroup;
          String _user;
+         String _database;
+         String _defaultDatabase;
+         String _lastDB;
          String _color;
          String _picture;
 

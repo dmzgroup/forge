@@ -367,7 +367,16 @@ dmz::WebServicesPluginObject::receive_message (
       const Data *InData,
       Data *outData) {
 
-   if (Type == _loginSuccessMsg) {
+   if (Type == _loginMsg) {
+
+      String dbName;
+      if (InData->lookup_string (_dbHandle, 0, dbName)) {
+
+         _dbApp = _defs.create_named_handle (dbName);
+      }
+      else { _dbApp = 0; }
+   }
+   else if (Type == _loginSuccessMsg) {
 
       if (_webservices) {
 
@@ -388,12 +397,7 @@ dmz::WebServicesPluginObject::receive_message (
          }
       }
    }
-   else if (Type == _loginFailedMsg) {
-
-      _online = False;
-      _dbApp = 0;
-   }
-   else if (Type == _logoutMsg) {
+   else if ((Type == _loginFailedMsg) || (Type == _logoutMsg) || (Type == _loginSkippedMsg)) {
 
       _online = False;
       _dbApp = 0;
@@ -2007,27 +2011,43 @@ dmz::WebServicesPluginObject::_init (Config &local) {
 
    _dbStudent = config_to_named_handle ("db.student", local, "students", context);
 
+   _dbHandle = config_to_named_handle ("attribute.database", local, "database", context);
+
    _loginSuccessMsg = config_create_message (
       "message.login-success",
       local,
       WebServicesLoginSuccessMessageName,
-       context);
+      context);
 
    _loginFailedMsg = config_create_message (
       "message.login-failed",
       local,
       WebServicesLoginFailedMessageName,
-       context);
+      context);
 
    _logoutMsg = config_create_message (
       "message.logout",
       local,
       WebServicesLogoutMessageName,
-       context);
+      context);
+
+   _loginSkippedMsg = config_create_message (
+      "message.login-skipped",
+      local,
+      WebServicesLoginSkippedMessageName,
+      context);
+
+   _loginMsg = config_create_message (
+      "message.login",
+      local,
+      WebServicesLoginMessageName,
+      context);
 
    subscribe_to_message (_loginSuccessMsg);
    subscribe_to_message (_loginFailedMsg);
    subscribe_to_message (_logoutMsg);
+   subscribe_to_message (_loginSkippedMsg);
+   subscribe_to_message (_loginMsg);
 
    // add internal attributes to filter
    FilterStruct *fs (new FilterStruct);
