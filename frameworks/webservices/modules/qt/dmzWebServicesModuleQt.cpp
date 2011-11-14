@@ -158,6 +158,7 @@ struct dmz::WebServicesModuleQt::State {
    Message loginMsg;
    Message loginSuccessMsg;
    Message loginFailedMsg;
+   Message loginErrorMsg;
    Message logoutMsg;
    Boolean loggedIn;
    Boolean fetchingSession;
@@ -750,6 +751,13 @@ dmz::WebServicesModuleQt::_authenticate (const Boolean GetSession) {
 
 
 void
+dmz::WebServicesModuleQt::_connect_error () {
+
+   _state.loginErrorMsg.send (_state.targetHandle);
+}
+
+
+void
 dmz::WebServicesModuleQt::_reply_download_progress (
       const UInt64 RequestId,
       QNetworkReply *reply,
@@ -944,6 +952,7 @@ out << "<---- [" << request.Id << "]"
 
       request.data.store_attribute ("conflict", "true");
    }
+   else if (request.statusCode == 0) { _connect_error (); }
 
 //_state.log.error << "_handle_error[" << request.Id << "]: " << request.statusCode << endl;
 //_state.log.error << "reason: " << config_to_string ("reason", request.data) << endl;
@@ -1709,6 +1718,12 @@ dmz::WebServicesModuleQt::_init (Config &local) {
       "message.login-failed",
       local,
       WebServicesLoginFailedMessageName,
+      context);
+
+   _state.loginErrorMsg = config_create_message (
+      "message.login-error",
+      local,
+      WebServicesLoginErrorMessageName,
       context);
 
    _state.logoutMsg = config_create_message (

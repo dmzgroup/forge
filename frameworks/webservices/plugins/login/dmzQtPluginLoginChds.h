@@ -68,6 +68,7 @@ namespace dmz {
          Message _loginSuccessMsg;
          Message _loginFailedMsg;
          Message _loginSkippedMsg;
+         Message _loginErrorMsg;
          Message _waitToOpenMsg;
          Message _allowOpenMsg;
          Boolean _waitToOpen;

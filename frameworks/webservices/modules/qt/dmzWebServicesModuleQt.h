@@ -205,6 +205,7 @@ namespace dmz {
 
          Boolean _handle_continuous_feed (RequestStruct &request);
          Boolean _authenticate (const Boolean GetSession = True);
+         void _connect_error ();
 
          QUrl _get_url (const String &Database, const String &EndPoint) const;
          QUrl _get_root_url (const String &EndPoint) const;

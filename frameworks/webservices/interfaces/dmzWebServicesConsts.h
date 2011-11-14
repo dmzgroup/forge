@@ -21,6 +21,7 @@ namespace dmz {
    const char WebServicesLoginMessageName[]         = "Login_Message";
    const char WebServicesLoginSuccessMessageName[]  = "Login_Success_Message";
    const char WebServicesLoginFailedMessageName[]   = "Login_Failed_Message";
+   const char WebServicesLoginErrorMessageName[]   = "Login_Error_Message";
    const char WebServicesLoginSkippedMessageName[]  = "Login_Skipped_Message";
    const char WebServicesLogoutMessageName[]        = "Logout_Message";
 

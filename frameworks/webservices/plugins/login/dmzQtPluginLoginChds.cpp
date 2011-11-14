@@ -170,6 +170,13 @@ dmz::QtPluginLoginChds::receive_message (
         else { _triedToOpen = true; }
       }
    }
+   else if (Type == _loginErrorMsg) {
+
+      Data data;
+      data.store_string (_databaseHandle, 0, _lastDB);
+      _loginErrorMsg.send (&data);
+      _loginSkippedMsg.send (&data);
+   }
 }
 
 
@@ -422,6 +429,12 @@ dmz::QtPluginLoginChds::_init (Config &local) {
       WebServicesLoginSkippedMessageName,
       context);
 
+   _loginErrorMsg = config_create_message (
+      "message.login-error",
+      local,
+      WebServicesLoginErrorMessageName,
+      context);
+
    _waitToOpenMsg = config_create_message (
       "wait-message.name",
       local,
@@ -439,6 +452,7 @@ dmz::QtPluginLoginChds::_init (Config &local) {
    subscribe_to_message (_loginRequiredMsg);
    subscribe_to_message (_loginSuccessMsg);
    subscribe_to_message (_loginFailedMsg);
+   subscribe_to_message (_loginErrorMsg);
 
    _targetHandle = config_to_named_handle ("login-target.name", local, context);
 
