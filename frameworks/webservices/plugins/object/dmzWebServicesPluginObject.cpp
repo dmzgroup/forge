@@ -201,6 +201,10 @@ dmz::WebServicesPluginObject::handle_error (
       _log.warn << "Config updated conflict." << endl;
 //      _fetch (Database, Id);
    }
+   else if (config_to_boolean ("connect-error", Data)) {
+
+      _log.warn << "Could not connect to database." << endl;
+   }
    else {
 
       if ((Database == _dbApp) && (Id == "_changes") && _webservices) {
