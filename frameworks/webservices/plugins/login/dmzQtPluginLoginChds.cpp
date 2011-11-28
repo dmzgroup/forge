@@ -80,7 +80,6 @@ dmz::QtPluginLoginChds::update_plugin_state (
 
          Config session (get_plugin_name ());
          String user = qPrintable (_ui.userNameLineEdit->text ());
-         QByteArray ba = QCryptographicHash::hash (user.get_buffer (), QCryptographicHash::Sha1);
          session.add_config (string_to_config ("user", "value", user));
          String database =
             _ui.checkBox->isChecked() ?
